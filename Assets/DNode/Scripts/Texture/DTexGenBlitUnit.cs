@@ -19,7 +19,7 @@ namespace DNode {
     protected virtual void Compute(Flow flow, RenderTexture output) {
       Material material = CreateMaterial();
       SetMaterialProperties(flow, material);
-      Graphics.Blit(null, output, material);
+      Blit(flow, output, material);
     }
 
     private Material CreateMaterial() {
@@ -38,5 +38,8 @@ namespace DNode {
 
     protected abstract string ShaderPath { get; }
     protected virtual void SetMaterialProperties(Flow flow, Material material) {}
+    protected virtual void Blit(Flow flow, RenderTexture output, Material material) {
+      Graphics.Blit(null, output, material);
+    }
   }
 }
