@@ -1,4 +1,7 @@
-﻿namespace DNode {
+﻿using Unity.VisualScripting;
+
+namespace DNode {
+  [TypeIcon(typeof(string))]
   public struct DIOFrameInputAddressSpec {
     public string Address;
 

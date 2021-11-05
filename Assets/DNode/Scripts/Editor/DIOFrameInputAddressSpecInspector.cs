@@ -12,6 +12,8 @@ namespace DNode {
   public class DIOFrameInputAddressSpecInspector : Inspector {
     private const int _buttonWidth = 80;
 
+    private static readonly Func<string[]> _getAllAddressesFunc = UnityEditorUtils.RateLimitedFunc(1.0f, () => Klak.Spout.SpoutManager.GetSourceNames().Concat(Klak.Syphon.SyphonClient.ServerList.Select(name => name.appName)).ToArray());
+
     public DIOFrameInputAddressSpecInspector(Metadata metadata) : base(metadata) {}
 
     protected override void OnGUI(Rect position, GUIContent label) {
@@ -28,7 +30,7 @@ namespace DNode {
         stringAddressChanged = check.changed;
       }
 
-      string[] allAddresses = Klak.Spout.SpoutManager.GetSourceNames();
+      string[] allAddresses = _getAllAddressesFunc.Invoke() ?? Array.Empty<string>();
       int selectedIndex = Array.IndexOf(allAddresses, oldValue.Address);
       bool selectedIndexChanged = false;
       int newSelectedIndex;

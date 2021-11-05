@@ -6,15 +6,16 @@ using UnityEngine;
 
 namespace DNode {
   public class DIOFrameOutput : DIOOutputNode {
+    [DoNotSerialize] public ValueInput Source;
     [DoNotSerialize] public ValueInput Input;
     [DoNotSerialize] public ValueInput Bypass;
     [DoNotSerialize] public ValueInput SizeSource;
     [DoNotSerialize] public ValueInput Address;
     [DoNotSerialize] public ValueInput UseAlphaChannel;
 
-    private static Klak.Spout.SpoutResources _spoutResources;
     private RenderTexture _outputTexture;
-    private Klak.Spout.SpoutSender _sender;
+    private DIOFrameIOTechnique _currentTechnique;
+    private IFrameSender _sender;
 
     public override void AfterAdd() {
       base.AfterAdd();
@@ -25,28 +26,24 @@ namespace DNode {
       StopSender();
     }
 
-    private void StartSender() {
-      if (_sender) {
+    private void StartSender(DIOFrameIOTechnique technique) {
+      if (_sender?.IsAlive == true && _currentTechnique == technique) {
         return;
       }
-      if (!_spoutResources) {
-        _spoutResources = ScriptableObject.CreateInstance<Klak.Spout.SpoutResources>();
-        _spoutResources.blitShader = Shader.Find("Hidden/Klak/Spout/Blit");
-      }
-      var gameObject = new GameObject(nameof(DIOFrameInput), typeof(Klak.Spout.SpoutSender));
-      _sender = gameObject.GetComponent<Klak.Spout.SpoutSender>();
-      _sender.SetResources(_spoutResources);
-      _sender.captureMethod = Klak.Spout.CaptureMethod.Texture;
+      StopSender();
+      _currentTechnique = technique;
+      _sender = FrameSenders.CreateSender(technique);
+      _sender.StartSender();
     }
 
     private void StopSender() {
-      if (!_sender) {
+      if (_sender?.IsAlive != true) {
         return;
       }
       var sender = _sender;
       var outputTexture = _outputTexture;
       DScriptMachine.DelayCall(() => {
-        UnityUtils.Destroy(sender.gameObject);
+        sender?.Dispose();
         UnityUtils.Destroy(outputTexture);
       });
       _sender = null;
@@ -54,6 +51,7 @@ namespace DNode {
     }
 
     protected override void Definition() {
+      Source = ValueInput<DIOFrameIOTechnique>("Source", DIOFrameIOTechnique.DefaultLocal);
       Input = ValueInput<DFrameTexture>("Input", default);
       Bypass = ValueInput<bool>("Bypass", false);
       SizeSource = ValueInput<TextureSizeSource>("Size", TextureSizeSource.Source);
@@ -68,9 +66,10 @@ namespace DNode {
         return;
       }
 
-      StartSender();
-      _sender.spoutName = flow.GetValue<string>(Address);
-      _sender.keepAlpha = flow.GetValue<bool>(UseAlphaChannel);
+      StartSender(flow.GetValue<DIOFrameIOTechnique>(Source));
+      _sender.Name = flow.GetValue<string>(Address);
+      _sender.UseAlphaChannel = flow.GetValue<bool>(UseAlphaChannel);
+      _sender.StartSender();
 
       if (flow.GetValue<bool>(Bypass)) {
         return;
@@ -80,10 +79,10 @@ namespace DNode {
       Vector2Int size = RenderTextureCache.GetSizeFromSource(input, sizeSource);
       if (_outputTexture == null || _outputTexture.width != size.x || _outputTexture.height != size.y) {
         UnityUtils.Destroy(_outputTexture);
-        _outputTexture = new RenderTexture(size.x, size.y, depth: 0, input.graphicsFormat, mipCount: 0);
+        _outputTexture = new RenderTexture(size.x, size.y, depth: 0, RenderTextureFormat.BGRA32, mipCount: 0);
         _outputTexture.autoGenerateMips = false;
-        _sender.sourceTexture = _outputTexture;
       }
+      _sender.TextureToSend = _outputTexture;
       Graphics.Blit(input, _outputTexture);
     }
   }

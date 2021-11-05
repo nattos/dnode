@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Unity.VisualScripting;
 using UnityEngine;
+using UnityEditor;
 
 namespace DNode {
   public static class UnityEditorUtils {
@@ -72,6 +73,32 @@ namespace DNode {
 
     public static bool IsFieldEditable(Metadata metadata) {
       return metadata.parent.parent.isEditable;
+    }
+
+    public static Func<TResult> RateLimitedFunc<TResult>(float minDelaySeconds, Func<TResult> func) {
+      double lastCalledTime = float.MinValue;
+      TResult cachedValue = default;
+      return () => {
+        double time = EditorApplication.timeSinceStartup;
+        if (time - lastCalledTime > minDelaySeconds) {
+          lastCalledTime = time;
+          cachedValue = func.Invoke();
+        }
+        return cachedValue;
+      };
+    }
+
+    public static Func<TData, TResult> RateLimitedFunc<TData, TResult>(float minDelaySeconds, Func<TData, TResult> func) {
+      double lastCalledTime = float.MinValue;
+      TResult cachedValue = default;
+      return data => {
+        double time = EditorApplication.timeSinceStartup;
+        if (time - lastCalledTime > minDelaySeconds) {
+          lastCalledTime = time;
+          cachedValue = func.Invoke(data);
+        }
+        return cachedValue;
+      };
     }
   }
 }
