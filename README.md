@@ -30,6 +30,9 @@ To create a new graph, either copy an existing one, renaming it, or, to create a
 
 1. Currently, only one "DRenderToTexture" node is supported per graph. Further nodes will cause objects to appear in both scenes
 1. Currently only one camera, the global camera, is supported
+1. Syphon on Mac isn't actually supported (even though it appears as an option in the dropdown)
+1. NDI isn't actually supported (even though it appears as an option in the dropdown)
+1. Ableton Link support only works on Windows (the native DLL needs to be compiled for Mac)
 
 ## License
 
