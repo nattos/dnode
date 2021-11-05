@@ -1,8 +1,9 @@
 ﻿using System.Linq;
+using UnityEngine;
 using Unity.VisualScripting;
 
 namespace DNode {
-  public class D3DRenderToTexture : DFrameUnit {
+  public class D3DRenderToTexture : DTexUnit {
     [DoNotSerialize][PortLabelHidden] public ValueInput Inputs;
 
     [DoNotSerialize]
@@ -20,7 +21,9 @@ namespace DNode {
         if (!Inputs.connections.Any()) {
           return UnityUtils.BlankTexture;
         }
-        return DScriptMachine.CurrentInstance.RenderNodesToTexture(flow.GetValue<DFrameNodes>(Inputs), SizeSource);
+        Texture result = DScriptMachine.CurrentInstance.RenderNodesToTexture(flow.GetValue<DFrameNodes>(Inputs), SizeSource);
+        BlitToDebugCaptureTexture(result);
+        return result;
       }
       result = ValueOutput<DFrameTexture>("result", DNodeUtils.CachePerFrame(ComputeFromFlow));
     }

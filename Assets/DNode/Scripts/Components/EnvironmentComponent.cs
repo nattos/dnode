@@ -19,6 +19,22 @@ namespace DNode {
     public FrameComponentField<UnityEngine.Rendering.Volume, float> FogBaseHeight;
     public FrameComponentField<UnityEngine.Rendering.Volume, float> FogMaxHeight;
 
+    public FrameComponentField<UnityEngine.Rendering.Volume, float> ExposureCompensation;
+
+    public FrameComponentField<UnityEngine.Rendering.Volume, float> MotionBlurIntensity;
+
+    public FrameComponentField<UnityEngine.Rendering.Volume, UnityEngine.Rendering.HighDefinition.FilmGrainLookup> FilmGrainType;
+    public FrameComponentField<UnityEngine.Rendering.Volume, float> FilmGrainIntensity;
+    public FrameComponentField<UnityEngine.Rendering.Volume, float> FilmGrainResponse;
+
+    public FrameComponentField<UnityEngine.Rendering.Volume, float> BloomThreshold;
+    public FrameComponentField<UnityEngine.Rendering.Volume, float> BloomIntensity;
+    public FrameComponentField<UnityEngine.Rendering.Volume, float> BloomScatter;
+    public FrameComponentField<UnityEngine.Rendering.Volume, Color> BloomTint;
+
+    public FrameComponentField<UnityEngine.Rendering.Volume, float> AmbientOcclusionIntensity;
+    public FrameComponentField<UnityEngine.Rendering.Volume, float> AmbientOcclusionRadius;
+
     protected override IEnumerable<IFrameComponentField> GetFields() {
       UnityEngine.Rendering.Volume volume = GetComponent<UnityEngine.Rendering.Volume>();
 
@@ -52,6 +68,52 @@ namespace DNode {
       yield return FogAttenuationDistance = FogSettingsField(volume, self => self.depthExtent.value, (self, value) => self.depthExtent.value = value);
       yield return FogBaseHeight = FogSettingsField(volume, self => self.baseHeight.value, (self, value) => self.baseHeight.value = value);
       yield return FogMaxHeight = FogSettingsField(volume, self => self.maximumHeight.value, (self, value) => self.maximumHeight.value = value);
+
+      FrameComponentField<UnityEngine.Rendering.Volume, TValue> ExposureSettingsField<TValue>(
+          UnityEngine.Rendering.Volume innerVolume,
+          Func<UnityEngine.Rendering.HighDefinition.Exposure, TValue> getter, Action<UnityEngine.Rendering.HighDefinition.Exposure, TValue> setter) {
+        return Field<UnityEngine.Rendering.HighDefinition.Exposure, TValue>(innerVolume, getter, setter);
+      }
+
+      yield return ExposureCompensation = ExposureSettingsField(volume, self => self.compensation.value, (self, value) => self.compensation.value = value);
+
+      FrameComponentField<UnityEngine.Rendering.Volume, TValue> MotionBlurSettingsField<TValue>(
+          UnityEngine.Rendering.Volume innerVolume,
+          Func<UnityEngine.Rendering.HighDefinition.MotionBlur, TValue> getter, Action<UnityEngine.Rendering.HighDefinition.MotionBlur, TValue> setter) {
+        return Field<UnityEngine.Rendering.HighDefinition.MotionBlur, TValue>(innerVolume, getter, setter);
+      }
+
+      yield return MotionBlurIntensity = MotionBlurSettingsField(volume, self => self.intensity.value, (self, value) => self.intensity.value = value);
+
+      FrameComponentField<UnityEngine.Rendering.Volume, TValue> FilmGrainSettingsField<TValue>(
+          UnityEngine.Rendering.Volume innerVolume,
+          Func<UnityEngine.Rendering.HighDefinition.FilmGrain, TValue> getter, Action<UnityEngine.Rendering.HighDefinition.FilmGrain, TValue> setter) {
+        return Field<UnityEngine.Rendering.HighDefinition.FilmGrain, TValue>(innerVolume, getter, setter);
+      }
+
+      yield return FilmGrainType = FilmGrainSettingsField(volume, self => self.type.value, (self, value) => self.type.value = value);
+      yield return FilmGrainIntensity = FilmGrainSettingsField(volume, self => self.intensity.value, (self, value) => self.intensity.value = value);
+      yield return FilmGrainResponse = FilmGrainSettingsField(volume, self => self.response.value, (self, value) => self.response.value = value);
+
+      FrameComponentField<UnityEngine.Rendering.Volume, TValue> BloomSettingsField<TValue>(
+          UnityEngine.Rendering.Volume innerVolume,
+          Func<UnityEngine.Rendering.HighDefinition.Bloom, TValue> getter, Action<UnityEngine.Rendering.HighDefinition.Bloom, TValue> setter) {
+        return Field<UnityEngine.Rendering.HighDefinition.Bloom, TValue>(innerVolume, getter, setter);
+      }
+
+      yield return BloomThreshold = BloomSettingsField(volume, self => self.threshold.value, (self, value) => self.threshold.value = value);
+      yield return BloomIntensity = BloomSettingsField(volume, self => self.intensity.value, (self, value) => self.intensity.value = value);
+      yield return BloomScatter = BloomSettingsField(volume, self => self.scatter.value, (self, value) => self.scatter.value = value);
+      yield return BloomTint = BloomSettingsField(volume, self => self.tint.value, (self, value) => self.tint.value = value);
+
+      FrameComponentField<UnityEngine.Rendering.Volume, TValue> AmbientOcclusionSettingsField<TValue>(
+          UnityEngine.Rendering.Volume innerVolume,
+          Func<UnityEngine.Rendering.HighDefinition.AmbientOcclusion, TValue> getter, Action<UnityEngine.Rendering.HighDefinition.AmbientOcclusion, TValue> setter) {
+        return Field<UnityEngine.Rendering.HighDefinition.AmbientOcclusion, TValue>(innerVolume, getter, setter);
+      }
+
+      yield return AmbientOcclusionIntensity = AmbientOcclusionSettingsField(volume, self => self.intensity.value, (self, value) => self.intensity.value = value);
+      yield return AmbientOcclusionRadius = AmbientOcclusionSettingsField(volume, self => self.radius.value, (self, value) => self.radius.value = value);
     }
 
     private static T GetOverride<T>(UnityEngine.Rendering.VolumeProfile profile) where T : UnityEngine.Rendering.VolumeComponent {
