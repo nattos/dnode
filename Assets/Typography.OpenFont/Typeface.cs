@@ -298,7 +298,7 @@ namespace Typography.OpenFont
         public short GetKernDistance(ushort leftGlyphIndex, ushort rightGlyphIndex)
         {
             //DEPRECATED -> use OpenFont layout instead
-            return this.KernTable?.GetKerningDistance(leftGlyphIndex, rightGlyphIndex) ?? 0;
+            return this.KernTable.GetKerningDistance(leftGlyphIndex, rightGlyphIndex);
         }
         //
         public Bounds Bounds { get; private set; }

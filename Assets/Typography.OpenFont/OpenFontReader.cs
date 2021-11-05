@@ -91,13 +91,8 @@ namespace Typography.OpenFont
         /// </summary>
         /// <param name="stream"></param>
         /// <returns></returns>
-        public PreviewFontInfo ReadPreview(Stream stream) {
-          return ReadPreview(stream, readNameOnly: false);
-        }
-        public PreviewFontInfo ReadNamePreview(Stream stream) {
-          return ReadPreview(stream, readNameOnly: true);
-        }
-        private PreviewFontInfo ReadPreview(Stream stream, bool readNameOnly) {
+        public PreviewFontInfo ReadPreview(Stream stream)
+        {
             //var little = BitConverter.IsLittleEndian;
             using (var input = new ByteOrderSwappingBinaryReader(stream))
             {
@@ -112,7 +107,7 @@ namespace Typography.OpenFont
                     for (uint i = 0; i < ttcHeader.numFonts; ++i)
                     {
                         input.BaseStream.Seek(ttcHeader.offsetTables[i], SeekOrigin.Begin);
-                        PreviewFontInfo member = members[i] = ReadActualFontPreview(input, false, readNameOnly);
+                        PreviewFontInfo member = members[i] = ReadActualFontPreview(input, false);
                         member.ActualStreamOffset = ttcHeader.offsetTables[i];
                     }
                     return new PreviewFontInfo(BuildTtcfName(members), members);
@@ -133,7 +128,7 @@ namespace Typography.OpenFont
                 }
                 else
                 {
-                    return ReadActualFontPreview(input, true, readNameOnly);//skip version data (majorVersion, minorVersion)
+                    return ReadActualFontPreview(input, true);//skip version data (majorVersion, minorVersion)
                 }
             }
         }
@@ -187,7 +182,7 @@ namespace Typography.OpenFont
             }
             return ttcHeader;
         }
-        PreviewFontInfo ReadActualFontPreview(ByteOrderSwappingBinaryReader input, bool skipVersionData, bool readNameOnly)
+        PreviewFontInfo ReadActualFontPreview(ByteOrderSwappingBinaryReader input, bool skipVersionData)
         {
             if (!skipVersionData)
             {
@@ -205,7 +200,7 @@ namespace Typography.OpenFont
             {
                 tables.AddEntry(new UnreadTableEntry(ReadTableHeader(input)));
             }
-            return ReadPreviewFontInfo(tables, input, readNameOnly);
+            return ReadPreviewFontInfo(tables, input);
         }
         public Typeface Read(Stream stream, int streamStartOffset = 0, ReadFlags readFlags = ReadFlags.Full)
         { 
@@ -330,14 +325,11 @@ namespace Typography.OpenFont
         }
 
 
-        internal PreviewFontInfo ReadPreviewFontInfo(TableEntryCollection tables, BinaryReader input, bool nameEntryOnly)
+        internal PreviewFontInfo ReadPreviewFontInfo(TableEntryCollection tables, BinaryReader input)
         {
             var rd = new EntriesReaderHelper(tables, input);
 
             NameEntry nameEntry = rd.Read(new NameEntry());
-            if (nameEntryOnly) {
-              return new PreviewFontInfo(nameEntry, os2Table: null, langs: null);
-            }
             OS2Table os2Table = rd.Read(new OS2Table());
             //for preview, read ONLY  script list from gsub and gpos (set OnlyScriptList).
             Meta metaTable = rd.Read(new Meta());

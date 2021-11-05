@@ -1,7 +1,6 @@
 ﻿//Apache2, 2017-present, WinterDev
 //Apache2, 2014-2016, Samuel Carlsson, WinterDev
 
-using System;
 using System.IO;
 using System.Text;
 namespace Typography.OpenFont.Tables
@@ -12,15 +11,6 @@ namespace Typography.OpenFont.Tables
     {
         public const string _N = "name";
         public override string Name => _N;
-
-        private static Encoding GetEncodingOrDefault(int codepage, Encoding defaultValue = null) {
-            try {
-                return Encoding.GetEncoding(20949);
-            } catch (NotSupportedException) {
-                return defaultValue ?? Encoding.UTF8;
-            }
-        }
-
         //
         protected override void ReadContentFrom(BinaryReader reader)
         {
@@ -48,25 +38,14 @@ namespace Typography.OpenFont.Tables
 
                 byte[] buf = reader.ReadBytes(ttRecord.uStringLength);
                 Encoding enc2;
-                switch (ttRecord.uPlatformID) {
-                  case 1: // Windows
-                    switch (ttRecord.uEncodingID) {
-                      case 1: enc2 = GetEncodingOrDefault(1200);  break; // Unicode BMP
-                      case 2: enc2 = GetEncodingOrDefault(932);   break; // ShiftJIS
-                      case 3: enc2 = GetEncodingOrDefault(936);   break; // PCR
-                      case 4: enc2 = GetEncodingOrDefault(950);   break; // Big5
-                      case 5: enc2 = GetEncodingOrDefault(20949); break; // Wansung
-                      case 6: enc2 = GetEncodingOrDefault(1361);  break; // Johab
-                      default: enc2 = Encoding.UTF8; break;
-                    }
-                    break;
-                  default:
-                    if (ttRecord.uEncodingID == 3 || ttRecord.uEncodingID == 1) {
-                        enc2 = Encoding.BigEndianUnicode;
-                    } else {
-                        enc2 = Encoding.UTF8;
-                    }
-                    break;
+                if (ttRecord.uEncodingID == 3 || ttRecord.uEncodingID == 1)
+                {
+
+                    enc2 = Encoding.BigEndianUnicode;
+                }
+                else
+                {
+                    enc2 = Encoding.UTF8;
                 }
                 string strRet = enc2.GetString(buf, 0, buf.Length);
                 //....
@@ -76,33 +55,33 @@ namespace Typography.OpenFont.Tables
                         //skip
                         break;
                     case NameIdKind.VersionString:
-                        VersionString = VersionString ?? strRet;
+                        VersionString = strRet;
                         break;
                     case NameIdKind.FontFamilyName:
-                        FontName = FontName ?? strRet;
+                        FontName = strRet;
                         break;
                     case NameIdKind.FontSubfamilyName:
-                        FontSubFamily = FontSubFamily ?? strRet;
+                        FontSubFamily = strRet;
                         break;
                     case NameIdKind.UniqueFontIden:
-                        UniqueFontIden = UniqueFontIden ?? strRet;
+                        UniqueFontIden = strRet;
                         break;
                     case NameIdKind.FullFontName:
-                        FullFontName = FullFontName ?? strRet;
+                        FullFontName = strRet;
                         break;
                     //
                     case NameIdKind.PostScriptName:
-                        PostScriptName = PostScriptName ?? strRet;
+                        PostScriptName = strRet;
                         break;
                     case NameIdKind.PostScriptCID_FindfontName:
-                        PostScriptCID_FindfontName = PostScriptCID_FindfontName ?? strRet;
+                        PostScriptCID_FindfontName = strRet;
                         break;
                     //
                     case NameIdKind.TypographicFamilyName:
-                        TypographicFamilyName = TypographicFamilyName ?? strRet;
+                        TypographicFamilyName = strRet;
                         break;
                     case NameIdKind.TypographyicSubfamilyName:
-                        TypographyicSubfamilyName = TypographyicSubfamilyName ?? strRet;
+                        TypographyicSubfamilyName = strRet;
                         break;
 
                 }

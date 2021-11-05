@@ -132,7 +132,7 @@ namespace Typography.OpenFont.WebFont
                     {
                         decompressStream.Position = 0;
                         OpenFontReader openFontReader = new OpenFontReader();
-                        PreviewFontInfo previewFontInfo = openFontReader.ReadPreviewFontInfo(tableEntryCollection, reader2, nameEntryOnly: false);
+                        PreviewFontInfo previewFontInfo = openFontReader.ReadPreviewFontInfo(tableEntryCollection, reader2);
                         if (previewFontInfo != null)
                         {
                             //add webfont info to this preview font

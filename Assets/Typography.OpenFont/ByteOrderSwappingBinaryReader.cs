@@ -9,8 +9,8 @@ namespace Typography.OpenFont
     {
         //All OpenType fonts use Motorola-style byte ordering (Big Endian)
         //
-        public ByteOrderSwappingBinaryReader(Stream input, bool leaveOpen = true)
-            : base(input, System.Text.Encoding.UTF8, leaveOpen: leaveOpen)
+        public ByteOrderSwappingBinaryReader(Stream input)
+            : base(input)
         {
         }
         protected override void Dispose(bool disposing)

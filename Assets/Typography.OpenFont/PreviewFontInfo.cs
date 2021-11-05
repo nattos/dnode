@@ -30,8 +30,8 @@ namespace Typography.OpenFont
 
             Name = nameEntry.FontName;
             SubFamilyName = nameEntry.FontSubFamily;
-            OS2TranslatedStyle = os2Table == null ? default : Extensions.TypefaceExtensions.TranslateOS2FontStyle(os2Table);
-            OS2FsSelection = os2Table == null ? default : Extensions.TypefaceExtensions.TranslateOS2FsSelection(os2Table);
+            OS2TranslatedStyle = Extensions.TypefaceExtensions.TranslateOS2FontStyle(os2Table);
+            OS2FsSelection = Extensions.TypefaceExtensions.TranslateOS2FsSelection(os2Table);
         }
         internal PreviewFontInfo(string fontName, PreviewFontInfo[] ttcfMembers)
         {

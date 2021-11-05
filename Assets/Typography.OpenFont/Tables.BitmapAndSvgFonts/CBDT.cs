@@ -63,7 +63,7 @@ namespace Typography.OpenFont.Tables
                     _ms = null;
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
                 //
             }
