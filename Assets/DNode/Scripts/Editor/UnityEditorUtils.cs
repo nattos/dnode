@@ -50,9 +50,8 @@ namespace DNode {
       return rect;
     }
 
-    public static string GetFieldLabel(Metadata metadata) {
-      if (metadata.parent.parent.HasAttribute<LabelAttribute>()) {
-        var attribute = metadata.parent.parent.GetAttribute<LabelAttribute>();
+    public static string GetFieldLabel(Metadata metadata, AttributeCache attributeCache) {
+      if (attributeCache.TryGetAttribute<LabelAttribute>(metadata, out LabelAttribute attribute)) {
         return attribute.Label;
       }
       return metadata.parent.parent.label?.text;

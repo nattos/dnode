@@ -12,6 +12,8 @@ namespace DNode {
   public class DValueInspector : Inspector {
     private static readonly List<double> _staticValues = new List<double>();
 
+    private readonly AttributeCache _attributeCache = new AttributeCache();
+
     public DValueInspector(Metadata metadata) : base(metadata) {}
 
     private struct FieldState {
@@ -51,14 +53,14 @@ namespace DNode {
       public bool HasValue => PortState != PortState.ConnectedUnknown && PortState != PortState.ConnectedEventDeferred;
     }
 
-    public static bool DValueField(Rect rect, Metadata metadata, DValue inValue, out DValue outValue) {
+    public static bool DValueField(Rect rect, Metadata metadata, DValue inValue, AttributeCache attributeCache, out DValue outValue) {
       outValue = inValue;
-      if (UnityEditorUtils.TryGetAttribute<NoEditorAttribute>(metadata, out _)) {
+      if (attributeCache.TryGetAttribute<NoEditorAttribute>(metadata, out _)) {
         return false;
       }
 
       PortState portState;
-      string label = UnityEditorUtils.GetFieldLabel(metadata);
+      string label = UnityEditorUtils.GetFieldLabel(metadata, attributeCache);
       if (UnityEditorUtils.IsFieldEditable(metadata)) {
         portState = PortState.NotConnected;
       } else {
@@ -92,14 +94,14 @@ namespace DNode {
       }
 
       _staticValues.Clear();
-      UnityEditorUtils.TryGetAttribute<RangeAttribute>(metadata, out var rangeAttrib);
-      UnityEditorUtils.TryGetAttribute<VectorAttribute>(metadata, out var vectorAttrib);
+      attributeCache.TryGetAttribute<RangeAttribute>(metadata, out var rangeAttrib);
+      attributeCache.TryGetAttribute<VectorAttribute>(metadata, out var vectorAttrib);
       int dims = vectorAttrib?.Dims ?? 1;
       float dimPartWidth = rect.width / dims;
 
-      bool isBool = UnityEditorUtils.TryGetAttribute<BooleanAttribute>(metadata, out _);
-      UnityEditorUtils.TryGetAttribute<ClampModeAttribute>(metadata, out var clampAttrib);
-      bool isLog = UnityEditorUtils.TryGetAttribute<LogScaleAttribute>(metadata, out var logScaleAttrib);
+      bool isBool = attributeCache.TryGetAttribute<BooleanAttribute>(metadata, out _);
+      attributeCache.TryGetAttribute<ClampModeAttribute>(metadata, out var clampAttrib);
+      bool isLog = attributeCache.TryGetAttribute<LogScaleAttribute>(metadata, out var logScaleAttrib);
 
       ValueState state = new ValueState {
           PortState = portState,
@@ -112,7 +114,7 @@ namespace DNode {
       };
 
       EditorGUI.BeginChangeCheck();
-      if (UnityEditorUtils.TryGetAttribute<ColorAttribute>(metadata, out _)) {
+      if (attributeCache.TryGetAttribute<ColorAttribute>(metadata, out _)) {
         Color outColor = EditorGUI.ColorField(rect, label: GUIContent.none, inValue, showEyedropper: true, showAlpha: true, hdr: true);
         _staticValues.Add(outColor.r);
         _staticValues.Add(outColor.g);
@@ -155,24 +157,26 @@ namespace DNode {
       }
     }
 
-    public static (float width, float height) GetDValidFieldSize(Metadata metadata) {
-      if (UnityEditorUtils.TryGetAttribute<NoEditorAttribute>(metadata, out _)) {
+    public static (float width, float height) GetDValidFieldSize(Metadata metadata, AttributeCache attributeCache) {
+      if (attributeCache.TryGetAttribute<NoEditorAttribute>(metadata, out _)) {
         return (0, EditorGUIUtility.singleLineHeight);
       }
-      if (UnityEditorUtils.TryGetAttribute<ShortEditorAttribute>(metadata, out _) ||
-          !UnityEditorUtils.TryGetAttribute<RangeAttribute>(metadata, out _)) {
+      if (attributeCache.TryGetAttribute<ShortEditorAttribute>(metadata, out _) ||
+          !attributeCache.TryGetAttribute<RangeAttribute>(metadata, out _)) {
         return (100, EditorGUIUtility.singleLineHeight);
       }
       return (200, EditorGUIUtility.singleLineHeight);
     }
 
     protected override void OnGUI(Rect position, GUIContent label) {
-      position = BeginLabeledBlock(metadata, position, label);
+      // position = BeginLabeledBlock(metadata, position, label);
+      EditorGUI.BeginChangeCheck();
       var rect = new Rect(position.x, position.y, position.width, EditorGUIUtility.singleLineHeight);
 
-      DValueField(rect, metadata, (DValue)metadata.value, out DValue outValue);
+      DValueField(rect, metadata, (DValue)metadata.value, _attributeCache, out DValue outValue);
 
-      if (EndBlock(metadata)) {
+      // if (EndBlock(metadata)) {
+      if (EditorGUI.EndChangeCheck()) {
         metadata.RecordUndo();
         metadata.value = (DValue)outValue;
       }
@@ -182,11 +186,11 @@ namespace DNode {
     protected override void OnEditorPrefGUI(Rect position, GUIContent label) {}
 
     protected override float GetHeight(float width, GUIContent label) {
-      return GetDValidFieldSize(metadata).height;
+      return GetDValidFieldSize(metadata, _attributeCache).height;
     }
 
     public override float GetAdaptiveWidth() {
-      return GetDValidFieldSize(metadata).width;
+      return GetDValidFieldSize(metadata, _attributeCache).width;
     }
 
     private const double _sliderFineDragDistance = 4000.0;
@@ -317,6 +321,9 @@ namespace DNode {
       if (e.clickCount < 2) {
         DragNumber(rect, controlId, ref value, defaultValue, state, fieldState, ref vectorState);
         vectorState.HadFirstDim = true;
+      } else {
+        GUIUtility.hotControl = 0;
+        GUIUtility.keyboardControl = 0;
       }
       bool isDraggingValue = DragNumberIsDragging(controlId);
       bool forceLabels = e.alt && e.CtrlOrCmd();
