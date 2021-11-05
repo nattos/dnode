@@ -1,4 +1,5 @@
-﻿//Apache2, 2017-present, WinterDev
+﻿//Apache2, 2021, Nathaniel Wong - suppressed unused variable warnings
+//Apache2, 2017-present, WinterDev
 //Apache2, 2014-2016, Samuel Carlsson, WinterDev
 
 using System;
@@ -12,7 +13,7 @@ namespace Typography.OpenFont
         /// <summary>
         /// glyph info has only essential layout detail (this is our extension)
         /// </summary>
-        readonly bool _onlyLayoutEssMode;
+        //readonly bool _onlyLayoutEssMode;
         bool _hasOrgAdvWidth;       //FOUND in all mode
 
         internal Glyph(
@@ -281,7 +282,7 @@ namespace Typography.OpenFont
         private Glyph(ushort glyphIndex)
         {
             //for Clone_NO_BuildingInstructions()
-            _onlyLayoutEssMode = true;
+            //_onlyLayoutEssMode = true;
             GlyphIndex = glyphIndex;
         }
 

@@ -1,4 +1,5 @@
-﻿//Apache2, 2017-present, WinterDev
+﻿//Apache2, 2021, Nathaniel Wong - stop throwing exceptions when no KernTable exists.
+//Apache2, 2017-present, WinterDev
 //Apache2, 2014-2016, Samuel Carlsson, WinterDev
 using System;
 using System.Collections.Generic;
@@ -298,7 +299,7 @@ namespace Typography.OpenFont
         public short GetKernDistance(ushort leftGlyphIndex, ushort rightGlyphIndex)
         {
             //DEPRECATED -> use OpenFont layout instead
-            return this.KernTable.GetKerningDistance(leftGlyphIndex, rightGlyphIndex);
+            return this.KernTable?.GetKerningDistance(leftGlyphIndex, rightGlyphIndex) ?? 0;
         }
         //
         public Bounds Bounds { get; private set; }

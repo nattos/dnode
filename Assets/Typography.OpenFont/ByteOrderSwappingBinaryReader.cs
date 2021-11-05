@@ -1,4 +1,5 @@
-﻿//Apache2, 2014-2016, Samuel Carlsson, WinterDev
+﻿//Apache2, 2021, Nathaniel Wong - Added leaveOpen parameter to allow seeking properly.
+//Apache2, 2014-2016, Samuel Carlsson, WinterDev
 
 using System;
 using System.IO;
@@ -9,8 +10,8 @@ namespace Typography.OpenFont
     {
         //All OpenType fonts use Motorola-style byte ordering (Big Endian)
         //
-        public ByteOrderSwappingBinaryReader(Stream input)
-            : base(input)
+        public ByteOrderSwappingBinaryReader(Stream input, bool leaveOpen = true)
+            : base(input, System.Text.Encoding.UTF8, leaveOpen: leaveOpen)
         {
         }
         protected override void Dispose(bool disposing)

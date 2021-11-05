@@ -1,4 +1,5 @@
-﻿//MIT, 2019-present, WinterDev
+﻿//MIT, 2021, Nathaniel Wong - suppressed unused variable warning
+//MIT, 2019-present, WinterDev
 using System;
 using System.IO;
 using Typography.OpenFont.Tables.BitmapFonts;
@@ -63,7 +64,7 @@ namespace Typography.OpenFont.Tables
                     _ms = null;
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 //
             }

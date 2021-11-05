@@ -1,4 +1,5 @@
-﻿//MIT, 2019-present, WinterDev 
+﻿//MIT, 2021, Nathaniel Wong - suppress unused variable warnings
+//MIT, 2019-present, WinterDev 
 using System.IO;
 using System.Collections.Generic;
 
@@ -681,22 +682,22 @@ namespace Typography.OpenFont.WebFont
                 float scale10 = 0;
                 float yscale = 1;
 
-                bool useMatrix = false;
+                //bool useMatrix = false;
                 //-----------------------------------------
-                bool hasScale = false;
+                //bool hasScale = false;
                 if (Glyf.HasFlag(flags, Glyf.CompositeGlyphFlags.WE_HAVE_A_SCALE))
                 {
                     //If the bit WE_HAVE_A_SCALE is set,
                     //the scale value is read in 2.14 format-the value can be between -2 to almost +2.
                     //The glyph will be scaled by this value before grid-fitting. 
                     xscale = yscale = reader.ReadF2Dot14(); /* Format 2.14 */
-                    hasScale = true;
+                    //hasScale = true;
                 }
                 else if (Glyf.HasFlag(flags, Glyf.CompositeGlyphFlags.WE_HAVE_AN_X_AND_Y_SCALE))
                 {
                     xscale = reader.ReadF2Dot14(); /* Format 2.14 */
                     yscale = reader.ReadF2Dot14(); /* Format 2.14 */
-                    hasScale = true;
+                    //hasScale = true;
                 }
                 else if (Glyf.HasFlag(flags, Glyf.CompositeGlyphFlags.WE_HAVE_A_TWO_BY_TWO))
                 {
@@ -714,8 +715,8 @@ namespace Typography.OpenFont.WebFont
                     //(or would need to be explicitly set with TrueType instructions).
 
                     //Note that the behavior of the USE_MY_METRICS operation is undefined for rotated composite components. 
-                    useMatrix = true;
-                    hasScale = true;
+                    //useMatrix = true;
+                    //hasScale = true;
                     xscale = reader.ReadF2Dot14(); /* Format 2.14 */
                     scale01 = reader.ReadF2Dot14(); /* Format 2.14 */
                     scale10 = reader.ReadF2Dot14();/* Format 2.14 */
@@ -1396,7 +1397,7 @@ namespace Typography.OpenFont.WebFont
                 {
                     TableEntryCollection tableEntryCollection = CreateTableEntryCollection(woff2TablDirs);
                     OpenFontReader openFontReader = new OpenFontReader();
-                    return openFontReader.ReadPreviewFontInfo(tableEntryCollection, reader2);
+                    return openFontReader.ReadPreviewFontInfo(tableEntryCollection, reader2, nameEntryOnly: false);
                 }
             }
         }

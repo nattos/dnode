@@ -1,4 +1,5 @@
-﻿//MIT, 2019-present, WinterDev 
+﻿//MIT, 2021, Nathaniel Wong - made ReadNamePreview actually do a minimal read.
+//MIT, 2019-present, WinterDev 
 //see https://www.w3.org/TR/2012/REC-WOFF-20121213/
 
 using System;
@@ -132,7 +133,7 @@ namespace Typography.OpenFont.WebFont
                     {
                         decompressStream.Position = 0;
                         OpenFontReader openFontReader = new OpenFontReader();
-                        PreviewFontInfo previewFontInfo = openFontReader.ReadPreviewFontInfo(tableEntryCollection, reader2);
+                        PreviewFontInfo previewFontInfo = openFontReader.ReadPreviewFontInfo(tableEntryCollection, reader2, nameEntryOnly: false);
                         if (previewFontInfo != null)
                         {
                             //add webfont info to this preview font

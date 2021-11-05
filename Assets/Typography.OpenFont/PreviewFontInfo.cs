@@ -1,4 +1,5 @@
-﻿//Apache2, 2017-present, WinterDev
+﻿//Apache2, 2021, Nathaniel Wong - made ReadNamePreview actually do a minimal read.
+//Apache2, 2017-present, WinterDev
 //Apache2, 2014-2016, Samuel Carlsson, WinterDev
 
 
@@ -30,8 +31,8 @@ namespace Typography.OpenFont
 
             Name = nameEntry.FontName;
             SubFamilyName = nameEntry.FontSubFamily;
-            OS2TranslatedStyle = Extensions.TypefaceExtensions.TranslateOS2FontStyle(os2Table);
-            OS2FsSelection = Extensions.TypefaceExtensions.TranslateOS2FsSelection(os2Table);
+            OS2TranslatedStyle = os2Table == null ? default : Extensions.TypefaceExtensions.TranslateOS2FontStyle(os2Table);
+            OS2FsSelection = os2Table == null ? default : Extensions.TypefaceExtensions.TranslateOS2FsSelection(os2Table);
         }
         internal PreviewFontInfo(string fontName, PreviewFontInfo[] ttcfMembers)
         {
