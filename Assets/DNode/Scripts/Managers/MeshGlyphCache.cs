@@ -212,7 +212,8 @@ namespace DNode {
         return null;
       }
 
-      GlyphPolygon[] polys = new GlyphPolygonizer().GetContours(glyph, font.InternalUnitsScale);
+      float xBias = (glyph.Bounds.XMin + glyph.Bounds.XMax) * 0.5f * font.InternalUnitsScale;
+      GlyphPolygon[] polys = new GlyphPolygonizer().GetContours(glyph, font.InternalUnitsScale, new Vector2(xBias, 0.0f));
       Array.Sort(polys, (a, b) => (int)Mathf.Sign(Mathf.Abs(b.Area) - Mathf.Abs(a.Area)));
       // Classify contours to find holes and their 'parents'.
       Dictionary<GlyphPolygon, List<GlyphPolygon>> childMap = polys.ToDictionary(p => p, p => new List<GlyphPolygon>());
@@ -377,10 +378,12 @@ namespace DNode {
     private class GlyphPolygonizer : Typography.OpenFont.IGlyphTranslator {
       private const float _bezierStepSize = 0.0015f;
       private float _scale = 1.0f;
+      private Vector2 _offset;
       private readonly List<GlyphPolygon> _contours = new List<GlyphPolygon>();
 
-      public GlyphPolygon[] GetContours(Typography.OpenFont.Glyph glyph, float scale) {
+      public GlyphPolygon[] GetContours(Typography.OpenFont.Glyph glyph, float scale, Vector2 offset) {
         _scale = scale;
+        _offset = offset;
         _contours.Clear();
         Typography.OpenFont.IGlyphReaderExtensions.Read(this, glyph.GlyphPoints, glyph.EndPoints);
         return _contours.ToArray();
@@ -395,20 +398,20 @@ namespace DNode {
       }
 
       void Typography.OpenFont.IGlyphTranslator.Curve3(float x1, float y1, float x2, float y2) {
-        _contours[_contours.Count - 1].ConicTo(new Vector2(x2, y2) * _scale, new Vector2(x1, y1) * _scale);
+        _contours[_contours.Count - 1].ConicTo(new Vector2(x2, y2) * _scale - _offset, new Vector2(x1, y1) * _scale - _offset);
       }
 
       void Typography.OpenFont.IGlyphTranslator.Curve4(float x1, float y1, float x2, float y2, float x3, float y3) {
-        _contours[_contours.Count - 1].CubicTo(new Vector2(x3, y3) * _scale, new Vector2(x1, y1) * _scale, new Vector2(x2, y2) * _scale);
+        _contours[_contours.Count - 1].CubicTo(new Vector2(x3, y3) * _scale - _offset, new Vector2(x1, y1) * _scale - _offset, new Vector2(x2, y2) * _scale - _offset);
       }
 
       void Typography.OpenFont.IGlyphTranslator.LineTo(float x1, float y1) {
-        _contours[_contours.Count - 1].AddPoint(new Vector2(x1, y1) * _scale);
+        _contours[_contours.Count - 1].AddPoint(new Vector2(x1, y1) * _scale - _offset);
       }
 
       void Typography.OpenFont.IGlyphTranslator.MoveTo(float x0, float y0) {
         _contours.Add(new GlyphPolygon(_bezierStepSize));
-        _contours[_contours.Count - 1].AddPoint(new Vector2(x0, y0) * _scale);
+        _contours[_contours.Count - 1].AddPoint(new Vector2(x0, y0) * _scale - _offset);
       }
     }
 

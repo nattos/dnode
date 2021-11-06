@@ -123,11 +123,15 @@ namespace DNode {
 
         int xBias;
         int advanceWidth;
+        bool isLastGlyph = i == codepoints.Length - 1;
+
+        var glyphBounds = localTypeface.GetGlyph(glyphIndex).Bounds;
+        float xOffset = (glyphBounds.XMax + glyphBounds.XMin) * 0.5f;
         if (_forceMonospace) {
           xBias = 0;
           advanceWidth = localTypeface.UnitsPerEm;
         } else {
-          advanceWidth = localTypeface.GetAdvanceWidthFromGlyphIndex(glyphIndex);
+          advanceWidth = isLastGlyph ? glyphBounds.XMax : localTypeface.GetAdvanceWidthFromGlyphIndex(glyphIndex);
           int leftSideBearing = localTypeface.GetLeftSideBearing(glyphIndex);
           int kernDistance = previousGlyphFont == localFont ? localTypeface.GetKernDistance(previousGlyphIndex, glyphIndex) : 0;
           xBias = kernDistance - leftSideBearing;
@@ -137,8 +141,8 @@ namespace DNode {
 
         _glyphs[i] = new Glyph {
           Codepoint = codepoint,
-          PositionMin = xPos * localScalingFactor,
-          PositionMax = xNextPos * localScalingFactor,
+          PositionMin = (xPos + xOffset) * localScalingFactor,
+          PositionMax = (xNextPos + xOffset) * localScalingFactor,
           Width = advanceWidth * localScalingFactor,
           Mesh = DScriptMachine.CurrentInstance.MeshGlyphCache.GetMeshForCodePoint(localFont, codepoint),
         };
