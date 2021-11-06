@@ -424,16 +424,21 @@ namespace DNode {
     public static bool IsFontCacheLoaded => _fetchFontsTask.IsValueCreated && _fetchFontsTask.Value.IsCompleted;
 
     private class FontCacheSerializedFormat {
-      public IReadOnlyDictionary<string, string> FontMap;
+      [SerializeField]
+      public SortedDictionary<string, string> FontMap;
     }
 
     public static void SerializeFontCache(Stream stream) {
-      FontCacheSerializedFormat data;
+      SortedDictionary<string, string> fontMap = new SortedDictionary<string, string>();
       lock (_fontCacheLock) {
-        data = new FontCacheSerializedFormat { FontMap = _fontMap };
+        foreach (var entry in _fontMap) {
+          fontMap[entry.Key] = entry.Value;
+        }
       }
+      FontCacheSerializedFormat data = new FontCacheSerializedFormat { FontMap = fontMap };
+      string json = Newtonsoft.Json.JsonConvert.SerializeObject(data);
       using (var writer = new StreamWriter(stream)) {
-        writer.Write(JsonUtility.ToJson(data, prettyPrint: false));
+        writer.Write(json);
       }
     }
 
@@ -442,8 +447,8 @@ namespace DNode {
       using (var reader = new StreamReader(stream)) {
         json = reader.ReadToEnd();
       }
-      FontCacheSerializedFormat data = JsonUtility.FromJson<FontCacheSerializedFormat>(json);
-      var fontMap = data.FontMap ?? new Dictionary<string, string>();
+      FontCacheSerializedFormat data = Newtonsoft.Json.JsonConvert.DeserializeObject<FontCacheSerializedFormat>(json);
+      var fontMap = data.FontMap?.ToDictionary(e => e.Key, e => e.Value) ?? new Dictionary<string, string>();
       string[] fonts = fontMap.Keys.ToArray();
       Array.Sort(fonts);
       lock (_fontCacheLock) {
