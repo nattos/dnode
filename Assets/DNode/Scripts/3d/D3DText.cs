@@ -37,7 +37,7 @@ namespace DNode {
         MeshGlyphFont font = null;
         string fontName = flow.GetValue<DFontSpec>(Font).FontName;
         if (!string.IsNullOrEmpty(fontName)) {
-          font = MeshGlyphCache.GetFontByName(fontName);
+          font = MeshGlyphCache.GetFontByNameImmediate(fontName);
         }
         layout.Font = font ?? DScriptMachine.CurrentInstance.DefaultFont;
         layout.ForceMonospace = Monospace;

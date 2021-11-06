@@ -1,8 +1,10 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
+using System;
 using System.IO;
 using System.Linq;
-using System;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace DNode {
   public class MeshGlyphFont {
@@ -38,7 +40,16 @@ namespace DNode {
         }
       }
 
-      public static FontFallback CreateFallback(MeshGlyphCache cache, IReadOnlyList<ScriptType> scriptOrder, IReadOnlyDictionary<ScriptType, FontFamily> fontFamilies) {
+      public static FontFallback CreateEmptyFallback(MeshGlyphCache cache) {
+        return new FontFallback(cache, Array.Empty<MeshGlyphFont>());
+      }
+
+      public static async Task<FontFallback> CreateFallbackAsync(MeshGlyphCache cache, IReadOnlyList<ScriptType> scriptOrder, IReadOnlyDictionary<ScriptType, FontFamily> fontFamilies) {
+        await MeshGlyphCache.LoadFontNameCache();
+        return CreateFallbackImmediate(cache, scriptOrder, fontFamilies);
+      }
+
+      public static FontFallback CreateFallbackImmediate(MeshGlyphCache cache, IReadOnlyList<ScriptType> scriptOrder, IReadOnlyDictionary<ScriptType, FontFamily> fontFamilies) {
         List<MeshGlyphFont> fonts = new List<MeshGlyphFont>();
         HashSet<MeshGlyphFont> fontSet = new HashSet<MeshGlyphFont>();
         foreach (ScriptType scriptType in scriptOrder) {
@@ -46,7 +57,7 @@ namespace DNode {
             continue;
           }
           foreach (string fontName in fontFamily.FontNames) {
-            MeshGlyphFont font = cache.GetFontByName(fontName);
+            MeshGlyphFont font = cache.GetFontByNameImmediate(fontName);
             if (font == null) {
               continue;
             }
@@ -92,59 +103,106 @@ namespace DNode {
   }
 
   public class MeshGlyphCache : IDisposable {
-    private static readonly List<Vector3> _drawMeshVertices = new List<Vector3>();
-    private static readonly List<Vector3> _drawMeshNormals = new List<Vector3>();
-    private static readonly List<int> _drawMeshTriangles = new List<int>();
+    private static readonly ThreadLocal<List<Vector3>> _drawMeshVertices = new ThreadLocal<List<Vector3>>(() => new List<Vector3>());
+    private static readonly ThreadLocal<List<Vector3>> _drawMeshNormals = new ThreadLocal<List<Vector3>>(() => new List<Vector3>());
+    private static readonly ThreadLocal<List<int>> _drawMeshTriangles = new ThreadLocal<List<int>>(() => new List<int>());
 
     private readonly Dictionary<string, MeshGlyphFont> _fontCache =
         new Dictionary<string, MeshGlyphFont>();
     private readonly Dictionary<(MeshGlyphFont, int), Mesh> _glyphMeshes =
         new Dictionary<(MeshGlyphFont, int), Mesh>();
 
+    // Thread-safe.
     public MeshGlyphFont GetFont(string path) {
-      if (!_fontCache.TryGetValue(path, out MeshGlyphFont font)) {
+      bool found;
+      MeshGlyphFont font;
+      lock (_fontCache) {
+        found = _fontCache.TryGetValue(path, out font);
+      }
+      if (!found) {
+        // TODO: it's possible we load a font multiple times. Fix this.
         font = MeshGlyphFont.TryLoadFont(path);
-        _fontCache[path] = font;
+        lock (_fontCache) {
+          _fontCache[path] = font;
+        }
       }
       return font;
     }
 
-    public MeshGlyphFont GetFontByName(string name) {
-      if (!TryGetFontPath(name, out string path)) {
+    // Thread-safe.
+    public MeshGlyphFont GetFontByNameImmediate(string name) {
+      if (!TryGetFontPathImmediate(name, out string path)) {
         return null;
       }
       return GetFont(path);
     }
 
+    // Main thread only.
     public void PrewarmCache(MeshGlyphFont font) {
       if (font == null) {
         return;
       }
+      List<int> codepointsToLoad = new List<int>();
       for (int i = 0; i < 256; ++i) {
-        GetMeshForCodePoint(font, i);
+        if (!_glyphMeshes.ContainsKey((font, i))) {
+          codepointsToLoad.Add(i);
+        }
       }
+      if (codepointsToLoad.Count == 0) {
+        return;
+      }
+      Task.Run(() => {
+        foreach (int codepoint in codepointsToLoad) {
+          var meshData = PolygonizeGlyph(font, codepoint);
+          UnityEditor.EditorApplication.delayCall += () => {
+            Mesh mesh = meshData?.CreateMesh();
+            _glyphMeshes[(font, codepoint)] = mesh;
+          };
+        }
+      });
     }
 
+    // Main thread only.
     public Mesh GetMeshForCodePoint(MeshGlyphFont font, int codepoint) {
       if (font == null) {
         return null;
       }
       if (!_glyphMeshes.TryGetValue((font, codepoint), out Mesh mesh)) {
-        mesh = PolygonizeGlyph(font, codepoint);
+        var meshData = PolygonizeGlyph(font, codepoint);
+        mesh = meshData?.CreateMesh();
         _glyphMeshes[(font, codepoint)] = mesh;
       }
       return mesh;
     }
 
+    // Main thread only.
     public void Dispose() {
       foreach (Mesh mesh in _glyphMeshes.Values) {
         UnityUtils.Destroy(mesh);
       }
-      _fontCache.Clear();
+      lock (_fontCache) {
+        _fontCache.Clear();
+      }
       _glyphMeshes.Clear();
     }
 
-    private static Mesh PolygonizeGlyph(MeshGlyphFont font, int codepoint) {
+    private struct MeshData {
+      public string Name;
+      public Vector3[] Vertices;
+      public Vector3[] Normals;
+      public int[] Triangles;
+
+      public Mesh CreateMesh() {
+        Mesh mesh = new Mesh();
+        mesh.name = Name;
+        mesh.vertices = Vertices;
+        mesh.normals = Normals;
+        mesh.triangles = Triangles;
+        return mesh;
+      }
+    }
+
+    private static MeshData? PolygonizeGlyph(MeshGlyphFont font, int codepoint) {
       var glyphIndex = font.Typeface.GetGlyphIndex(codepoint);
       if (glyphIndex == 0) {
         return null;
@@ -175,9 +233,12 @@ namespace DNode {
         }
       }
 
-      _drawMeshVertices.Clear();
-      _drawMeshNormals.Clear();
-      _drawMeshTriangles.Clear();
+      var drawMeshVertices = _drawMeshVertices.Value;
+      var drawMeshNormals = _drawMeshNormals.Value;
+      var drawMeshTriangles = _drawMeshTriangles.Value;
+      drawMeshVertices.Clear();
+      drawMeshNormals.Clear();
+      drawMeshTriangles.Clear();
       void TriangulatePoly(GlyphPolygon poly) {
         List<GlyphPolygon> children = childMap[poly];
 
@@ -195,26 +256,26 @@ namespace DNode {
         TriangleNet.Meshing.IMesh triMesh = TriangleNet.Geometry.ExtensionMethods.Triangulate(triangulationPoly);
 
         // Forward faces.
-        int baseVertexIndex = _drawMeshVertices.Count;
+        int baseVertexIndex = drawMeshVertices.Count;
         foreach (var v in triMesh.Vertices) {
-          _drawMeshVertices.Add(new Vector3((float)v.x, (float)v.y, 0.0f));
-          _drawMeshNormals.Add(Vector3.forward);
+          drawMeshVertices.Add(new Vector3((float)v.x, (float)v.y, 0.0f));
+          drawMeshNormals.Add(Vector3.forward);
         }
         foreach (var tri in triMesh.Triangles) {
-          _drawMeshTriangles.Add(tri.vertices[0].id + baseVertexIndex);
-          _drawMeshTriangles.Add(tri.vertices[1].id + baseVertexIndex);
-          _drawMeshTriangles.Add(tri.vertices[2].id + baseVertexIndex);
+          drawMeshTriangles.Add(tri.vertices[0].id + baseVertexIndex);
+          drawMeshTriangles.Add(tri.vertices[1].id + baseVertexIndex);
+          drawMeshTriangles.Add(tri.vertices[2].id + baseVertexIndex);
         }
         // Reverse faces.
-        baseVertexIndex = _drawMeshVertices.Count;
+        baseVertexIndex = drawMeshVertices.Count;
         foreach (var v in triMesh.Vertices) {
-          _drawMeshVertices.Add(new Vector3((float)v.x, (float)v.y, 0.0f));
-          _drawMeshNormals.Add(Vector3.back);
+          drawMeshVertices.Add(new Vector3((float)v.x, (float)v.y, 0.0f));
+          drawMeshNormals.Add(Vector3.back);
         }
         foreach (var tri in triMesh.Triangles) {
-          _drawMeshTriangles.Add(tri.vertices[0].id + baseVertexIndex);
-          _drawMeshTriangles.Add(tri.vertices[2].id + baseVertexIndex);
-          _drawMeshTriangles.Add(tri.vertices[1].id + baseVertexIndex);
+          drawMeshTriangles.Add(tri.vertices[0].id + baseVertexIndex);
+          drawMeshTriangles.Add(tri.vertices[2].id + baseVertexIndex);
+          drawMeshTriangles.Add(tri.vertices[1].id + baseVertexIndex);
         }
 
         // Recurse into children of holes, which are filled.
@@ -229,11 +290,12 @@ namespace DNode {
         TriangulatePoly(root);
       }
 
-      Mesh mesh = new Mesh();
-      mesh.name = System.Text.Encoding.UTF32.GetString(BitConverter.GetBytes(codepoint));
-      mesh.vertices = _drawMeshVertices.ToArray();
-      mesh.normals = _drawMeshNormals.ToArray();
-      mesh.triangles = _drawMeshTriangles.ToArray();
+      MeshData mesh = new MeshData {
+        Name = System.Text.Encoding.UTF32.GetString(BitConverter.GetBytes(codepoint)),
+        Vertices = drawMeshVertices.ToArray(),
+        Normals = drawMeshNormals.ToArray(),
+        Triangles = drawMeshTriangles.ToArray(),
+      };
       return mesh;
     }
 
@@ -350,22 +412,79 @@ namespace DNode {
       }
     }
 
-    private static readonly Lazy<IReadOnlyDictionary<string, string>> _fontMap = new Lazy<IReadOnlyDictionary<string, string>>(FetchFontNameToPathMap);
+    private static object _fontCacheLock = new object();
+    private static IReadOnlyDictionary<string, string> _fontMap = new Dictionary<string, string>();
+    private static string[] _allFontNames = Array.Empty<string>();
+    private static readonly Lazy<Task> _fetchFontsTask = new Lazy<Task>(() => Task.Run(async () => await PopulateFontCache()));
 
-    public static bool TryGetFontPath(string name, out string path) {
-      return _fontMap.Value.TryGetValue(name, out path);
+    public static Task LoadFontNameCache() => _fetchFontsTask.Value;
+    public static bool IsFontCacheLoaded => _fetchFontsTask.IsValueCreated && _fetchFontsTask.Value.IsCompleted;
+
+    private class FontCacheSerializedFormat {
+      public IReadOnlyDictionary<string, string> FontMap;
     }
 
-    public static string[] AllFontNames {
-      get {
-        string[] fonts = _fontMap.Value.Keys.ToArray();
-        Array.Sort(fonts);
-        return fonts;
+    public static void SerializeFontCache(Stream stream) {
+      FontCacheSerializedFormat data;
+      lock (_fontCacheLock) {
+        data = new FontCacheSerializedFormat { FontMap = _fontMap };
+      }
+      using (var writer = new StreamWriter(stream)) {
+        writer.Write(JsonUtility.ToJson(data, prettyPrint: false));
       }
     }
 
-    private static IReadOnlyDictionary<string, string> FetchFontNameToPathMap() {
-      var fontEntries = Font.GetPathsToOSFonts().SelectMany(path => {
+    public static void LoadSerializedFontCache(Stream stream) {
+      string json;
+      using (var reader = new StreamReader(stream)) {
+        json = reader.ReadToEnd();
+      }
+      FontCacheSerializedFormat data = JsonUtility.FromJson<FontCacheSerializedFormat>(json);
+      var fontMap = data.FontMap ?? new Dictionary<string, string>();
+      string[] fonts = fontMap.Keys.ToArray();
+      Array.Sort(fonts);
+      lock (_fontCacheLock) {
+        _fontMap = fontMap;
+        _allFontNames = fonts;
+      }
+    }
+
+    public static bool TryGetFontPathImmediate(string name, out string path) {
+      lock (_fontCacheLock) {
+        return _fontMap.TryGetValue(name, out path);
+      }
+    }
+
+    public static string[] AllFontNamesImmediate {
+      get {
+        lock (_fontCacheLock) {
+          return _allFontNames;
+        }
+      }
+    }
+
+    private async static Task PopulateFontCache() {
+      var fontMap = await FetchFontNameToPathMap();
+      string[] fonts = fontMap.Keys.ToArray();
+      Array.Sort(fonts);
+      lock (_fontCacheLock) {
+        _fontMap = fontMap;
+        _allFontNames = fonts;
+      }
+    }
+
+    private async static Task<IReadOnlyDictionary<string, string>> FetchFontNameToPathMap() {
+      // Delegate back to the main thread so we can call Unity.
+      TaskCompletionSource<string[]> osFontPathAsync = new TaskCompletionSource<string[]>();
+      UnityEditor.EditorApplication.delayCall += () => {
+        try {
+          osFontPathAsync.SetResult(Font.GetPathsToOSFonts());
+        } catch (Exception e) {
+          osFontPathAsync.SetException(e);
+        }
+      };
+      string[] osFontPaths = await osFontPathAsync.Task;
+      var fontEntries = osFontPaths.SelectMany(path => {
         using (FileStream stream = new FileStream(path, FileMode.Open, FileAccess.Read)) {
           var fontReader = new Typography.OpenFont.OpenFontReader();
           var preview = fontReader.ReadNamePreview(stream);

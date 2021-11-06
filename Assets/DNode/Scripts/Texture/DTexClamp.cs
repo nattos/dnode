@@ -6,8 +6,8 @@ namespace DNode {
     private int _Min = Shader.PropertyToID("_Min");
     private int _Max = Shader.PropertyToID("_Max");
 
-    [DoNotSerialize][PortLabelHidden][Color][ShortEditor] public ValueInput Min;
-    [DoNotSerialize][PortLabelHidden][Color][ShortEditor] public ValueInput Max;
+    [DoNotSerialize][Color][ShortEditor] public ValueInput Min;
+    [DoNotSerialize][Color][ShortEditor] public ValueInput Max;
 
     protected override void Definition() {
       base.Definition();

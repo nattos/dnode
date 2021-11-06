@@ -10,10 +10,10 @@ namespace DNode {
     private int _BaseValue2 = Shader.PropertyToID("_BaseValue2");
     private int _Shift2 = Shader.PropertyToID("_Shift2");
 
-    [DoNotSerialize][PortLabelHidden][Color] public ValueInput ColorBasis;
+    [DoNotSerialize][Color] public ValueInput ColorBasis;
     [DoNotSerialize][PortLabelHidden][Scalar][ZeroOneRange] public ValueInput BaseValue;
     [DoNotSerialize][PortLabelHidden][Vector2][OneRange] public ValueInput Shift;
-    [DoNotSerialize][PortLabelHidden][Color] public ValueInput ColorBasis2;
+    [DoNotSerialize][Color] public ValueInput ColorBasis2;
     [DoNotSerialize][PortLabelHidden][Scalar][ZeroOneRange] public ValueInput BaseValue2;
     [DoNotSerialize][PortLabelHidden][Vector2][OneRange] public ValueInput Shift2;
 

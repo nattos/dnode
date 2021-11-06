@@ -5,6 +5,7 @@ using Unity.VisualScripting;
 using System.IO;
 using System.Linq;
 using System;
+using System.Threading.Tasks;
 
 namespace DNode {
   [RequireComponent(typeof(ScriptMachine))]
@@ -33,6 +34,8 @@ namespace DNode {
       MeshGlyphFont.ScriptType.Arabic,
     };
 
+    private static string _fontCachePath => Path.Combine(Application.temporaryCachePath, "dnode_font_cache.json");
+
     public MeshGlyphFont.FontFallback DefaultFontFallback;
 
     public DEnvironmentOverrides Environment;
@@ -50,7 +53,7 @@ namespace DNode {
     }
     public EnvironmentComponent EnvironmentComponent;
     public MeshGlyphFont DefaultFont;
-    public Font DefaultFontAsset;
+    public string DefaultFontName;
 
     public Transport Transport = new Transport();
     public PrefabCache PrefabCache = new PrefabCache();
@@ -70,14 +73,42 @@ namespace DNode {
     private IFrameComponent[] _frameComponents;
 
     protected void OnEnable() {
-      string fontAssetPath = UnityEditor.AssetDatabase.GetAssetPath(DefaultFontAsset);
-      string fontFilePath = Path.Combine(Path.GetDirectoryName(Application.dataPath), fontAssetPath);
-
-      DefaultFont = MeshGlyphCache.GetFont(fontFilePath);
-      MeshGlyphCache.PrewarmCache(DefaultFont);
-      DefaultFontFallback = MeshGlyphFont.FontFallback.CreateFallback(MeshGlyphCache, _fallbackScriptTypes, _fallbackFontFamilies);
-      // Note: Do _not_ prewarm all fallback fonts. This results in a big chunk of time and memory spent on glyphs that will never be used.
-      // DefaultFontFallback.PrewarmCache();
+      bool loadedCachedFonts = false;
+      string fontCachePath = _fontCachePath;
+      if (File.Exists(fontCachePath)) {
+        try {
+          using (var stream = File.OpenRead(fontCachePath)) {
+            MeshGlyphCache.LoadSerializedFontCache(stream);
+          }
+          DefaultFont = MeshGlyphCache.GetFontByNameImmediate(DefaultFontName);
+          DefaultFontFallback = MeshGlyphFont.FontFallback.CreateFallbackImmediate(MeshGlyphCache, _fallbackScriptTypes, _fallbackFontFamilies);
+          Debug.Log("Loaded font cache.");
+        } catch (Exception e) {
+          Debug.Log(e);
+        }
+      }
+      if (!loadedCachedFonts) {
+        DefaultFontFallback = MeshGlyphFont.FontFallback.CreateEmptyFallback(MeshGlyphCache);
+      }
+      Task.Run(async () => {
+        var fallbackFont = await MeshGlyphFont.FontFallback.CreateFallbackAsync(MeshGlyphCache, _fallbackScriptTypes, _fallbackFontFamilies);
+        try {
+          using (var stream = File.OpenWrite(fontCachePath)) {
+            MeshGlyphCache.SerializeFontCache(stream);
+            Debug.Log("Saved font cache.");
+          }
+        } catch (Exception e) {
+          Debug.Log(e);
+        }
+        // Delegate back to the main thread, to avoid any cached reads.
+        UnityEditor.EditorApplication.delayCall += () => {
+          DefaultFontFallback = fallbackFont;
+          DefaultFont = MeshGlyphCache.GetFontByNameImmediate(DefaultFontName);
+          MeshGlyphCache.PrewarmCache(DefaultFont);
+          // Note: Do _not_ prewarm all fallback fonts. This results in a big chunk of time and memory spent on glyphs that will never be used.
+          // DefaultFontFallback.PrewarmCache();
+        };
+      });
 
       _frameComponents = new IFrameComponent[] {
           PrefabCache,

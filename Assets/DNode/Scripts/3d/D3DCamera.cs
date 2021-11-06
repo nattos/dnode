@@ -13,7 +13,7 @@ namespace DNode {
     [DoNotSerialize][PortLabelHidden][Scalar][Range(0, D3DConstants.DefaultFarWorldRange, 0.3)][LogScale]  public ValueInput NearClip;
     [DoNotSerialize][PortLabelHidden][Scalar][Range(0, D3DConstants.DefaultFarWorldRange, 1000)][LogScale]  public ValueInput FarClip;
     [DoNotSerialize] public ValueInput ClearMode;
-    [DoNotSerialize][PortLabelHidden][Color] public ValueInput ClearColor;
+    [DoNotSerialize][Color] public ValueInput ClearColor;
 
     private bool _useFocalLength = true;
     [Serialize][Inspectable] public bool UseFocalLength {

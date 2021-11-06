@@ -6,7 +6,7 @@ namespace DNode {
     private int _Color = Shader.PropertyToID("_Color");
     private int _Gain = Shader.PropertyToID("_Gain");
 
-    [DoNotSerialize][PortLabelHidden][Color][ShortEditor] public ValueInput Color;
+    [DoNotSerialize][Color][ShortEditor] public ValueInput Color;
     [DoNotSerialize][PortLabelHidden][Scalar][Range(D3DConstants.DefaultMinEv, D3DConstants.DefaultMaxEv, 0)][ShortEditor] public ValueInput Exposure;
 
     protected override void Definition() {

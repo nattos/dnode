@@ -19,7 +19,7 @@ namespace DNode {
 
     [DoNotSerialize] public ValueInput Type;
     [DoNotSerialize][PortLabelHidden][Scalar][ZeroOneRange(0.25)][LogScale] public ValueInput ShapeRadius;
-    [DoNotSerialize][PortLabelHidden][Color] public ValueInput FilterColor;
+    [DoNotSerialize][Color] public ValueInput FilterColor;
     [DoNotSerialize][PortLabelHidden][Scalar][Range(1500, 20000, 6500)][Label("Temperature (K)")] public ValueInput TemperatureKelvin;
     [DoNotSerialize][PortLabelHidden][Scalar][Range(0, 10000, 1500)][Label("Intensity (Kilolumens)")][LogScale] public ValueInput IntensityKilolumens;
     [DoNotSerialize][PortLabelHidden][Scalar][Range(0.0, D3DConstants.DefaultFarWorldRange, D3DConstants.DefaultFarWorldRange)][LogScale] public ValueInput Range;
@@ -30,7 +30,7 @@ namespace DNode {
 
     protected override void Definition() {
       base.Definition();
-      Type = ValueInput<HDLightType?>(nameof(Type), null);
+      Type = ValueInput<HDLightType>(nameof(Type), HDLightType.Point);
       ShapeRadius = ValueInput<DEvent>(nameof(ShapeRadius), DEvent.CreateImmediate(0.25, triggered: false));
       FilterColor = ValueInput<DEvent>(nameof(FilterColor), DEvent.CreateImmediate(Color.white, triggered: false));
       TemperatureKelvin = ValueInput<DEvent>(nameof(TemperatureKelvin), DEvent.CreateImmediate(6500, triggered: false));
@@ -44,7 +44,7 @@ namespace DNode {
 
     protected override Data GetData(Flow flow, DFrameObject[] inputs) {
       return new Data {
-        Type = GetNullableValue<HDLightType>(flow, Type),
+        Type = flow.GetValue<HDLightType>(Type),
         ShapeRadius = GetNullableDValueFromDEventInput(flow, ShapeRadius),
         FilterColor = GetNullableDValueFromDEventInput(flow, FilterColor),
         TemperatureKelvin = GetNullableDValueFromDEventInput(flow, TemperatureKelvin),

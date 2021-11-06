@@ -13,11 +13,11 @@ namespace DNode {
       public DValue? EmissionMultiplyWithBase;
     }
 
-    [DoNotSerialize][PortLabelHidden][Color] public ValueInput BaseColor;
+    [DoNotSerialize][Color] public ValueInput BaseColor;
     [DoNotSerialize][Texture] public ValueInput BaseTexture;
     [DoNotSerialize][PortLabelHidden][Scalar][ZeroOneRange] public ValueInput Metallic;
     [DoNotSerialize][PortLabelHidden][Scalar][ZeroOneRange] public ValueInput Smoothness;
-    [DoNotSerialize][PortLabelHidden][Color] public ValueInput EmissionColor;
+    [DoNotSerialize][Color] public ValueInput EmissionColor;
     [DoNotSerialize][PortLabelHidden][Scalar][ZeroOneRange(defaultValue: 1.0)] public ValueInput EmissionExposureWeight;
     [DoNotSerialize][PortLabelHidden][Boolean] public ValueInput EmissionMultiplyWithBase;
 

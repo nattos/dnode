@@ -64,6 +64,7 @@ namespace DNode {
     private string _text = "";
     private MeshGlyphFont _font = null;
     private bool _forceMonospace = false;
+    private MeshGlyphFont.FontFallback _fontFallback;
     private Glyph[] _glyphs = Array.Empty<Glyph>();
     private float _totalWidth = 0.0f;
     private float _descent = 0.0f;
@@ -72,9 +73,11 @@ namespace DNode {
     private bool _dirty = false;
 
     private void ValidateLayout() {
-      if (!_dirty) {
+      MeshGlyphFont.FontFallback fontFallback = DScriptMachine.CurrentInstance.DefaultFontFallback;
+      if (!_dirty && _fontFallback == fontFallback) {
         return;
       }
+      _fontFallback = fontFallback;
       _dirty = false;
       UpdateGlyphs();
     }
@@ -88,7 +91,9 @@ namespace DNode {
       Array.Resize(ref _glyphs, codepoints.Length);
 
       MeshGlyphFont font = _font ?? DScriptMachine.CurrentInstance.DefaultFont;
-      MeshGlyphFont.FontFallback fontFallback = DScriptMachine.CurrentInstance.DefaultFontFallback;
+      if (font == null) {
+        return;
+      }
       Typography.OpenFont.Typeface typeface = font.Typeface;
       float scalingFactor = 1.0f / typeface.UnitsPerEm;
 
@@ -104,7 +109,7 @@ namespace DNode {
         ushort glyphIndex = typeface.GetGlyphIndex(codepoint, nextCodepoint, out bool skipNextCodepoint);
         // Handle fallback fonts.
         if (glyphIndex == 0) {
-          foreach (MeshGlyphFont fallbackFont in fontFallback.Fonts) {
+          foreach (MeshGlyphFont fallbackFont in _fontFallback?.Fonts ?? Array.Empty<MeshGlyphFont>()) {
             glyphIndex = fallbackFont.Typeface.GetGlyphIndex(codepoint, nextCodepoint, out skipNextCodepoint);
             if (glyphIndex != 0) {
               localFont = fallbackFont;

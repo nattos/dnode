@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using Unity.VisualScripting;
 
 namespace DNode {
+  [TypeIcon(typeof(object))]
   public struct DFrameArray<T> : IDisplayDataProvider where T : DFrameNode {
     public T[] ValueArray;
 

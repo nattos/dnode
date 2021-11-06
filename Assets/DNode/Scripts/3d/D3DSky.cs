@@ -5,9 +5,9 @@ using UnityEngine;
 namespace DNode {
   public class D3DSky : DFrameUnit {
     [DoNotSerialize][PortLabelHidden][Scalar][ExposureRange] public ValueInput Exposure;
-    [DoNotSerialize][PortLabelHidden][Color] public ValueInput TopColor;
-    [DoNotSerialize][PortLabelHidden][Color] public ValueInput MiddleColor;
-    [DoNotSerialize][PortLabelHidden][Color] public ValueInput BottomColor;
+    [DoNotSerialize][Color] public ValueInput TopColor;
+    [DoNotSerialize][Color] public ValueInput MiddleColor;
+    [DoNotSerialize][Color] public ValueInput BottomColor;
     [DoNotSerialize][Texture][Label("BG")] public ValueInput BackgroundTexture;
     [DoNotSerialize][PortLabelHidden][Scalar][ZeroOneRange][Label("BG Alpha")] public ValueInput BackgroundTextureAlpha;
 

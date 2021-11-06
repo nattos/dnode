@@ -14,9 +14,9 @@ namespace DNode {
     private int _AlphaG = Shader.PropertyToID("_AlphaG");
     private int _AlphaB = Shader.PropertyToID("_AlphaB");
 
-    [DoNotSerialize][PortLabelHidden][Color] public ValueInput ColorBasisR;
-    [DoNotSerialize][PortLabelHidden][Color] public ValueInput ColorBasisG;
-    [DoNotSerialize][PortLabelHidden][Color] public ValueInput ColorBasisB;
+    [DoNotSerialize][Color] public ValueInput ColorBasisR;
+    [DoNotSerialize][Color] public ValueInput ColorBasisG;
+    [DoNotSerialize][Color] public ValueInput ColorBasisB;
     [DoNotSerialize][PortLabelHidden][Scalar][RotationRange][ClampMode(ClampMode.Wrap)] public ValueInput HueShift;
     [DoNotSerialize][PortLabelHidden][Vector2][Range(-2, 2, 0)] public ValueInput ShiftR;
     [DoNotSerialize][PortLabelHidden][Vector2][Range(-2, 2, 0)] public ValueInput ShiftG;

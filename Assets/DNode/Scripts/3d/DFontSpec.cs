@@ -1,4 +1,7 @@
-﻿namespace DNode {
+﻿using Unity.VisualScripting;
+
+namespace DNode {
+  [TypeIcon(typeof(UnityEngine.Font))]
   public struct DFontSpec {
     public string FontName;
 

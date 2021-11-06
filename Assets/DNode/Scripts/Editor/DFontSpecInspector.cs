@@ -12,7 +12,10 @@ namespace DNode {
   public class DFontSpecInspector : Inspector {
     private const string _defaultFontTag = "<Default>";
 
-    private Lazy<string[]> _allFontNames = new Lazy<string[]>(() => new[] { _defaultFontTag }.Concat(MeshGlyphCache.AllFontNames).ToArray());
+    private static readonly Func<string[]> _allFontNames = UnityEditorUtils.RateLimitedFunc(5.0f, () => {
+      MeshGlyphCache.LoadFontNameCache();
+      return new[] { _defaultFontTag }.Concat(MeshGlyphCache.AllFontNamesImmediate).ToArray();
+    });
 
     public DFontSpecInspector(Metadata metadata) : base(metadata) {}
 
@@ -22,7 +25,7 @@ namespace DNode {
       DFontSpec oldValue = (DFontSpec)metadata.value;
       var rangeAttribute = metadata.GetAttribute<InspectorRangeAttribute>();
 
-      string[] allFontNames = _allFontNames.Value;
+      string[] allFontNames = _allFontNames.Invoke();
       int selectedIndex = Math.Max(0, Array.IndexOf(allFontNames, oldValue.FontName));
       int newSelectedIndex = EditorGUI.Popup(fieldPosition, selectedIndex, allFontNames);
 
@@ -39,7 +42,7 @@ namespace DNode {
       DFontSpec oldValue = (DFontSpec)metadata.value;
       var rangeAttribute = metadata.GetAttribute<InspectorRangeAttribute>();
 
-      string[] allFontNames = _allFontNames.Value;
+      string[] allFontNames = _allFontNames.Invoke();
       int selectedIndex = Math.Max(0, Array.IndexOf(allFontNames, oldValue.FontName));
       int newSelectedIndex = EditorGUI.Popup(fieldPosition, selectedIndex, allFontNames);
 

@@ -5,7 +5,7 @@ namespace DNode {
   public class DTexLumaToAlpha : DTexUnaryBlitUnit {
     private int _ColorBasis = Shader.PropertyToID("_ColorBasis");
 
-    [DoNotSerialize][PortLabelHidden][Color] public ValueInput ColorBasis;
+    [DoNotSerialize][Color] public ValueInput ColorBasis;
 
     protected override void Definition() {
       base.Definition();
