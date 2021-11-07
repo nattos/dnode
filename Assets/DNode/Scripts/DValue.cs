@@ -101,6 +101,10 @@ namespace DNode {
       return (float)this[row, 0];
     }
 
+    public bool BoolFromRow(int row, Vector2 defaultValues = default) {
+      return this[row, 0] != 0.0;
+    }
+
     public Vector2 Vector2FromRow(int row, Vector2 defaultValues = default) {
       if (Columns == 1) {
         float value = (float)this[row, 0];
