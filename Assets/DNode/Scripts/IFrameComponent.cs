@@ -24,6 +24,9 @@ namespace DNode {
     private readonly Func<TComponent, TValue> _getter;
     private readonly Action<TComponent, TValue> _setter;
     private readonly TComponent _component;
+    private readonly bool _useChangeCheck;
+    private readonly Func<TComponent, bool> _useChangeCheckPredicate;
+    private readonly Func<TComponent, bool> _shouldResetPredicate;
 
     private TValue _initialValue = default;
     private TValue _currentValue;
@@ -31,10 +34,13 @@ namespace DNode {
     private bool _wasChanged = false;
     private int _currentFrameNumber = 0;
 
-    public FrameComponentField(TComponent comonent, Func<TComponent, TValue> getter, Action<TComponent, TValue> setter) {
+    public FrameComponentField(TComponent comonent, Func<TComponent, TValue> getter, Action<TComponent, TValue> setter, bool useChangeCheck = true, Func<TComponent, bool> useChangeCheckPredicate = null, Func<TComponent, bool> shouldResetPredicate = null) {
       _component = comonent;
       _getter = getter;
       _setter = setter;
+      _useChangeCheck = useChangeCheck && useChangeCheckPredicate == null;
+      _useChangeCheckPredicate = useChangeCheckPredicate;
+      _shouldResetPredicate = shouldResetPredicate;
     }
 
     public TValue Value {
@@ -43,7 +49,7 @@ namespace DNode {
       }
       set {
         _currentFrameNumber = DScriptMachine.CurrentInstance.Transport.AbsoluteFrame;
-        if (_comparer.Equals(_currentValue, value)) {
+        if ((_useChangeCheck || _useChangeCheckPredicate?.Invoke(_component) == true) && _comparer.Equals(_currentValue, value)) {
           return;
         }
         if (!_isDirty) {
@@ -82,8 +88,10 @@ namespace DNode {
       }
       int currentFrame = DScriptMachine.CurrentInstance.Transport.AbsoluteFrame;
       if (_currentFrameNumber != currentFrame) {
-        _setter.Invoke(_component, _initialValue);
-        _currentValue = _initialValue;
+        if (_shouldResetPredicate?.Invoke(_component) != false) {
+          _setter.Invoke(_component, _initialValue);
+          _currentValue = _initialValue;
+        }
         wasChanged = true;
         _isDirty = false;
         _wasChanged = false;

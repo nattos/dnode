@@ -20,8 +20,8 @@ namespace DNode {
 
     protected override void Definition() {
       base.Definition();
-      Position = ValueInput<DEvent>(nameof(Position), default);
-      Rotation = ValueInput<DEvent>(nameof(Rotation), default);
+      Position = ValueInput<DEvent>(nameof(Position), DEvent.CreateImmediate((DValue)Vector3.zero, triggered: false));
+      Rotation = ValueInput<DEvent>(nameof(Rotation), DEvent.CreateImmediate((DValue)Vector3.zero, triggered: false));
       Scale = ValueInput<DEvent>(nameof(Scale), DEvent.CreateImmediate((DValue)Vector3.one, triggered: false));
     }
 
