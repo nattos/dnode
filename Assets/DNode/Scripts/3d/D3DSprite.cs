@@ -40,7 +40,9 @@ namespace DNode {
           if (transform) {
             transform.LocalPosition.Value = position.Vector3FromRow(row);
             transform.LocalRotation.Value = Quaternion.Euler(rotation.Vector3FromRow(row));
-            transform.LocalScale.Value = scale.Vector3FromRow(row, Vector3.one);
+            Vector3 localScale = scale.Vector3FromRow(row, Vector3.one);
+            localScale.x *= texture.width / (float)texture.height;
+            transform.LocalScale.Value = localScale;
           }
 
           instance.GetComponent<Renderer>().SetPropertyBlock(materialPropertyBlock);

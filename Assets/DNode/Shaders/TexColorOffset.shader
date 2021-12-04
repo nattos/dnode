@@ -79,9 +79,9 @@ Shader "Hidden/TexColorOffset"
                 colR.rgb = ShiftHue(colR.rgb, hueShift);
                 colG.rgb = ShiftHue(colG.rgb, hueShift);
                 colB.rgb = ShiftHue(colB.rgb, hueShift);
-                float4 outR = float4(dot(colR.rgb, colorBasesR.rgb) * colorBasesR.rgb, _ColorBasisR.a * _AlphaR);
-                float4 outG = float4(dot(colG.rgb, colorBasesG.rgb) * colorBasesG.rgb, _ColorBasisG.a * _AlphaG);
-                float4 outB = float4(dot(colB.rgb, colorBasesB.rgb) * colorBasesB.rgb, _ColorBasisB.a * _AlphaB);
+                float4 outR = float4(dot(colR.rgb, colorBasesR.rgb) * colorBasesR.rgb, colR.a * _AlphaR);
+                float4 outG = float4(dot(colG.rgb, colorBasesG.rgb) * colorBasesG.rgb, colG.a * _AlphaG);
+                float4 outB = float4(dot(colB.rgb, colorBasesB.rgb) * colorBasesB.rgb, colB.a * _AlphaB);
                 outR.rgb = ShiftHue(outR.rgb, -hueShift);
                 outG.rgb = ShiftHue(outG.rgb, -hueShift);
                 outB.rgb = ShiftHue(outB.rgb, -hueShift);
