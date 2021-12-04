@@ -17,6 +17,7 @@ namespace DNode {
 
     private DTexUnit _capturingUnit = null;
     private RenderTexture _captureTexture;
+    private bool _previewAlphaChannel = false;
 
     private double _lastDrawTime = Time.realtimeSinceStartupAsDouble;
     private TextureUsedCheckerState _textureUsedCheckerState = null;
@@ -56,6 +57,10 @@ namespace DNode {
       descRect.y = yPos;
       descRect.height = EditorGUIUtility.singleLineHeight;
       yPos = descRect.yMax + yPadding;
+      Rect previewAlphaRect = rect;
+      previewAlphaRect.y = yPos;
+      previewAlphaRect.height = EditorGUIUtility.singleLineHeight;
+      yPos = previewAlphaRect.yMax + yPadding;
       Rect previewRect = rect;
       previewRect.y = yPos;
       previewRect.height = rect.yMax - yPos;
@@ -67,7 +72,12 @@ namespace DNode {
         return;
       }
       EditorGUI.LabelField(descRect, $"Texture: {_captureTexture.width}x{_captureTexture.height}");
-      EditorGUI.DrawPreviewTexture(previewRect, _captureTexture, mat: null, scaleMode: ScaleMode.ScaleToFit);
+      _previewAlphaChannel = EditorGUI.ToggleLeft(previewAlphaRect, "Alpha channel", _previewAlphaChannel);
+      if (_previewAlphaChannel) {
+        EditorGUI.DrawTextureAlpha(previewRect, _captureTexture, scaleMode: ScaleMode.ScaleToFit);
+      } else {
+        EditorGUI.DrawPreviewTexture(previewRect, _captureTexture, mat: null, scaleMode: ScaleMode.ScaleToFit);
+      }
     }
 
     private void StartCapturingTexture() {
