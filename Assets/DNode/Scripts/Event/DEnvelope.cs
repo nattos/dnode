@@ -234,7 +234,11 @@ namespace DNode {
       DValue ComputeFromFlow(Flow flow) {
         DValue input;
         if (_useMultiTrigger) {
-          input = flow.GetValue<DValue>(MultiTrigger);
+          if (MultiTrigger.hasAnyConnection) {
+            input = flow.GetValue<DValue>(MultiTrigger);
+          } else {
+            input = 0.0;
+          }
         } else {
           input = flow.GetValue<bool>(Trigger) ? 1.0 : 0.0;
         }

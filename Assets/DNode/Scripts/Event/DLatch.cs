@@ -14,9 +14,25 @@ namespace DNode {
     [DoNotSerialize] public ValueInput Initial;
     [DoNotSerialize] public ValueInput Input;
     [DoNotSerialize] public ValueInput Trigger;
+    [DoNotSerialize] public ValueInput MultiTrigger;
     [DoNotSerialize] public ValueInput Reset;
 
     [Inspectable] public LatchMode Latch = LatchMode.Trigger;
+    
+    private bool _useMultiTrigger = false;
+    [Serialize][Inspectable] public bool UseMultiTrigger {
+      get {
+        return _useMultiTrigger;
+      }
+      set {
+        if (_useMultiTrigger == value) {
+          return;
+        }
+        _useMultiTrigger = value;
+        PortsChanged();
+      }
+    }
+
     [Inspectable] public bool OutputIsEventFlow = true;
 
     [DoNotSerialize]
@@ -32,7 +48,11 @@ namespace DNode {
     protected override void Definition() {
       Initial = ValueInput<DValue>(nameof(Initial));
       Input = ValueInput<DEvent>(nameof(Input));
-      Trigger = ValueInput<bool>(nameof(Trigger), false);
+      if (_useMultiTrigger) {
+        MultiTrigger = ValueInput<DValue>(nameof(MultiTrigger));
+      } else {
+        Trigger = ValueInput<bool>(nameof(Trigger), false);
+      }
       Reset = ValueInput<bool>(nameof(Reset), false);
 
       DEvent ComputeFromFlow(Flow flow) {
@@ -60,13 +80,44 @@ namespace DNode {
               }
             }
             case LatchMode.Trigger: {
-              bool trigger = flow.GetValue<bool>(Trigger);
-              if (trigger) {
-                DEvent input = DEvent.GetOptionalEventInput(flow, Input);
-                _latchedValue = input.Value;
-                return DEvent.CreateImmediate(_latchedValue, true);
-              } else {
+              if (_useMultiTrigger) {
+                if (!MultiTrigger.hasAnyConnection) {
+                  return DEvent.CreateImmediate(_latchedValue, !OutputIsEventFlow);
+                }
+                DValue trigger = flow.GetValue<DValue>(MultiTrigger);
+                bool anyTriggered = false;
+                for (int i = 0; i < trigger.Rows; ++i) {
+                  if (trigger.BoolFromRow(i)) {
+                    anyTriggered = true;
+                    break;
+                  }
+                }
+                if (anyTriggered) {
+                  DValue oldValue = _latchedValue;
+                  DValue input = DEvent.GetOptionalEventInput(flow, Input).Value;
+                  int rows = trigger.Rows;
+                  int cols = System.Math.Max(oldValue.Columns, input.Columns);
+                  DMutableValue newValue = new DMutableValue(rows, cols);
+                  for (int i = 0; i < rows; ++i) {
+                    if (trigger.BoolFromRow(i)) {
+                      newValue.SetRow(i, input, i);
+                    } else {
+                      newValue.SetRow(i, oldValue, i);
+                    }
+                  }
+                  _latchedValue = newValue.ToValue();
+                  return DEvent.CreateImmediate(_latchedValue, true);
+                }
                 return DEvent.CreateImmediate(_latchedValue, !OutputIsEventFlow);
+              } else {
+                bool trigger = flow.GetValue<bool>(Trigger);
+                if (trigger) {
+                  DEvent input = DEvent.GetOptionalEventInput(flow, Input);
+                  _latchedValue = input.Value;
+                  return DEvent.CreateImmediate(_latchedValue, true);
+                } else {
+                  return DEvent.CreateImmediate(_latchedValue, !OutputIsEventFlow);
+                }
               }
             }
             default:
