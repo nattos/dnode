@@ -65,16 +65,16 @@ namespace DNode {
 
     protected override void SetMaterialProperties(Flow flow, Material material) {
       base.SetMaterialProperties(flow, material);
-      material.SetColor(_ColorBasisR, flow.GetValue<DValue>(ColorBasisR));
-      material.SetColor(_ColorBasisG, flow.GetValue<DValue>(ColorBasisG));
-      material.SetColor(_ColorBasisB, flow.GetValue<DValue>(ColorBasisB));
+      material.SetColor(_ColorBasisR, _useCustomColorBasis ? flow.GetValue<DValue>(ColorBasisR) : Color.red);
+      material.SetColor(_ColorBasisG, _useCustomColorBasis ? flow.GetValue<DValue>(ColorBasisG) : Color.green);
+      material.SetColor(_ColorBasisB, _useCustomColorBasis ? flow.GetValue<DValue>(ColorBasisB) : Color.blue);
       material.SetFloat(_HueShift, flow.GetValue<DValue>(HueShift) / 360.0f * Mathf.PI * 2);
       material.SetVector(_ShiftR, (Vector2)flow.GetValue<DValue>(ShiftR));
       material.SetVector(_ShiftG, (Vector2)flow.GetValue<DValue>(ShiftG));
       material.SetVector(_ShiftB, (Vector2)flow.GetValue<DValue>(ShiftB));
-      material.SetFloat(_AlphaR, flow.GetValue<DValue>(AlphaR));
-      material.SetFloat(_AlphaG, flow.GetValue<DValue>(AlphaG));
-      material.SetFloat(_AlphaB, flow.GetValue<DValue>(AlphaB));
+      material.SetFloat(_AlphaR, _useAlphaPerChannel ? flow.GetValue<DValue>(AlphaR) : 1.0f);
+      material.SetFloat(_AlphaG, _useAlphaPerChannel ? flow.GetValue<DValue>(AlphaG) : 1.0f);
+      material.SetFloat(_AlphaB, _useAlphaPerChannel ? flow.GetValue<DValue>(AlphaB) : 1.0f);
     }
   }
 }

@@ -143,7 +143,7 @@ namespace DNode {
         }
         if (drawFullLabel) {
           EditorGUI.DrawRect(GetSliderInnerRect(pixelRect), _sliderBarOverlayColor);
-          DrawSliderLabel(pixelRect, label, isFullWidth: true);
+          DrawSliderLabel(pixelRect, label, isFullWidth: true, isVisible: true);
         }
       }
       if (EditorGUI.EndChangeCheck()) {
@@ -249,7 +249,10 @@ namespace DNode {
       }
     }
 
-    private static void DrawSliderLabel(Rect rect, string label, bool isFullWidth) {
+    private static void DrawSliderLabel(Rect rect, string label, bool isFullWidth, bool isVisible) {
+      if (!isVisible) {
+        rect.width = 0;
+      }
       EditorGUI.LabelField(SliderLabelRect(rect, isFullWidth), label);
     }
     private static Rect SliderLabelRect(Rect rect, bool isFullWidth) {
@@ -301,7 +304,7 @@ namespace DNode {
         }
       }
 
-      DrawSliderLabel(rect, label, isFullWidth: true);
+      DrawSliderLabel(rect, label, isFullWidth: true, isVisible: true);
       if (EditorGUI.EndChangeCheck()) {
         return boolValue ? 1.0 : 0.0;
       }
@@ -332,9 +335,7 @@ namespace DNode {
       bool valueFullWidth = state.HasValue && (e.alt || isDraggingValue || (!drawFullLabel && fieldState.Hovered));
       bool showLabel = forceLabels || (!valueFullWidth && state.ShowLabel && !drawFullLabel);
       bool showValue = !forceLabels && state.HasValue;
-      if (showLabel) {
-        DrawSliderLabel(rect, label, isFullWidth: !showValue);
-      }
+      DrawSliderLabel(rect, label, isFullWidth: !showValue, isVisible: showLabel);
       float floatValue = showValue ? SliderTextField(rect, value, valueFullWidth) : (float)value;
       if (EditorGUI.EndChangeCheck()) {
         return floatValue;
