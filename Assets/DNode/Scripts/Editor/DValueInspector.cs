@@ -251,7 +251,10 @@ namespace DNode {
 
     private static void DrawSliderLabel(Rect rect, string label, bool isFullWidth, bool isVisible) {
       if (!isVisible) {
-        rect.width = 0;
+        // Note: If this is zero, Unity doesn't record the record the existence of the control at
+        // all, breaking the ordering of controls and their IDs. This messes up certain dragging
+        // operations.
+        rect.width = 1.0f;
       }
       EditorGUI.LabelField(SliderLabelRect(rect, isFullWidth), label);
     }
@@ -445,7 +448,13 @@ namespace DNode {
     
     private static double ComputeSliderValueFromDelta(Rect rect, float delta, double oldValue, ValueState state) {
       double t = ToTSpace(oldValue, state.Min, state.Max, state.IsLog, state.LogScalingFactor);
-      t += delta / _sliderFineDragDistance;
+      if (t < 0.0) {
+        t += (Math.Floor(-t) + 1.0) * delta / _sliderFineDragDistance;
+      } else if (t > 1.0) {
+        t += (Math.Floor(t - 1.0) + 1.0) * delta / _sliderFineDragDistance;
+      } else {
+        t += delta / _sliderFineDragDistance;
+      }
       return FromTSpace(t, state.Min, state.Max, state.IsLog, state.LogScalingFactor, state.ClampMode);
     }
 
