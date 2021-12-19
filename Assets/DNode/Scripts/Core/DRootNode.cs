@@ -14,6 +14,8 @@ namespace DNode {
     [DoNotSerialize]
     public ValueInput FrameOutput;
 
+    private readonly List<DIOOutputNode> _executeAfterNodesScratch = new List<DIOOutputNode>();
+
     protected override void Definition() {
       FrameOutput = ValueInput<DFrameNodes>("FrameOutput");
 
@@ -45,14 +47,25 @@ namespace DNode {
         }
 
         // Pull output nodes.
+        _executeAfterNodesScratch.Clear();
         var outputNodes = DIOOutputNode.GetNodesForGraph(graph) ?? Array.Empty<DIOOutputNode>();
         DScriptMachine.CurrentInstance.ReportedOutputNodeCount = outputNodes.Count;
         foreach (var node in outputNodes) {
-          node.ComputeFromFlow(flow);
+          if (node.ExecuteAfterGraph) {
+            _executeAfterNodesScratch.Add(node);
+          } else {
+            node.ComputeFromFlow(flow);
+          }
         }
 
         DFrameNodes frameData = FrameOutput.connectedPorts.Any() ? flow.GetValue<DFrameNodes>(FrameOutput) : default;
         flow.stack.gameObject.GetComponent<DScriptMachine>().ExportFrameData(new DFrameData { Nodes = frameData });
+
+        foreach (var node in _executeAfterNodesScratch) {
+          node.ComputeFromFlow(flow);
+        }
+        _executeAfterNodesScratch.Clear();
+
         return null;
       });
     }

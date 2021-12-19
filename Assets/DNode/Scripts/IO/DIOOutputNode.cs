@@ -7,6 +7,8 @@ namespace DNode {
   public abstract class DIOOutputNode : Unit, IDOutputNode {
     private static readonly Dictionary<FlowGraph, List<DIOOutputNode>> _outputNodes = new Dictionary<FlowGraph, List<DIOOutputNode>>();
 
+    public virtual bool ExecuteAfterGraph => false;
+
     public static IReadOnlyList<DIOOutputNode> GetNodesForGraph(FlowGraph graph) {
       _outputNodes.TryGetValue(graph, out var nodes);
       return nodes;

@@ -6,10 +6,24 @@ namespace DNode {
   public class DOnChange : Unit {
     private const double _epsilon = UnityUtils.DefaultEpsilon;
 
+    [DoNotSerialize] public ValueInput Initial;
     [DoNotSerialize] public ValueInput Input;
     [DoNotSerialize] public ValueInput Reset;
 
     [Inspectable] public bool UseMultiTrigger = false;
+    [Inspectable] public bool TriggerOnReset = true;
+
+    private bool _useExplicitInitialState = false;
+    [Serialize][Inspectable] public bool UseExplicitInitialState {
+      get => _useExplicitInitialState;
+      set {
+        if (value == _useExplicitInitialState) {
+          return;
+        }
+        _useExplicitInitialState = value;
+        PortsChanged();
+      }
+    }
 
     [DoNotSerialize]
     [PortLabelHidden]
@@ -19,6 +33,9 @@ namespace DNode {
     private DValue _latchedValue;
 
     protected override void Definition() {
+      if (UseExplicitInitialState) {
+        Initial = ValueInput<DValue>(nameof(Initial));
+      }
       Input = ValueInput<DEvent>(nameof(Input));
       Reset = ValueInput<bool>(nameof(Reset), false);
 
@@ -26,12 +43,21 @@ namespace DNode {
         DEvent input = DEvent.GetOptionalEventInput(flow, Input);
         if (!_hasLatchedValue || flow.GetValue<bool>(Reset)) {
           _hasLatchedValue = true;
-          _latchedValue = input.Value;
-          if (UseMultiTrigger) {
-            DMutableValue emptyMultiTriggerResult = new DMutableValue(_latchedValue.Rows, 1);
-            return DEvent.CreateImmediate(emptyMultiTriggerResult.ToValue(), true);
+          if (UseExplicitInitialState && Initial.hasAnyConnection) {
+            _latchedValue = flow.GetValue<DValue>(Initial);
           } else {
-            return DEvent.CreateImmediate(_latchedValue, true);
+            _latchedValue = input.Value;
+            if (UseMultiTrigger) {
+              DMutableValue emptyMultiTriggerResult = new DMutableValue(_latchedValue.Rows, 1);
+              if (TriggerOnReset) {
+                for (int row = 0; row < emptyMultiTriggerResult.Rows; ++row) {
+                  emptyMultiTriggerResult[row, 0] = 1.0;
+                }
+              }
+              return DEvent.CreateImmediate(emptyMultiTriggerResult.ToValue(), TriggerOnReset);
+            } else {
+              return DEvent.CreateImmediate(_latchedValue, TriggerOnReset);
+            }
           }
         }
         DMutableValue newMultiTriggerResult = default;

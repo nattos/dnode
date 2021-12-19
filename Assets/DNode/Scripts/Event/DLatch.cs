@@ -34,6 +34,7 @@ namespace DNode {
     }
 
     [Inspectable] public bool OutputIsEventFlow = true;
+    [Inspectable] public bool TriggerOnReset = false;
 
     [DoNotSerialize]
     [PortLabelHidden]
@@ -62,7 +63,9 @@ namespace DNode {
           }
           _latchedValue = flow.GetValue<DValue>(Initial);
           _hasLatchedValue = true;
-          return DEvent.CreateImmediate(_latchedValue, true);
+          if (TriggerOnReset) {
+            return DEvent.CreateImmediate(_latchedValue, true);
+          }
         }
         int frameNumber = DScriptMachine.CurrentInstance.Transport.AbsoluteFrame;
         if (_currentFrameNumber != frameNumber) {

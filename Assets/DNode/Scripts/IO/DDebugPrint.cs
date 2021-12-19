@@ -6,6 +6,8 @@ namespace DNode {
   public class DDebugPrint : DIOOutputNode {
     [DoNotSerialize][PortLabelHidden] public ValueInput Input;
 
+    public override bool ExecuteAfterGraph => true;
+
     protected override void Definition() {
       Input = ValueInput<object>("Input", default);
     }

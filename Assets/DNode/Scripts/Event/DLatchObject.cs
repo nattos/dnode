@@ -8,6 +8,8 @@ namespace DNode {
     [DoNotSerialize] public ValueInput Trigger;
     [DoNotSerialize] public ValueInput Reset;
 
+    [Inspectable] public bool TriggerOnReset = false;
+
     [DoNotSerialize]
     [PortLabelHidden]
     public ValueOutput result;
@@ -15,7 +17,7 @@ namespace DNode {
     [DoNotSerialize] public ValueOutput resultPrev;
 
     private bool _hasLatchedValue;
-    private int _currentFrameNumber = 0;
+    private int _currentFrameNumber = -1;
     private object _latchedValue;
 
     protected override void Definition() {
@@ -31,7 +33,9 @@ namespace DNode {
           }
           _latchedValue = flow.GetValue<object>(Initial);
           _hasLatchedValue = true;
-          return _latchedValue;
+          if (TriggerOnReset) {
+            return _latchedValue;
+          }
         }
         int frameNumber = DScriptMachine.CurrentInstance.Transport.AbsoluteFrame;
         if (_currentFrameNumber != frameNumber) {
