@@ -7,6 +7,8 @@ using UnityEngine;
 
 namespace DNode {
   public class MaterialComponent : FrameComponentBase {
+    private int _Alpha = Shader.PropertyToID("_Alpha");
+    private int _Texture2D = Shader.PropertyToID("_Texture2D");
     private int _BaseColorMap = Shader.PropertyToID("_BaseColorMap");
     private int _ExposureTexture = Shader.PropertyToID("_ExposureTexture");
 
@@ -19,6 +21,8 @@ namespace DNode {
     private int _EmissiveColor = Shader.PropertyToID("_EmissiveColor");
     private int _BaseColor = Shader.PropertyToID("_BaseColor");
 
+    public FrameComponentField<MaterialComponent, float> Alpha;
+    public FrameComponentField<MaterialComponent, Texture> Texture2D;
     public FrameComponentField<MaterialComponent, Color> BaseColor;
     public FrameComponentField<MaterialComponent, Texture> BaseTexture;
     public FrameComponentField<MaterialComponent, float> Metallic;
@@ -42,6 +46,8 @@ namespace DNode {
     }
 
     protected override IEnumerable<IFrameComponentField> GetFields() {
+      yield return Alpha = MakeFloatField(_Alpha);
+      yield return Texture2D = MakeTextureField(_Texture2D);
       yield return BaseColor = MakeColorField(_BaseColor);
       yield return BaseTexture = MakeTextureField(_BaseColorMap);
       yield return Metallic = MakeFloatField(_Metallic);
@@ -58,7 +64,7 @@ namespace DNode {
     private static Color GetColor(MaterialComponent self, int propId) => self._materialPropertyBlock.GetColor(propId);
     private static void SetColor(MaterialComponent self, int propId, Color value) => self._materialPropertyBlock.SetColor(propId, value);
     private static Texture GetTexture(MaterialComponent self, int propId) => self._materialPropertyBlock.GetTexture(propId);
-    private static void SetTexture(MaterialComponent self, int propId, Texture value) => self._materialPropertyBlock.SetTexture(propId, value.OrNull() ?? Texture2D.whiteTexture);
+    private static void SetTexture(MaterialComponent self, int propId, Texture value) => self._materialPropertyBlock.SetTexture(propId, value.OrNull() ?? UnityEngine.Texture2D.whiteTexture);
 
     private static readonly Dictionary<int, (object getter, object setter, object getFromMaterial)> _propDelegates = new Dictionary<int, (object, object, object)>();
 

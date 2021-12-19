@@ -8,6 +8,7 @@ namespace DNode {
     [DoNotSerialize] public ValueInput Input;
     [DoNotSerialize][PortLabelHidden][PortKey("CustomTrigger")] public ValueInput CustomTriggerInput;
     [DoNotSerialize][PortLabelHidden] public ValueOutput result;
+    [DoNotSerialize][PortLabelHidden] public ValueOutput resultPlaying;
     [DoNotSerialize][PortLabelHidden] public ValueOutput resultTriggered;
 
     private bool _useExternalOptions = false;
@@ -25,6 +26,7 @@ namespace DNode {
     [Serialize][Inspectable] public DLaunchFollowActionType FollowActionB { get => LaunchOptions.FollowActionB; set => LaunchOptions.FollowActionB = value; }
     [Serialize][Inspectable][InspectorRange(0, 1)] public double FollowABChance { get => LaunchOptions.FollowABChance; set => LaunchOptions.FollowABChance = value; }
     [Serialize][Inspectable] public bool FireTriggerOnLoop { get => LaunchOptions.FireTriggerOnLoop; set => LaunchOptions.FireTriggerOnLoop = value; }
+    [Serialize][Inspectable] public bool IsDefaultCell = false;
 
     [DoNotSerialize] public DLaunchOptions LaunchOptions;
     [DoNotSerialize] public bool HasInput => Input.hasAnyConnection;
@@ -60,6 +62,7 @@ namespace DNode {
         PreviousSibling = DNodeUtils.GetOptional<DLaunchCell>(flow, PreviousSiblingInput);
         return this;
       }));
+      resultPlaying = ValueOutput<bool>("resultPlaying", flow => StatusPlaying);
       resultTriggered = ValueOutput<bool>("resultTriggered", flow => DScriptMachine.CurrentInstance.Transport.AbsoluteFrame == StatusLaunchedOnFrameNumber);
     }
   }

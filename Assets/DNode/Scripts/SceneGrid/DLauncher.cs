@@ -94,6 +94,7 @@ namespace DNode {
     DLaunchQuantization IDLaunchable.LaunchOptionQuantization => DLaunchQuantization.Global;
 
     private Func<Flow, DLauncher> _computeLayoutFromFlow;
+    private bool _isInitialized = false;
     private DLaunchHeader[] _headers = new DLaunchHeader[0];
     private DLaunchCell[,] _cells = new DLaunchCell[0, 0];
     private DLaunchScene[] _scenes = new DLaunchScene[0];
@@ -101,6 +102,7 @@ namespace DNode {
     private int?[] _queuedScene = new int?[0];
     private QuantizedLaunchHelper[] _quantizedLaunchers = new QuantizedLaunchHelper[0];
     private PlayHelper[] _players = new PlayHelper[0];
+    private List<DLaunchCell> _triggerOnLoopScratch = new List<DLaunchCell>();
 
     protected override void Definition() {
       NameInput = ValueInput<DLaunchHeader>("Name");
@@ -123,6 +125,31 @@ namespace DNode {
         UpdateLayout();
         _cachedInputConnections.Clear();
         EnumerateAllLayoutConnections(_cachedInputConnections);
+
+        if (!_isInitialized) {
+          _isInitialized = true;
+          for (int row = 0; row < _scenes.Length; ++row) {
+            var scene = _scenes[row];
+            if (scene == null) {
+              continue;
+            }
+            if (scene.IsDefaultScene) {
+              scene.Triggered = true;
+            }
+          }
+          for (int row = 0; row < _cells.GetLength(0); ++row) {
+            for (int col = 0; col < _cells.GetLength(1); ++col) {
+              var cell = _cells[row, col];
+              if (cell == null) {
+                continue;
+              }
+              if (cell.IsDefaultCell) {
+                cell.Triggered = true;
+              }
+            }
+          }
+        }
+
         return this;
       });
 
@@ -251,21 +278,23 @@ namespace DNode {
     }
 
     private void UpdateTriggerInputs(Flow flow) {
-      if (flow.GetValue<DLaunchableTriggerValue>(CustomTriggerInput).Trigger) {
+      if (flow.GetValue<DLaunchableTriggerValue>(CustomTriggerInput)?.Trigger == true) {
         _allStopTriggered = true;
       }
       foreach (DLaunchHeader header in _headers) {
-        if (flow.GetValue<DLaunchableTriggerValue>(header.CustomTriggerInput).Trigger) {
+        if (flow.GetValue<DLaunchableTriggerValue>(header.CustomTriggerInput)?.Trigger == true) {
           header.Triggered = true;
         }
       }
       foreach (DLaunchScene scene in _scenes) {
-        if (flow.GetValue<DLaunchableTriggerValue>(scene.CustomTriggerInput).Trigger) {
+        if (scene != null && scene.CustomTriggerInput != null &&
+            flow.GetValue<DLaunchableTriggerValue>(scene.CustomTriggerInput)?.Trigger == true) {
           scene.Triggered = true;
         }
       }
       foreach (DLaunchCell cell in _cells) {
-        if (flow.GetValue<DLaunchableTriggerValue>(cell.CustomTriggerInput).Trigger) {
+        if (cell != null && cell.CustomTriggerInput != null &&
+            flow.GetValue<DLaunchableTriggerValue>(cell.CustomTriggerInput)?.Trigger == true) {
           cell.Triggered = true;
         }
       }
@@ -275,6 +304,7 @@ namespace DNode {
       int sceneCount = _cells.GetLength(0);
       int columnCount = _cells.GetLength(1);
       int currentFrame = DScriptMachine.CurrentInstance.Transport.AbsoluteFrame;
+      _triggerOnLoopScratch.Clear();
 
       if (_allStopTriggered) {
         _allStopTriggered = false;
@@ -299,10 +329,6 @@ namespace DNode {
         bool followActionTriggered = player.Step(ref launchOptions, out double nextLaunchTime, out double playQuantizationPercent);
         cell.StatusPlayingQuantizationPercent = playQuantizationPercent;
         if (followActionTriggered) {
-          if (launchOptions.FireTriggerOnLoop) {
-            cell.StatusLaunchedOnFrameNumber = currentFrame;
-          }
-
           double p = _random.NextDouble();
           DLaunchFollowActionType followAction;
           if (p < launchOptions.FollowABChance) {
@@ -375,11 +401,18 @@ namespace DNode {
             toTrigger.StatusQueued = false;
             if (toTrigger.HasInput) {
               toTrigger.StatusPlaying = true;
+              _triggerOnLoopScratch.Add(toTrigger);
             } else {
               toTrigger.StatusPlaying = false;
             }
             _playingScene[col] = toTrigger.LayoutScene;
             _players[col].ResetAtLaunchTime(nextLaunchTime);
+          }
+          // TODO: Do not trigger if playing cell changed.
+          if (toTrigger == null || toTrigger == cell) {
+            if (launchOptions.FireTriggerOnLoop) {
+              _triggerOnLoopScratch.Add(cell);
+            }
           }
         }
       }
@@ -481,7 +514,6 @@ namespace DNode {
             }
           }
           _players[col].Reset(launchQuantization);
-          // TODO: Send trigger.
         }
       }
 
@@ -504,6 +536,13 @@ namespace DNode {
         _scenes[row].StatusQueued = allQueued;
         _scenes[row].StatusPlaying = allPlaying;
       }
+
+      foreach (var cell in _triggerOnLoopScratch) {
+        if (cell.StatusPlaying) {
+          cell.StatusLaunchedOnFrameNumber = currentFrame;
+        }
+      }
+      _triggerOnLoopScratch.Clear();
     }
 
     private DLaunchCell GetCellOrNull(int row, int col) {

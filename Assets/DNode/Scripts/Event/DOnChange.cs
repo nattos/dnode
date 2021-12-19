@@ -9,6 +9,8 @@ namespace DNode {
     [DoNotSerialize] public ValueInput Input;
     [DoNotSerialize] public ValueInput Reset;
 
+    [Inspectable] public bool UseMultiTrigger = false;
+
     [DoNotSerialize]
     [PortLabelHidden]
     public ValueOutput result;
@@ -25,13 +27,27 @@ namespace DNode {
         if (!_hasLatchedValue || flow.GetValue<bool>(Reset)) {
           _hasLatchedValue = true;
           _latchedValue = input.Value;
-          return DEvent.CreateImmediate(_latchedValue, true);
+          if (UseMultiTrigger) {
+            DMutableValue emptyMultiTriggerResult = new DMutableValue(_latchedValue.Rows, 1);
+            return DEvent.CreateImmediate(emptyMultiTriggerResult.ToValue(), true);
+          } else {
+            return DEvent.CreateImmediate(_latchedValue, true);
+          }
+        }
+        DMutableValue newMultiTriggerResult = default;
+        if (UseMultiTrigger) {
+          newMultiTriggerResult = new DMutableValue(_latchedValue.Rows, 1);
         }
         if (!input.IsTriggered) {
-          return DEvent.CreateImmediate(_latchedValue, false);
+          if (UseMultiTrigger) {
+            return DEvent.CreateImmediate(newMultiTriggerResult.ToValue(), true);
+          } else {
+            return DEvent.CreateImmediate(_latchedValue, false);
+          }
         }
         DValue newValue = input.Value;
-        bool changed;
+        bool changed = false;
+        bool multiChanged = false;
         if (newValue.Rows != _latchedValue.Rows || newValue.Columns != _latchedValue.Columns) {
           changed = true;
         } else {
@@ -41,7 +57,12 @@ namespace DNode {
           for (int row = 0; row < rows; ++row) {
             for (int col = 0; col < columns; ++col) {
               if (Math.Abs(newValue[row, col] - _latchedValue[row, col]) > _epsilon) {
-                changed = true;
+                if (UseMultiTrigger) {
+                  newMultiTriggerResult[row, 0] = 1.0;
+                  multiChanged = true;
+                } else {
+                  changed = true;
+                }
                 break;
               }
             }
@@ -50,10 +71,14 @@ namespace DNode {
             }
           }
         }
-        if (changed) {
+        if (changed || multiChanged) {
           _latchedValue = newValue;
         }
-        return DEvent.CreateImmediate(_latchedValue, changed);
+        if (UseMultiTrigger) {
+          return DEvent.CreateImmediate(newMultiTriggerResult.ToValue(), multiChanged);
+        } else {
+          return DEvent.CreateImmediate(_latchedValue, changed);
+        }
       }
       result = ValueOutput<DEvent>("result", DNodeUtils.CachePerFrame(ComputeFromFlow));
     }

@@ -207,6 +207,9 @@ namespace DNode {
       }
     }
     [Inspectable] public ResetMode OnTriggerResetMode;
+    [Inspectable] public bool UseAbsoluteTime;
+
+    private double _lastAbsoluteTime = 0.0;
 
     [DoNotSerialize]
     [PortLabelHidden]
@@ -266,7 +269,18 @@ namespace DNode {
           }
         }
 
-        double deltaTime = DScriptMachine.CurrentInstance.Transport.DeltaTime;
+        double deltaTime;
+        if (UseAbsoluteTime) {
+          double currentTime = DScriptMachine.CurrentInstance.Transport.AbsoluteTime;
+          if (_lastAbsoluteTime == 0.0) {
+            deltaTime = DScriptMachine.CurrentInstance.Transport.DeltaTime;
+          } else {
+            deltaTime = currentTime - _lastAbsoluteTime;
+          }
+          _lastAbsoluteTime = currentTime;
+        } else {
+          deltaTime = DScriptMachine.CurrentInstance.Transport.DeltaTime;
+        }
         for (int row = 0; row < rows; ++row) {
           var envelope = _envelopes[row];
           if (reset) {

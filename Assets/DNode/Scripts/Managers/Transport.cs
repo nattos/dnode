@@ -16,6 +16,7 @@ namespace DNode {
     public double LoopPhase => UnityUtils.WrappedModulo(Beat, LoopLengthBeats) / LoopLengthBeats;
     public int AbsoluteFrame = 0;
     public double DeltaTime => UnityEngine.Time.deltaTime;
+    public double AbsoluteTime => UnityEngine.Time.timeAsDouble;
 
     public double Tempo = 120.0;
     public double TempoBeatsPerSecond => Tempo / 60.0;

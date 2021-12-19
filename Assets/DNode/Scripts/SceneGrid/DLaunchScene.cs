@@ -11,6 +11,7 @@ namespace DNode {
     [DoNotSerialize] public string Name;
     [DoNotSerialize] public DLaunchCell FirstCell;
     [DoNotSerialize] public DLaunchScene NextScene;
+    [Serialize][Inspectable] public bool IsDefaultScene = false;
 
     [DoNotSerialize] public int LayoutSceneNumber;
     [DoNotSerialize] public DLauncher LayoutGrid;

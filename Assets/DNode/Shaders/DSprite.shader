@@ -3,6 +3,7 @@ Shader "New Shader Graph"
         Properties
         {
             [NoScaleOffset]_Texture2D("Texture2D", 2D) = "white" {}
+            _Alpha("Float", Float) = 1.0
             [HideInInspector]_EmissionColor("Color", Color) = (1, 1, 1, 1)
             [HideInInspector]_RenderQueueType("Float", Float) = 4
             [HideInInspector][ToggleUI]_AddPrecomputedVelocity("Boolean", Float) = 0
@@ -5316,6 +5317,7 @@ Shader "New Shader Graph"
                 float4 _DoubleSidedConstants;
                 float _BlendMode;
                 float _EnableBlendModePreserveSpecularLighting;
+                float _Alpha;
                 CBUFFER_END
                 
                 // Object and Global properties
@@ -5458,7 +5460,7 @@ Shader "New Shader Graph"
                     float _SampleTexture2D_f8b110823ee943e1adcd2303a5688a1d_A_7 = _SampleTexture2D_f8b110823ee943e1adcd2303a5688a1d_RGBA_0.a;
                     surface.BaseColor = (_SampleTexture2D_f8b110823ee943e1adcd2303a5688a1d_RGBA_0.xyz);
                     surface.Emission = float3(0, 0, 0);
-                    surface.Alpha = _SampleTexture2D_f8b110823ee943e1adcd2303a5688a1d_A_7;
+                    surface.Alpha = _SampleTexture2D_f8b110823ee943e1adcd2303a5688a1d_A_7 * _Alpha;
                     surface.AlphaClipThreshold = 0.5;
                     surface.AlphaClipThresholdDepthPrepass = 0.5;
                     surface.AlphaClipThresholdDepthPostpass = 0.5;
@@ -5966,6 +5968,7 @@ Shader "New Shader Graph"
                 float4 _DoubleSidedConstants;
                 float _BlendMode;
                 float _EnableBlendModePreserveSpecularLighting;
+                float _Alpha;
                 CBUFFER_END
                 
                 // Object and Global properties
@@ -6108,7 +6111,7 @@ Shader "New Shader Graph"
                     float _SampleTexture2D_f8b110823ee943e1adcd2303a5688a1d_A_7 = _SampleTexture2D_f8b110823ee943e1adcd2303a5688a1d_RGBA_0.a;
                     surface.BaseColor = (_SampleTexture2D_f8b110823ee943e1adcd2303a5688a1d_RGBA_0.xyz);
                     surface.Emission = float3(0, 0, 0);
-                    surface.Alpha = _SampleTexture2D_f8b110823ee943e1adcd2303a5688a1d_A_7;
+                    surface.Alpha = _SampleTexture2D_f8b110823ee943e1adcd2303a5688a1d_A_7 * _Alpha;
                     surface.AlphaClipThreshold = 0.5;
                     surface.AlphaClipThresholdDepthPrepass = 0.5;
                     surface.AlphaClipThresholdDepthPostpass = 0.5;
@@ -6353,7 +6356,7 @@ Shader "New Shader Graph"
                         // If use shadow threshold isn't enable we don't allow any test
                         #endif
             
-                        GENERIC_ALPHA_TEST(surfaceDescription.Alpha, alphaCutoff);
+                    //    GENERIC_ALPHA_TEST(surfaceDescription.Alpha, alphaCutoff);
                     #endif
             
                     #if !defined(SHADER_STAGE_RAY_TRACING) && _DEPTHOFFSET_ON
@@ -6422,7 +6425,8 @@ Shader "New Shader Graph"
                 // --------------------------------------------------
                 // Main
             
-                #include "Packages/com.unity.render-pipelines.high-definition/Runtime/RenderPipeline/ShaderPass/ShaderPassForwardUnlit.hlsl"
+                // #include "Packages/com.unity.render-pipelines.high-definition/Runtime/RenderPipeline/ShaderPass/ShaderPassForwardUnlit.hlsl"
+                #include "DSpriteForwardUnlit.hlsl"
             
                 // --------------------------------------------------
                 // Visual Effect Vertex Invocations
