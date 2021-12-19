@@ -25,11 +25,14 @@ namespace DNode {
         var buttonPosition = new Rect(position.x, position.y, position.width, EditorGUIUtility.singleLineHeight);
 
         Color launchColor = target?.StatusPlaying == true ? Color.green : target?.StatusQueued == true ? Color.yellow : target?.HasInput == true ? Color.gray : Color.red;
-        if (UnityEditorUtils.ColoredButton(buttonPosition, target?.LaunchLabelOverride ?? "Launch", EditorStyles.miniButton, launchColor)) {
+        double quantizationPercent = target?.StatusPlaying == true ? target.StatusPlayingQuantizationPercent : target?.StatusQueued == true ? target.StatusQueuedQuantizationPercent : 0.0;
+        launchColor = Color.Lerp(Color.black, launchColor, 0.5f);
+        if (DValueInspector.SemiFilledButton(buttonPosition, target?.LaunchLabelOverride ?? "Launch", launchColor, UnityUtils.LerpAlpha(Color.black, 0.0f, 0.5f), quantizationPercent)) {
           if (target != null) {
             target.Triggered = true;
           }
         }
+
       } finally {
         EndBlock(metadata);
       }

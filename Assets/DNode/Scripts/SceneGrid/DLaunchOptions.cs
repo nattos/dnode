@@ -47,6 +47,7 @@ namespace DNode {
     public DLaunchFollowActionType FollowActionB;
     [InspectorRange(0, 1)]
     public double FollowABChance;
+    public bool FireTriggerOnLoop;
 
     public static DLaunchOptions Make(DLaunchQuantization quantization) {
       return new DLaunchOptions { Quantization = quantization };

@@ -19,6 +19,9 @@ namespace DNode {
     [DoNotSerialize] public bool Triggered { get; set; }
     [DoNotSerialize] public bool StatusPlaying { get; set; }
     [DoNotSerialize] public bool StatusQueued { get; set; }
+    [DoNotSerialize] public double StatusPlayingQuantizationPercent { get; set; }
+    [DoNotSerialize] public double StatusQueuedQuantizationPercent { get; set; }
+    [DoNotSerialize] public int StatusLaunchedOnFrameNumber { get; set; } = -1;
     string IDLaunchable.LaunchLabelOverride => null;
     DLaunchQuantization IDLaunchable.LaunchOptionQuantization => DLaunchQuantization.Global;
 

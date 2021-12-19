@@ -8,6 +8,7 @@ namespace DNode {
     [DoNotSerialize] public ValueInput Input;
     [DoNotSerialize][PortLabelHidden][PortKey("CustomTrigger")] public ValueInput CustomTriggerInput;
     [DoNotSerialize][PortLabelHidden] public ValueOutput result;
+    [DoNotSerialize][PortLabelHidden] public ValueOutput resultTriggered;
 
     private bool _useExternalOptions = false;
     [Inspectable] public bool UseExternalOptions {
@@ -23,6 +24,7 @@ namespace DNode {
     [Serialize][Inspectable] public DLaunchFollowActionType FollowActionA { get => LaunchOptions.FollowActionA; set => LaunchOptions.FollowActionA = value; }
     [Serialize][Inspectable] public DLaunchFollowActionType FollowActionB { get => LaunchOptions.FollowActionB; set => LaunchOptions.FollowActionB = value; }
     [Serialize][Inspectable][InspectorRange(0, 1)] public double FollowABChance { get => LaunchOptions.FollowABChance; set => LaunchOptions.FollowABChance = value; }
+    [Serialize][Inspectable] public bool FireTriggerOnLoop { get => LaunchOptions.FireTriggerOnLoop; set => LaunchOptions.FireTriggerOnLoop = value; }
 
     [DoNotSerialize] public DLaunchOptions LaunchOptions;
     [DoNotSerialize] public bool HasInput => Input.hasAnyConnection;
@@ -35,6 +37,9 @@ namespace DNode {
     [DoNotSerialize] public bool Triggered { get; set; }
     [DoNotSerialize] public bool StatusPlaying { get; set; }
     [DoNotSerialize] public bool StatusQueued { get; set; }
+    [DoNotSerialize] public double StatusPlayingQuantizationPercent { get; set; }
+    [DoNotSerialize] public double StatusQueuedQuantizationPercent { get; set; }
+    [DoNotSerialize] public int StatusLaunchedOnFrameNumber { get; set; } = -1;
     string IDLaunchable.LaunchLabelOverride => null;
     DLaunchQuantization IDLaunchable.LaunchOptionQuantization => LaunchOptions.Quantization;
 
@@ -55,6 +60,7 @@ namespace DNode {
         PreviousSibling = DNodeUtils.GetOptional<DLaunchCell>(flow, PreviousSiblingInput);
         return this;
       }));
+      resultTriggered = ValueOutput<bool>("resultTriggered", flow => DScriptMachine.CurrentInstance.Transport.AbsoluteFrame == StatusLaunchedOnFrameNumber);
     }
   }
 }

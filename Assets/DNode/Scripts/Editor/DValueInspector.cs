@@ -314,6 +314,42 @@ namespace DNode {
       return value;
     }
 
+    public static bool SemiFilledButton(Rect rect, string label, Color backgroundColor, Color fillColor, double fillValue) {
+      var controlId = GUIUtility.GetControlID(_dsliderControlIDHint, FocusType.Passive, rect);
+      FieldState fieldState = new FieldState {
+          Highlighted = GUIUtility.keyboardControl == controlId,
+          Hovered = rect.Contains(e.mousePosition),
+      };
+
+      Color borderColor = fieldState.Highlighted ? _sliderBarHighlightBorder : fieldState.Hovered ? _sliderBarHoveredBorder : _sliderBarHighlightBorder;
+      EditorGUI.DrawRect(rect, borderColor);
+      Rect innerRect = GetSliderInnerRect(rect);
+      EditorGUI.DrawRect(innerRect, backgroundColor);
+      Rect valueRect = innerRect;
+      valueRect.width *= (float)Math.Max(0.0, Math.Min(1.0, fillValue));
+      EditorGUI.DrawRect(valueRect, fillColor);
+
+      EditorGUI.BeginChangeCheck();
+      switch (e.GetTypeForControl(controlId)) {
+        case EventType.MouseDown: {
+          if (!rect.Contains(e.mousePosition) || e.button != (int)MouseButton.Left) {
+            break;
+          }
+          GUI.changed = true;
+          e.Use();
+          break;
+        }
+      }
+
+      GUIStyle style = new GUIStyle(EditorStyles.centeredGreyMiniLabel);
+      style.normal.textColor = Color.white;
+      EditorGUI.LabelField(SliderLabelRect(rect, isFullWidth: true), label, style);
+      if (EditorGUI.EndChangeCheck()) {
+        return true;
+      }
+      return false;
+    }
+
     private static double Slider(Rect rect, string label, double value, double defaultValue, ValueState state, ref VectorState vectorState, out bool drawFullLabel) {
       var controlId = GUIUtility.GetControlID(_dsliderControlIDHint, FocusType.Keyboard, rect);
       FieldState fieldState = new FieldState {

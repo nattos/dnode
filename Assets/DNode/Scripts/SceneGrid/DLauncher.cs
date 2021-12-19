@@ -16,13 +16,17 @@ namespace DNode {
         _previousTime = CurrentTime;
       }
 
-      public bool Step(double quantization) {
+      public bool Step(double quantization, out double quantizedPercent) {
         if (quantization < UnityUtils.DefaultEpsilon) {
+          quantizedPercent = 1.0;
           return true;
         }
         double currentTime = CurrentTime;
-        bool triggered = Math.Floor(_previousTime / quantization) != Math.Floor(currentTime / quantization);
+        double currentQuantizedTime = currentTime / quantization;
+        double currentQuantizedIndex = Math.Floor(currentQuantizedTime);
+        bool triggered = Math.Floor(_previousTime / quantization) != currentQuantizedIndex;
         _previousTime = currentTime;
+        quantizedPercent = currentQuantizedTime - currentQuantizedIndex;
         return triggered;
       }
     }
@@ -33,14 +37,16 @@ namespace DNode {
       private double _launchTime;
       private double _previousTime;
 
-      public bool Step(ref DLaunchOptions options, out double nextLaunchTime) {
+      public bool Step(ref DLaunchOptions options, out double nextLaunchTime, out double playQuantizationPercent) {
         double currentTime = CurrentTime - _launchTime;
         double lengthBeats = options.LengthBeats < UnityUtils.DefaultEpsilon ? 4.0 : Math.Max(UnityUtils.DefaultEpsilon, options.LengthBeats);
         double previousPatternIndex = Math.Floor(_previousTime / lengthBeats);
-        double nextPatternIndex = Math.Floor(currentTime / lengthBeats);
+        double nextPatternPos = currentTime / lengthBeats;
+        double nextPatternIndex = Math.Floor(nextPatternPos);
         bool triggered = previousPatternIndex != nextPatternIndex;
         _previousTime = currentTime;
         nextLaunchTime = _launchTime + nextPatternIndex * lengthBeats;
+        playQuantizationPercent = nextPatternPos - nextPatternIndex;
         return triggered;
       }
 
@@ -80,6 +86,9 @@ namespace DNode {
     bool IDLaunchable.Triggered { get { return _allStopTriggered; } set { _allStopTriggered = value; } }
     bool IDLaunchable.StatusPlaying { get { return false; } set {} }
     bool IDLaunchable.StatusQueued { get { return false; } set {} }
+    double IDLaunchable.StatusPlayingQuantizationPercent { get; set; }
+    double IDLaunchable.StatusQueuedQuantizationPercent { get; set; }
+    int IDLaunchable.StatusLaunchedOnFrameNumber { get; set; } = -1;
     string IDLaunchable.LaunchLabelOverride => "All Stop";
     bool IDLaunchable.HasInput => false;
     DLaunchQuantization IDLaunchable.LaunchOptionQuantization => DLaunchQuantization.Global;
@@ -265,6 +274,7 @@ namespace DNode {
     private void UpdateTriggering() {
       int sceneCount = _cells.GetLength(0);
       int columnCount = _cells.GetLength(1);
+      int currentFrame = DScriptMachine.CurrentInstance.Transport.AbsoluteFrame;
 
       if (_allStopTriggered) {
         _allStopTriggered = false;
@@ -286,7 +296,13 @@ namespace DNode {
 
         DLaunchOptions launchOptions = cell.LaunchOptions;
         ref PlayHelper player = ref _players[col];
-        if (player.Step(ref launchOptions, out double nextLaunchTime)) {
+        bool followActionTriggered = player.Step(ref launchOptions, out double nextLaunchTime, out double playQuantizationPercent);
+        cell.StatusPlayingQuantizationPercent = playQuantizationPercent;
+        if (followActionTriggered) {
+          if (launchOptions.FireTriggerOnLoop) {
+            cell.StatusLaunchedOnFrameNumber = currentFrame;
+          }
+
           double p = _random.NextDouble();
           DLaunchFollowActionType followAction;
           if (p < launchOptions.FollowABChance) {
@@ -444,11 +460,14 @@ namespace DNode {
         }
 
         double launchQuantization = GetLaunchQuantization(cell.LaunchOptionQuantization);
-        if (_quantizedLaunchers[col].Step(launchQuantization)) {
+        bool launched = _quantizedLaunchers[col].Step(launchQuantization, out double launchQuantizationPercent);
+        cell.StatusQueuedQuantizationPercent = launchQuantizationPercent;
+        if (launched) {
           cell.StatusQueued = false;
           int? oldPlayingScene = _playingScene[col];
           if (cell.HasInput) {
             cell.StatusPlaying = true;
+            cell.StatusLaunchedOnFrameNumber = currentFrame;
             _playingScene[col] = queuedScene;
           } else {
             cell.StatusPlaying = false;

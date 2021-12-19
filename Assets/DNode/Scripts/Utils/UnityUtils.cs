@@ -100,6 +100,10 @@ namespace DNode {
       Vector3 yIQ = new Vector3(lightness, I, Q);
       return new Color(Vector3.Dot(yIQ, kYIQToR), Vector3.Dot(yIQ, kYIQToG), Vector3.Dot(yIQ, kYIQToB), hsl.w);
     }
+
+    public static Color LerpAlpha(Color color, float targetAlpha, float t) {
+      return new Color(color.r, color.g, color.b, Lerp(color.a, targetAlpha, t));
+    }
   
     public static int Modulo(int a, int b) {
       int remainder = a % b;
