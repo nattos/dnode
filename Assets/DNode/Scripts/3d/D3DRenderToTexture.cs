@@ -18,7 +18,7 @@ namespace DNode {
       Inputs = ValueInput<DFrameNodes>("Inputs", default);
 
       DFrameTexture ComputeFromFlow(Flow flow) {
-        if (!Inputs.connections.Any()) {
+        if (!Inputs.hasAnyConnection) {
           return UnityUtils.BlankTexture;
         }
         Texture result = DScriptMachine.CurrentInstance.RenderNodesToTexture(flow.GetValue<DFrameNodes>(Inputs), SizeSource);

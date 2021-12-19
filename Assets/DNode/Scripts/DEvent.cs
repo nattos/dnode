@@ -55,7 +55,7 @@ namespace DNode {
     }
 
     public static DEvent GetOptionalEventInput(Unity.VisualScripting.Flow flow, Unity.VisualScripting.ValueInput input) {
-      if (!input.connections.Any()) {
+      if (!input.hasAnyConnection) {
         return DEvent.Create(() => default, triggered: false);
       }
       return flow.GetValue<DEvent>(input);

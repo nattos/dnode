@@ -26,7 +26,7 @@ namespace DNode {
 
       object ComputeFromFlow(Flow flow) {
         if (!_hasLatchedValue || flow.GetValue<bool>(Reset)) {
-          if (!Initial.connections.Any()) {
+          if (!Initial.hasAnyConnection) {
             return _latchedValue;
           }
           _latchedValue = flow.GetValue<object>(Initial);

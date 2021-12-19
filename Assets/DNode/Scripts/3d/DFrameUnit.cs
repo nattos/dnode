@@ -10,7 +10,7 @@ namespace DNode {
     protected MeshGlyphCache MeshGlyphCache => DScriptMachine.CurrentInstance.MeshGlyphCache;
 
     public static DValue? GetNullableDValueFromDEventInput(Flow flow, ValueInput input, bool hasDefault = true) {
-      if (!hasDefault && !input.connections.Any()) {
+      if (!hasDefault && !input.hasAnyConnection) {
         return null;
       }
       DEvent devent = flow.GetValue<DEvent>(input);
@@ -21,21 +21,21 @@ namespace DNode {
     }
 
     public static DFrameTexture GetNullableDFrameTexture(Flow flow, ValueInput input) {
-      if (!input.connections.Any()) {
+      if (!input.hasAnyConnection) {
         return null;
       }
       return flow.GetValue<DFrameTexture>(input);
     }
   
     public static T? GetNullableValue<T>(Flow flow, ValueInput input) where T : struct {
-      if (!input.connections.Any()) {
+      if (!input.hasAnyConnection) {
         return default;
       }
       return flow.GetValue<T>(input);
     }
 
     public static DFrameArray<DFrameObject> GetFrameObjects(Flow flow, ValueInput input) {
-      if (!input.connections.Any()) {
+      if (!input.hasAnyConnection) {
         return default;
       }
       return flow.GetValue<DFrameArray<DFrameObject>>(input);

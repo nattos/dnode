@@ -57,7 +57,7 @@ namespace DNode {
 
       DEvent ComputeFromFlow(Flow flow) {
         if (!_hasLatchedValue || flow.GetValue<bool>(Reset)) {
-          if (!Initial.connections.Any()) {
+          if (!Initial.hasAnyConnection) {
             return DEvent.CreateImmediate(_latchedValue, triggered: !OutputIsEventFlow);
           }
           _latchedValue = flow.GetValue<DValue>(Initial);

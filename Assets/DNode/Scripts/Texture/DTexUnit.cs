@@ -27,7 +27,7 @@ namespace DNode {
 
     public static Texture GetTextureInput(Flow flow, ValueInput input, Texture defaultTexture = null) {
       Texture texture = null;
-      if (input.connections.Any()) {
+      if (input.hasAnyConnection) {
         texture = flow.GetValue<DFrameTexture>(input);
       }
       if (texture == null) {

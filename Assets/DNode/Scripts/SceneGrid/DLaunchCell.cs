@@ -25,7 +25,7 @@ namespace DNode {
     [Serialize][Inspectable][InspectorRange(0, 1)] public double FollowABChance { get => LaunchOptions.FollowABChance; set => LaunchOptions.FollowABChance = value; }
 
     [DoNotSerialize] public DLaunchOptions LaunchOptions;
-    [DoNotSerialize] public bool HasInput { get; set; }
+    [DoNotSerialize] public bool HasInput => Input.hasAnyConnection;
     [DoNotSerialize] public DLaunchCell PreviousSibling;
 
     [DoNotSerialize] public DLauncher LayoutGrid;
@@ -50,8 +50,7 @@ namespace DNode {
 
       result = ValueOutput<DLaunchCell>("result", DNodeUtils.CachePerFrame(flow => {
         flow.GetValue<DLaunchableTriggerValue>(CustomTriggerInput).Target = this;
-        LaunchOptions = DNodeUtils.GetOptional<DLaunchOptions>(flow, Options, LaunchOptions);
-        HasInput = Input.connections.Any();
+        LaunchOptions = _useExternalOptions ? DNodeUtils.GetOptional<DLaunchOptions>(flow, Options, LaunchOptions) : LaunchOptions;
 
         PreviousSibling = DNodeUtils.GetOptional<DLaunchCell>(flow, PreviousSiblingInput);
         return this;

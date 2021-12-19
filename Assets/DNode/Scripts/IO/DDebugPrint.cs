@@ -11,7 +11,7 @@ namespace DNode {
     }
 
     public override void ComputeFromFlow(Flow flow) {
-      if (!Input.connections.Any()) {
+      if (!Input.hasAnyConnection) {
         return;
       }
       object input = flow.GetValue<object>(Input);

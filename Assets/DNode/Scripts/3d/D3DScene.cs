@@ -14,7 +14,7 @@ namespace DNode {
       DFrameNodes ComputeFromFlow(Flow flow) {
         List<DFrameNode> outputs = new List<DFrameNode>();
         foreach (var input in multiInputs) {
-          if (!input.connections.Any()) {
+          if (!input.hasAnyConnection) {
             continue;
           }
           var frameObjects = flow.GetValue<DFrameNodes>(input);

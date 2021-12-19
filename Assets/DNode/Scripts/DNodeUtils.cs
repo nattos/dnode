@@ -5,7 +5,7 @@ using Unity.VisualScripting;
 namespace DNode {
   public static class DNodeUtils {
     public static T GetOptional<T>(Flow flow, ValueInput input, T defaultValue = default) {
-      if (!input.connections.Any()) {
+      if (!input.hasAnyConnection) {
         return defaultValue;
       }
       return flow.GetValue<T>(input);
