@@ -4,7 +4,7 @@ using UnityEngine;
 using Unity.VisualScripting;
 
 namespace DNode {
-  public class DLiteral : Unit {
+  public class DLiteral : Unit, IDCustomInspectorDataProvider {
     [DoNotSerialize][PortLabelHidden][ShortEditor] public ValueInput X;
     [DoNotSerialize][PortLabelHidden][ShortEditor] public ValueInput Y;
     [DoNotSerialize][PortLabelHidden][ShortEditor] public ValueInput Z;
@@ -23,10 +23,13 @@ namespace DNode {
     private Vector4 _valueDefault = Vector4.zero;
     private Vector4 _valueMin = Vector4.zero;
     private Vector4 _valueMax = Vector4.one;
+    private bool _isLogScale = false;
+    private double _logScalingFactor = 1.0;
+    private ClampMode _clampMode = ClampMode.Clamp;
     [Serialize][Inspectable] public Vector4 DefaultValue {
-      get => _valueMin;
+      get => _valueDefault;
       set {
-        _valueMin = value;
+        _valueDefault = value;
         PortsChanged();
       }
     }
@@ -44,22 +47,70 @@ namespace DNode {
         PortsChanged();
       }
     }
+    [Serialize][Inspectable] public bool IsLogScale {
+      get => _isLogScale;
+      set {
+        _isLogScale = value;
+        PortsChanged();
+      }
+    }
+    [Serialize][Inspectable] public double LogScalingFactor {
+      get => _logScalingFactor;
+      set {
+        _logScalingFactor = value;
+        PortsChanged();
+      }
+    }
+    [Serialize][Inspectable] public ClampMode ClampMode {
+      get => _clampMode;
+      set {
+        _clampMode = value;
+        PortsChanged();
+      }
+    }
 
     private int _resultLength;
 
+    private DCustomInspectorValue MakeValue(int axis) {
+      return new DCustomInspectorValue {
+        Value = _valueDefault[axis],
+        Key = $"{axis}",
+      };
+    }
+
+    public DCustomInspectorData? ProvideCustomInspectorData(string key) {
+      int axis;
+      switch (key) {
+        case "0": axis = 0; break;
+        case "1": axis = 1; break;
+        case "2": axis = 2; break;
+        case "3": axis = 3; break;
+        default:
+          return null;
+      }
+      return new DCustomInspectorData {
+        MinValue = _valueMin[axis],
+        MaxValue = _valueMax[axis],
+        DefaultValue = _valueDefault[axis],
+        IsLogScale = _isLogScale,
+        LogScalingFactor = _logScalingFactor,
+        ClampMode = _clampMode,
+      };
+    }
+
     protected override void Definition() {
-      X = ValueInput<DValue>(nameof(X), _valueDefault.x);
+      X = ValueInput<DCustomInspectorValue>(nameof(X), MakeValue(0));
       _resultLength = 1;
       if (_vectorLength >= 2) {
-        Y = ValueInput<DValue>(nameof(Y), _valueDefault.y);
+        Y = ValueInput<DCustomInspectorValue>(nameof(Y), MakeValue(1));
         _resultLength = 2;
       }
       if (_vectorLength >= 3) {
-        Z = ValueInput<DValue>(nameof(Z), _valueDefault.z);
+        Z = ValueInput<DCustomInspectorValue>(nameof(Z), MakeValue(2));
         _resultLength = 3;
       }
       if (_vectorLength >= 4) {
-        W = ValueInput<DValue>(nameof(W), _valueDefault.w);
+        W = ValueInput<DCustomInspectorValue>(nameof(W), MakeValue(3));
         _resultLength = 4;
       }
 

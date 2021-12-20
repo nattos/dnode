@@ -199,6 +199,7 @@ namespace DNode {
       System.Reflection.FieldInfo typesWithDefaultValuesField = typeof(ValueInput).GetField("typesWithDefaultValues", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
       ICollection<Type> typesWithDefaultValues = (ICollection<Type>)typesWithDefaultValuesField.GetValue(null);
       typesWithDefaultValues.Add(typeof(DValue));
+      typesWithDefaultValues.Add(typeof(DCustomInspectorValue));
       typesWithDefaultValues.Add(typeof(DEvent));
       typesWithDefaultValues.Add(typeof(DFontSpec));
       typesWithDefaultValues.Add(typeof(DIOFrameInputAddressSpec));

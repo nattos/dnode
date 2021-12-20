@@ -53,7 +53,7 @@ namespace DNode {
       public bool HasValue => PortState != PortState.ConnectedUnknown && PortState != PortState.ConnectedEventDeferred;
     }
 
-    public static bool DValueField(Rect rect, Metadata metadata, DValue inValue, AttributeCache attributeCache, out DValue outValue) {
+    public static bool DValueField(Rect rect, Metadata metadata, DValue inValue, AttributeCache attributeCache, out DValue outValue, DCustomInspectorData? customInspectorData = null) {
       outValue = inValue;
       if (attributeCache.TryGetAttribute<NoEditorAttribute>(metadata, out _)) {
         return false;
@@ -105,13 +105,14 @@ namespace DNode {
 
       ValueState state = new ValueState {
           PortState = portState,
-          Min = rangeAttrib?.Min ?? D3DConstants.DefaultGenericMathMin,
-          Max = rangeAttrib?.Max ?? D3DConstants.DefaultGenericMathMax,
-          IsLog = isLog,
-          LogScalingFactor = logScaleAttrib?.ScalingFactor ?? 1.0,
-          ClampMode = clampAttrib?.ClampMode ?? ClampMode.Clamp,
+          Min = customInspectorData?.MinValue ?? rangeAttrib?.Min ?? D3DConstants.DefaultGenericMathMin,
+          Max = customInspectorData?.MaxValue ?? rangeAttrib?.Max ?? D3DConstants.DefaultGenericMathMax,
+          IsLog = customInspectorData?.IsLogScale ?? isLog,
+          LogScalingFactor = customInspectorData?.LogScalingFactor ?? logScaleAttrib?.ScalingFactor ?? 1.0,
+          ClampMode = customInspectorData?.ClampMode ?? clampAttrib?.ClampMode ?? ClampMode.Clamp,
           ShowLabel = true,
       };
+      DValue? defaultValues = customInspectorData?.DefaultValue;
 
       EditorGUI.BeginChangeCheck();
       if (attributeCache.TryGetAttribute<ColorAttribute>(metadata, out _)) {
@@ -130,7 +131,12 @@ namespace DNode {
           Rect dimRect = pixelRect;
           dimRect.x += i * dimPartWidth;
           dimRect.width = dimPartWidth;
-          double defaultValue = (i == 0 ? rangeAttrib?.DefaultValue0 : i == 1 ? rangeAttrib?.DefaultValue1 : i == 2 ? rangeAttrib?.DefaultValue2 : i == 3 ? rangeAttrib?.DefaultValue3 : null) ?? 0.0;
+          double defaultValue;
+          if (defaultValues != null) {
+            defaultValue = defaultValues.Value[0, i];
+          } else {
+            defaultValue = (i == 0 ? rangeAttrib?.DefaultValue0 : i == 1 ? rangeAttrib?.DefaultValue1 : i == 2 ? rangeAttrib?.DefaultValue2 : i == 3 ? rangeAttrib?.DefaultValue3 : null) ?? 0.0;
+          }
           if (isBool) {
             _staticValues.Add(BooleanToggle(dimRect, partLabel, inValue[0, i], state));
           } else {
@@ -448,8 +454,10 @@ namespace DNode {
                 vectorState.IsGroupDrag = true;
                 vectorState.DragDelta = HandleUtility.niceMouseDelta;
               }
+              Debug.Log($"Shift: {value}");
             } else {
               value = ComputeSliderValue(rect, e.mousePosition, state);
+              Debug.Log($"Non-shift: {value}");
             }
             GUI.changed = true;
           }
@@ -484,6 +492,7 @@ namespace DNode {
     
     private static double ComputeSliderValueFromDelta(Rect rect, float delta, double oldValue, ValueState state) {
       double t = ToTSpace(oldValue, state.Min, state.Max, state.IsLog, state.LogScalingFactor);
+      bool disableClamp = t < -0.01 || t > 1.01;
       if (t < 0.0) {
         t += (Math.Floor(-t) + 1.0) * delta / _sliderFineDragDistance;
       } else if (t > 1.0) {
@@ -491,7 +500,11 @@ namespace DNode {
       } else {
         t += delta / _sliderFineDragDistance;
       }
-      return FromTSpace(t, state.Min, state.Max, state.IsLog, state.LogScalingFactor, state.ClampMode);
+      ClampMode clampMode = state.ClampMode;
+      if (disableClamp && clampMode == ClampMode.Clamp) {
+        clampMode = ClampMode.None;
+      }
+      return FromTSpace(t, state.Min, state.Max, state.IsLog, state.LogScalingFactor, clampMode);
     }
 
     private static double ComputeSliderValue(Rect rect, Vector2 mousePoint, ValueState state) {
