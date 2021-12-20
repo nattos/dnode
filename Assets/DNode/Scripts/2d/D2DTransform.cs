@@ -17,7 +17,7 @@ namespace DNode {
     [DoNotSerialize][PortLabelHidden][Scalar][WorldRange] public ValueInput Depth;
     [DoNotSerialize][PortLabelHidden][Boolean] public ValueInput FaceCamera;
     [DoNotSerialize][PortLabelHidden][Vector2][ZeroOneRange(0.5)] public ValueInput Anchor;
-    [DoNotSerialize][PortLabelHidden][Vector2][RotationRange] public ValueInput Rotation;
+    [DoNotSerialize][PortLabelHidden][Vector2][RotationRange][ClampMode(ClampMode.Wrap)] public ValueInput Rotation;
     [DoNotSerialize][PortLabelHidden][Vector2][ScaleRange] public ValueInput Scale;
     [DoNotSerialize] public ValueInput Relative;
 

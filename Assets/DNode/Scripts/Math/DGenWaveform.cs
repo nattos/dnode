@@ -78,23 +78,36 @@ namespace DNode {
         for (int row = 0; row < rows; ++row) {
           double t = time * speed[row, 0] + phase[row, 0];
           double value;
-          if (complement) {
-            t += 0.5f;
-          }
           switch (type) {
-            case WaveformType.Sine:
+            case WaveformType.Sine: {
+              if (complement) {
+                t += 0.25f;
+              }
               value = Math.Sin(t * Math.PI * 2.0);
               break;
-            case WaveformType.Triangle:
+            }
+            case WaveformType.Triangle: {
+              if (complement) {
+                t += 0.25f;
+              }
               value = Math.Abs(t - Math.Floor(t) - 0.5) * -4.0 + 1.0;
               break;
+            }
             default:
-            case WaveformType.Saw:
+            case WaveformType.Saw: {
               value = (t - Math.Floor(t)) * 2.0 - 1.0;
+              if (complement) {
+                value = -value;
+              }
               break;
-            case WaveformType.Pulse:
+            }
+            case WaveformType.Pulse: {
+              if (complement) {
+                t += 0.5f;
+              }
               value = (t - Math.Floor(t)) >= 0.5 ? 1.0 : -1.0;
               break;
+            }
           }
           if (range == RangeType.Unipolar) {
             value = value * 0.5 + 0.5;

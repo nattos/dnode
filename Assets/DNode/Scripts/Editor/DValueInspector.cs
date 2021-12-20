@@ -454,10 +454,8 @@ namespace DNode {
                 vectorState.IsGroupDrag = true;
                 vectorState.DragDelta = HandleUtility.niceMouseDelta;
               }
-              Debug.Log($"Shift: {value}");
             } else {
               value = ComputeSliderValue(rect, e.mousePosition, state);
-              Debug.Log($"Non-shift: {value}");
             }
             GUI.changed = true;
           }
