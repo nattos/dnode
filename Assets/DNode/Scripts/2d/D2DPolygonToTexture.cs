@@ -90,8 +90,9 @@ namespace DNode {
           _triangleArray[i * 3 + 2] = i + 2;
         }
 
-        _mesh.vertices = _vertexArray;
-        _mesh.triangles = _triangleArray;
+        _mesh.Clear();
+        _mesh.SetVertices(_vertexArray);
+        _mesh.SetTriangles(_triangleArray, 0);
       }
       if (_mesh != null) {
         if (_material == null) {

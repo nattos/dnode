@@ -5,7 +5,9 @@ namespace DNode {
   public abstract class DTexGenUnit<TData> : DTexUnit {
     [DoNotSerialize] public ValueInput Bypass;
 
-    [Inspectable] public TextureSizeSource SizeSource = TextureSizeSource.EnvOutput;
+    [Inspectable] public TextureGenSizeSource SizeSource = TextureGenSizeSource.EnvOutput;
+    [Inspectable] public int FixedWidth = 1024;
+    [Inspectable] public int FixedHeight = 1024;
 
     [DoNotSerialize]
     [PortLabelHidden]
@@ -18,9 +20,28 @@ namespace DNode {
         if (flow.GetValue<bool>(Bypass)) {
           return new DFrameTexture { Texture = GetBypassTexture(flow) };
         }
-        TextureSizeSource sizeSource = SizeSource;
+
         TData data = GetData(flow);
-        RenderTexture output = DScriptMachine.CurrentInstance.RenderTextureCache.Allocate(RenderTextureCache.GetSizeFromSource(GetSourceSize(data), sizeSource));
+        TextureSizeSource sizeSource;
+        Vector2Int? sourceSize = GetSourceSize(data);
+        switch (SizeSource) {
+          default:
+          case TextureGenSizeSource.Auto:
+            sizeSource = TextureSizeSource.Source;
+            break;
+          case TextureGenSizeSource.Fixed:
+            sizeSource = TextureSizeSource.Source;
+            sourceSize = new Vector2Int(Mathf.Max(1, FixedWidth), Mathf.Max(1, FixedHeight));
+            break;
+          case TextureGenSizeSource.EnvInput:
+            sizeSource = TextureSizeSource.EnvInput;
+            break;
+          case TextureGenSizeSource.EnvOutput:
+            sizeSource = TextureSizeSource.EnvOutput;
+            break;
+        }
+
+        RenderTexture output = DScriptMachine.CurrentInstance.RenderTextureCache.Allocate(RenderTextureCache.GetSizeFromSource(sourceSize, sizeSource));
         Compute(flow, data, output);
         BlitToDebugCaptureTexture(output);
         return new DFrameTexture { Texture = output };

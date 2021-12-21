@@ -12,6 +12,13 @@ namespace DNode {
     EnvInput,
   }
 
+  public enum TextureGenSizeSource {
+    Auto,
+    Fixed,
+    EnvOutput,
+    EnvInput,
+  }
+
   public class RenderTextureCache : IFrameComponent {
     private struct Key {
       public int Width;

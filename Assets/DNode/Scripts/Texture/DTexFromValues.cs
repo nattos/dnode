@@ -36,7 +36,7 @@ namespace DNode {
     private Texture2D _texture;
 
     public DTexFromValues() {
-      SizeSource = TextureSizeSource.Source;
+      SizeSource = TextureGenSizeSource.Auto;
     }
 
     public override void Dispose() {

@@ -36,7 +36,7 @@ namespace DNode {
     [Inspectable] public bool RetainPixelAspect = false;
 
     public DTexResize() {
-      SizeSource = TextureSizeSource.Source;
+      SizeSource = TextureGenSizeSource.Auto;
     }
 
     protected override void Definition() {

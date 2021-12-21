@@ -369,7 +369,7 @@ namespace DNode {
       if (e.clickCount < 2) {
         DragNumber(rect, controlId, ref value, defaultValue, state, fieldState, ref vectorState);
         vectorState.HadFirstDim = true;
-      } else {
+      } else if (rect.Contains(e.mousePosition)) {
         GUIUtility.hotControl = 0;
         GUIUtility.keyboardControl = 0;
       }

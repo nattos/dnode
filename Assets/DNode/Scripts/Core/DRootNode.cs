@@ -14,6 +14,9 @@ namespace DNode {
     [DoNotSerialize]
     public ValueInput FrameOutput;
 
+    [Inspectable] public int ReportedOutputNodeCount { get; private set; }
+    [Inspectable] public int ReportedRenderTextureCount { get; private set; }
+
     private readonly List<DIOOutputNode> _executeAfterNodesScratch = new List<DIOOutputNode>();
 
     protected override void Definition() {
@@ -65,6 +68,9 @@ namespace DNode {
           node.ComputeFromFlow(flow);
         }
         _executeAfterNodesScratch.Clear();
+
+        ReportedOutputNodeCount = DScriptMachine.CurrentInstance.ReportedOutputNodeCount;
+        ReportedRenderTextureCount = DScriptMachine.CurrentInstance.ReportedRenderTextureCount;
 
         return null;
       });

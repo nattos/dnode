@@ -8,6 +8,7 @@ using UnityEngine;
 namespace DNode {
   public static class UnityUtils {
     public const double DefaultEpsilon = 1e-6;
+    public const float DefaultFloatEpsilon = 1e-6f;
 
     private static Texture3D _blankTexture3D;
     public static Texture3D BlankTexture3D {
