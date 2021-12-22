@@ -10,18 +10,19 @@
       "url": "https://packages.unity.com"
     },
     "com.unity.cinemachine": {
-      "version": "2.8.1",
+      "version": "2.8.2",
       "depth": 0,
       "source": "registry",
       "dependencies": {},
       "url": "https://packages.unity.com"
     },
     "com.unity.collab-proxy": {
-      "version": "1.7.1",
+      "version": "1.15.1",
       "depth": 0,
       "source": "registry",
       "dependencies": {
-        "com.unity.nuget.newtonsoft-json": "2.0.0"
+        "com.unity.nuget.newtonsoft-json": "2.0.0",
+        "com.unity.services.core": "1.0.1"
       },
       "url": "https://packages.unity.com"
     },
@@ -42,7 +43,7 @@
       "url": "https://packages.unity.com"
     },
     "com.unity.ide.visualstudio": {
-      "version": "2.0.11",
+      "version": "2.0.12",
       "depth": 0,
       "source": "registry",
       "dependencies": {
@@ -58,7 +59,7 @@
       "url": "https://packages.unity.com"
     },
     "com.unity.inputsystem": {
-      "version": "1.1.1",
+      "version": "1.2.0",
       "depth": 0,
       "source": "registry",
       "dependencies": {
@@ -67,21 +68,21 @@
       "url": "https://packages.unity.com"
     },
     "com.unity.mathematics": {
-      "version": "1.2.4",
+      "version": "1.2.5",
       "depth": 1,
       "source": "registry",
       "dependencies": {},
       "url": "https://packages.unity.com"
     },
     "com.unity.nuget.newtonsoft-json": {
-      "version": "2.0.0",
+      "version": "2.0.2",
       "depth": 1,
       "source": "registry",
       "dependencies": {},
       "url": "https://packages.unity.com"
     },
     "com.unity.render-pipelines.core": {
-      "version": "12.1.0",
+      "version": "13.1.1",
       "depth": 1,
       "source": "builtin",
       "dependencies": {
@@ -91,7 +92,7 @@
       }
     },
     "com.unity.render-pipelines.high-definition": {
-      "version": "12.1.0",
+      "version": "13.1.1",
       "depth": 0,
       "source": "builtin",
       "dependencies": {
@@ -101,34 +102,43 @@
         "com.unity.modules.animation": "1.0.0",
         "com.unity.modules.imageconversion": "1.0.0",
         "com.unity.modules.terrain": "1.0.0",
-        "com.unity.render-pipelines.core": "12.1.0",
-        "com.unity.shadergraph": "12.1.0",
-        "com.unity.visualeffectgraph": "12.1.0",
-        "com.unity.render-pipelines.high-definition-config": "12.1.0"
+        "com.unity.render-pipelines.core": "13.1.1",
+        "com.unity.shadergraph": "13.1.1",
+        "com.unity.visualeffectgraph": "13.1.1",
+        "com.unity.render-pipelines.high-definition-config": "13.1.1"
       }
     },
     "com.unity.render-pipelines.high-definition-config": {
-      "version": "12.1.0",
+      "version": "13.1.1",
       "depth": 1,
       "source": "builtin",
       "dependencies": {
-        "com.unity.render-pipelines.core": "12.1.0"
+        "com.unity.render-pipelines.core": "13.1.1"
       }
     },
     "com.unity.searcher": {
-      "version": "4.9.0",
+      "version": "4.9.1",
       "depth": 2,
       "source": "registry",
       "dependencies": {},
       "url": "https://packages.unity.com"
     },
+    "com.unity.services.core": {
+      "version": "1.0.1",
+      "depth": 1,
+      "source": "registry",
+      "dependencies": {
+        "com.unity.modules.unitywebrequest": "1.0.0"
+      },
+      "url": "https://packages.unity.com"
+    },
     "com.unity.shadergraph": {
-      "version": "12.1.0",
+      "version": "13.1.1",
       "depth": 1,
       "source": "builtin",
       "dependencies": {
-        "com.unity.render-pipelines.core": "12.1.0",
-        "com.unity.searcher": "4.8.0"
+        "com.unity.render-pipelines.core": "13.1.1",
+        "com.unity.searcher": "4.9.1"
       }
     },
     "com.unity.test-framework": {
@@ -143,7 +153,7 @@
       "url": "https://packages.unity.com"
     },
     "com.unity.timeline": {
-      "version": "1.6.2",
+      "version": "1.7.0-pre.1",
       "depth": 0,
       "source": "registry",
       "dependencies": {
@@ -164,16 +174,16 @@
       }
     },
     "com.unity.visualeffectgraph": {
-      "version": "12.1.0",
+      "version": "13.1.1",
       "depth": 1,
       "source": "builtin",
       "dependencies": {
-        "com.unity.shadergraph": "12.1.0",
-        "com.unity.render-pipelines.core": "12.1.0"
+        "com.unity.shadergraph": "13.1.1",
+        "com.unity.render-pipelines.core": "13.1.1"
       }
     },
     "com.unity.visualscripting": {
-      "version": "1.7.3",
+      "version": "1.7.5",
       "depth": 0,
       "source": "registry",
       "dependencies": {
