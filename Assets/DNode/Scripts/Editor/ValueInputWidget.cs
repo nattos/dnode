@@ -40,17 +40,9 @@ namespace DNode {
             break;
         }
       }
-      //if (displayIconAsType == null) {
-      //  if (isDValue) {
-      //    ;
-      //  } else if (isDEvent) {
-      //    ;
-      //  }
-      //}
-      // Note: No longer works as UnitPortDescription.icon is a property.
-      // if (displayIconAsType != null) {
-      //   description.icon = Icons.Type(displayIconAsType);
-      // }
+      if (displayIconAsType != null) {
+        description.icon = Icons.Type(displayIconAsType);
+      }
     }
   }
 }
