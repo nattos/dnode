@@ -58,7 +58,7 @@ namespace DNode {
 
     protected override void Compute(Flow flow, Data data, RenderTexture output) {
       Texture texture = data.InputTexture;
-      texture.wrapMode = data.Wrap == DTexWrapMode.Wrap ? TextureWrapMode.Mirror : TextureWrapMode.Clamp;
+      texture.wrapMode = data.Wrap == DTexWrapMode.Wrap ? TextureWrapMode.Repeat : TextureWrapMode.Clamp;
       texture.filterMode = data.Interpolate == DTexInterpolationMode.Hard ? FilterMode.Point : FilterMode.Bilinear;
 
       Vector2 scale;

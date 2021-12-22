@@ -102,7 +102,7 @@ namespace DNode {
       }
       _texture.SetPixels(_colors);
       _texture.Apply(updateMipmaps: false);
-      _texture.wrapMode = data.Wrap == DTexWrapMode.Wrap ? TextureWrapMode.Mirror : TextureWrapMode.Clamp;
+      _texture.wrapMode = data.Wrap == DTexWrapMode.Wrap ? TextureWrapMode.Repeat : TextureWrapMode.Clamp;
       _texture.filterMode = data.Interpolate == DTexInterpolationMode.Hard ? FilterMode.Point : FilterMode.Bilinear;
 
       Graphics.Blit(_texture, output);

@@ -16,6 +16,7 @@ namespace DNode {
     [DoNotSerialize][Color] public ValueInput ColorBasis2;
     [DoNotSerialize][PortLabelHidden][Scalar][ZeroOneRange] public ValueInput BaseValue2;
     [DoNotSerialize][PortLabelHidden][Vector2][OneRange] public ValueInput Shift2;
+    [DoNotSerialize] public ValueInput Wrap;
 
     private bool _useSecondBasis = false;
     [Serialize][Inspectable] public bool UseSecondBasis {
@@ -37,6 +38,7 @@ namespace DNode {
         BaseValue2 = ValueInput<DValue>(nameof(BaseValue2), 0.5f);
         Shift2 = ValueInput<DValue>(nameof(Shift2), Vector2.zero);
       }
+      Wrap = ValueInput<DTexWrapMode>(nameof(Wrap), DTexWrapMode.Clamp);
     }
 
     protected override string ShaderPath => "Hidden/TexLumaOffset";
@@ -71,6 +73,12 @@ namespace DNode {
       material.SetColor(_ColorBasis2, colorBasis2);
       material.SetFloat(_BaseValue2, flow.GetValue<DValue>(BaseValue2));
       material.SetVector(_Shift2, (Vector2)flow.GetValue<DValue>(Shift2));
+    }
+
+    protected override void Blit(Flow flow, Texture lhs, Texture rhs, RenderTexture output, Material material) {
+      var wrapMode = flow.GetValue<DTexWrapMode>(Wrap);
+      lhs.wrapMode = wrapMode == DTexWrapMode.Wrap ? TextureWrapMode.Repeat : TextureWrapMode.Clamp;
+      base.Blit(flow, lhs, rhs, output, material);
     }
   }
 }
