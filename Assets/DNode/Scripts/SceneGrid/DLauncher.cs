@@ -306,6 +306,26 @@ namespace DNode {
       int currentFrame = DScriptMachine.CurrentInstance.Transport.AbsoluteFrame;
       _triggerOnLoopScratch.Clear();
 
+      int slideDelta = 0;
+      if (DScriptMachine.CurrentInstance.NextSlideRequested) {
+        slideDelta++;
+      }
+      if (DScriptMachine.CurrentInstance.PreviousSlideRequested) {
+        slideDelta--;
+      }
+      if (slideDelta != 0 && sceneCount > 0) {
+        int playingSceneIndex = -1;
+        for (int row = 0; row < sceneCount; ++row) {
+          if (_scenes[row].StatusPlaying) {
+            playingSceneIndex = row;
+            break;
+          }
+        }
+        int nextSceneIndex = playingSceneIndex + slideDelta;
+        nextSceneIndex = Math.Max(0, Math.Min(sceneCount - 1, nextSceneIndex));
+        _scenes[nextSceneIndex].Triggered = true;
+      }
+
       if (_allStopTriggered) {
         _allStopTriggered = false;
         foreach (DLaunchHeader header in _headers) {

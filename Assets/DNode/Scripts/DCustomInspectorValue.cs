@@ -12,6 +12,7 @@ namespace DNode {
     public bool? IsLogScale;
     public double? LogScalingFactor;
     public ClampMode? ClampMode;
+    public int? Dimensions;
   }
 
   public interface IDCustomInspectorDataProvider {

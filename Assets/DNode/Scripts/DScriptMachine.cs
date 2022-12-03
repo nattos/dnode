@@ -195,7 +195,16 @@ namespace DNode {
       return outputTexture;
     }
 
+    public bool PreviousSlideRequested = false;
+    public bool NextSlideRequested = false;
+
     protected void Update() {
+      PreviousSlideRequested =
+          UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.UpArrow) ||
+          UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.LeftArrow);
+      NextSlideRequested =
+          UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.DownArrow) ||
+          UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.RightArrow);
       if (!RunOnStep) {
         return;
       }

@@ -59,6 +59,11 @@ namespace DNode {
         return false;
       }
 
+      string fieldName = (metadata.parent?.parent?.value as ValueInput)?.key;
+      if (fieldName != null) {
+        customInspectorData = customInspectorData ?? (metadata.parent?.parent?.parent?.value as IDCustomInspectorDataProvider)?.ProvideCustomInspectorData(fieldName);
+      }
+
       PortState portState;
       string label = UnityEditorUtils.GetFieldLabel(metadata, attributeCache);
       if (UnityEditorUtils.IsFieldEditable(metadata)) {
@@ -96,7 +101,7 @@ namespace DNode {
       _staticValues.Clear();
       attributeCache.TryGetAttribute<RangeAttribute>(metadata, out var rangeAttrib);
       attributeCache.TryGetAttribute<VectorAttribute>(metadata, out var vectorAttrib);
-      int dims = vectorAttrib?.Dims ?? 1;
+      int dims = customInspectorData?.Dimensions ?? vectorAttrib?.Dims ?? 1;
       float dimPartWidth = rect.width / dims;
 
       bool isBool = attributeCache.TryGetAttribute<BooleanAttribute>(metadata, out _);
