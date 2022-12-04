@@ -15,7 +15,7 @@ namespace NanoGraph {
     public NanoFunction Function;
     public NanoFunction ArraySizeFunction;
     public IReadOnlyList<CodeLocal> InputLocals;
-    public IReadOnlyList<DataField> CompileTimeOnlyInputs;
+    // public IReadOnlyList<DataField> CompileTimeOnlyInputs;
     public IReadOnlyList<CodeLocal> OutputLocals;
     public List<string> Errors;
   }
@@ -30,13 +30,45 @@ namespace NanoGraph {
     void EmitCode(CodeContext context);
   }
 
+  public struct ComputeNodeResultEntry {
+    public IComputeNode Node;
+    public IComputeNodeEmitCodeOperation Operation;
+    public CodeCachedResult? Result;
+  }
+
+  public struct ComputeNodeEmitCodeOperationContext {
+    public List<string> errors;
+    public NanoGraph graph;
+    public NanoProgram program;
+
+    public NanoFunction executeFunction;
+    public NanoFunction createPipelinesFunction;
+
+    public IReadOnlyList<ComputeNodeResultEntry> dependentComputeNodes;
+    public IReadOnlyList<DataPlug> dependentComputeInputs;
+  }
+
+  public interface IComputeNodeEmitCodeOperation {
+    void EmitFunctionSignature();
+    void EmitFunctionPreamble(out NanoFunction func, out NanoFunction arraySizesFunc);
+    void EmitLoadFunctionInputs();
+    void ConsumeFunctionBodyResult(IReadOnlyDictionary<DataPlug, CodeLocal> resultLocalMap);
+    void EmitFunctionReturn(out CodeCachedResult? result);
+    void EmitValidateSizesCacheFunction();
+    void EmitValidateCacheFunction();
+    void EmitExecuteFunctionCode();
+
+    void RecordLoadInputForDescendantNode(IComputeNode descendant, DataField field, int inputIndex);
+    DataField[] GetInputsForDescendantNode(IComputeNode descendant);
+    void EmitLoadInputsForDescendantNode(IComputeNode descendant, CodeContext context);
+  }
+
   public interface IComputeNode : IDataNode {
     DataSpec ComputeInputSpec { get; }
     DataSpec AuxSizesOutputSpec { get; }
     INanoCodeContext CodeContext { get; }
-    void EmitLoadOutputsCode(CodeContext context, CodeCachedResult cachedResult);
     void EmitStoreAuxSizesCode(CodeContext context, CodeCachedResult cachedResult);
-    string EmitTotalThreadCount(NanoFunction func, CodeCachedResult cachedResult);
+    IComputeNodeEmitCodeOperation CreateEmitCodeOperation(ComputeNodeEmitCodeOperationContext context);
   }
 
   public interface ICompileTimeOnlyNode : IDataNode {}

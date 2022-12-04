@@ -29,5 +29,12 @@ namespace NanoGraph {
       }
       return defaultValue;
     }
+
+    public static TValue? GetOrNull<TKey, TValue>(this IReadOnlyDictionary<TKey, TValue> self, TKey key) where TValue : struct {
+      if (self.TryGetValue(key, out TValue value)) {
+        return value;
+      }
+      return null;
+    }
   }
 }

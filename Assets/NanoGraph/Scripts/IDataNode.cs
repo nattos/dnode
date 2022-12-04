@@ -8,6 +8,7 @@ namespace NanoGraph {
   public struct DataField {
     public string Name;
     public TypeSpec Type;
+    public IReadOnlyList<string> Attributes;
     public bool IsCompileTimeOnly;
 
     public static DataField MakePrimitive(string name, PrimitiveType type) {
@@ -19,14 +20,14 @@ namespace NanoGraph {
     }
 
     public static DataField FromTypeField(TypeField field) {
-      return new DataField { Name = field.Name, Type = field.Type };
+      return new DataField { Name = field.Name, Type = field.Type, Attributes = field.Attributes };
     }
 
     public static DataField[] FromTypeFields(IEnumerable<TypeField> fields) {
       if (fields == null) {
         return Array.Empty<DataField>();
       }
-      return fields.Select(field => new DataField { Name = field.Name, Type = field.Type }).ToArray();
+      return fields.Select(FromTypeField).ToArray();
     }
 
     public override string ToString() {

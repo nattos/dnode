@@ -79,9 +79,9 @@ namespace NanoGraph.VisualScripting {
               value = Vector4.zero;
               break;
             case PrimitiveType.TypeDecl:
+            case PrimitiveType.Vertices:
             default:
               break;
-
           }
         }
         if (value == null) {
@@ -229,12 +229,15 @@ namespace NanoGraph.VisualScripting {
 
   public class VectorCompute : NodeOfType<VectorComputeNode> {}
   public class ScalarCompute : NodeOfType<ScalarComputeNode> {}
+  public class VertexCompute : NodeOfType<VertexShaderComputeNode> {}
+  public class FragmentCompute : NodeOfType<FragmentShaderComputeNode> {}
   public class Read : NodeOfType<ReadNode> {}
   public class Math : NodeOfType<MathNode> {}
   public class MakeArray : NodeOfType<MakeArrayNode>{}
   public class Concat : NodeOfType<ConcatNode>{}
   public class VectorIndex : NodeOfType<VectorIndexNode>{}
   public class Pack : NodeOfType<PackNode>{}
+  public class Unpack : NodeOfType<UnpackNode>{}
   public class Literal : NodeOfType<LiteralNode>{}
 
   public class TypeDecl : NodeOfType<TypeDeclNode>{}

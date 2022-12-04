@@ -11,7 +11,7 @@ namespace NanoGraph {
     string EmitWritableBufferType(NanoProgramType type);
     string EmitSampleBuffer(string source, string index);
     string EmitWriteBuffer(string destination, string index, string value);
-    string EmitFunctionInput(CodeCachedResult cachedResult, DataField field, int index);
+    string EmitFunctionInput(NanoProgram program, CodeLocal cachedResult, string fieldName, int index);
     string EmitThreadId();
   }
 
@@ -20,8 +20,15 @@ namespace NanoGraph {
     public string EmitWritableBufferType(NanoProgramType type) => $"std::shared_ptr<NanoTypedBuffer<{type.EmitIdentifier(this)}>>";
     public string EmitSampleBuffer(string source, string index) => $"SampleBuffer({source}, {index})";
     public string EmitWriteBuffer(string destination, string index, string value) => $"WriteBuffer({destination}, {index}, {value})";
-    public string EmitFunctionInput(CodeCachedResult cachedResult, DataField field, int index) => $"{cachedResult.Result.Identifier}.{cachedResult.ResultType.GetField(field.Name)}";
+    public string EmitFunctionInput(NanoProgram program, CodeLocal cachedResult, string fieldName, int index) => $"{cachedResult.Identifier}.{program.GetProgramType(cachedResult.Type).GetField(fieldName)}";
     public string EmitThreadId() => throw new NotSupportedException();
+  }
+
+  public struct NanoGpuBufferRef {
+    public string FieldName;
+    public string Expression;
+    public int Index;
+    public TypeSpec Type;
   }
 
   public class NanoGpuContext : INanoCodeContext {
@@ -29,7 +36,7 @@ namespace NanoGraph {
     public string EmitWritableBufferType(NanoProgramType type) => $"device {type.EmitIdentifier(this)}*";
     public string EmitSampleBuffer(string source, string index) => $"SampleBuffer({source}, {index})";
     public string EmitWriteBuffer(string destination, string index, string value) => $"WriteBuffer({destination}, {index}, {value})";
-    public string EmitFunctionInput(CodeCachedResult cachedResult, DataField field, int index) => $"input{index}";
+    public string EmitFunctionInput(NanoProgram program, CodeLocal cachedResult, string fieldName, int index) => $"input{index}";
     public string EmitThreadId() => "gid";
   }
 
@@ -198,6 +205,17 @@ namespace NanoGraph {
     // public bool CanConvert(TypeSpec fromType, TypeSpec toType) {
     // }
 
+    public bool RequiresConvert(TypeSpec fromType, TypeSpec toType) {
+      return RequiresConvert(Program.GetProgramType(fromType), Program.GetProgramType(toType));
+    }
+
+    public bool RequiresConvert(NanoProgramType fromType, NanoProgramType toType) {
+      if (fromType == toType) {
+        return false;
+      }
+      return true;
+    }
+
     public string EmitConvert(TypeSpec fromType, TypeSpec toType, string expr) {
       return EmitConvert(Program.GetProgramType(fromType), Program.GetProgramType(toType), expr);
     }
@@ -228,13 +246,19 @@ namespace NanoGraph {
   }
 
   public class NanoProgramType {
+    private struct Field {
+      public NanoProgramType Type;
+      public string Name;
+      public IReadOnlyList<string> Attributes;
+    }
+
     public readonly NanoProgram Program;
     public readonly string Identifier;
     public readonly bool IsBuiltIn;
     public readonly bool IsArray;
     public readonly NanoProgramType ElementType;
 
-    private readonly List<(NanoProgramType, string)> _fields = new List<(NanoProgramType, string)>();
+    private readonly List<Field> _fields = new List<Field>();
     private readonly Dictionary<string, string> _fieldMap = new Dictionary<string, string>();
 
     public NanoProgramType(NanoProgram program, string identifier, bool isBuiltIn, bool isArray, NanoProgramType elementType) {
@@ -252,10 +276,11 @@ namespace NanoGraph {
       return Identifier;
     }
 
-    public string AddField(NanoProgramType type, string nameHint) {
+    public string AddField(NanoProgramType type, string nameHint, IReadOnlyList<string> attributes = null) {
+      attributes = attributes ?? Array.Empty<string>();
       int index = _fields.Count;
       string name = $"_{NanoProgram.SanitizeIdentifierFragment(nameHint)}_{index:D3}";
-      _fields.Add((type, name));
+      _fields.Add(new Field { Type = type, Name = name, Attributes = attributes });
       _fieldMap[nameHint] = name;
       return name;
     }
@@ -267,8 +292,14 @@ namespace NanoGraph {
     public string EmitOuterCode(INanoCodeContext context) {
       StringBuilder output = new StringBuilder();
       output.AppendLine($"struct {Identifier} {{");
-      foreach ((NanoProgramType fieldType, string name) in _fields) {
-        string line = $"{fieldType.EmitIdentifier(context)} {name};";
+      foreach (Field field in _fields) {
+        NanoProgramType fieldType = field.Type;
+        string name = field.Name;
+        string suffix = "";
+        if (field.Attributes?.Count > 0) {
+          suffix = $" {string.Join(" ", field.Attributes)}";
+        }
+        string line = $"{fieldType.EmitIdentifier(context)} {name}{suffix};";
         output.AppendLine("  " + line);
       }
       output.AppendLine($"}};");
@@ -315,7 +346,10 @@ namespace NanoGraph {
     public readonly NanoProgramType Float2Type;
     public readonly NanoProgramType Float3Type;
     public readonly NanoProgramType Float4Type;
+    public readonly NanoProgramType Texture;
     public readonly NanoProgramType MTLComputePipelineStateType;
+    public readonly NanoProgramType MTLRenderPipelineState;
+    public readonly NanoProgramType MTLRenderPassDescriptor;
 
     public NanoProgram(string name) {
       Identifier = $"Program_{SanitizeIdentifierFragment(name)}";
@@ -327,7 +361,10 @@ namespace NanoGraph {
       _types.Add(Float2Type = NanoProgramType.MakeBuiltIn(this, "vector_float2"));
       _types.Add(Float3Type = NanoProgramType.MakeBuiltIn(this, "vector_float3"));
       _types.Add(Float4Type = NanoProgramType.MakeBuiltIn(this, "vector_float4"));
+      _types.Add(Texture = NanoProgramType.MakeBuiltIn(this, "NanoTexture"));
       _types.Add(MTLComputePipelineStateType = NanoProgramType.MakeBuiltIn(this, "id<MTLComputePipelineState>"));
+      _types.Add(MTLRenderPipelineState = NanoProgramType.MakeBuiltIn(this, "id<MTLRenderPipelineState>"));
+      _types.Add(MTLRenderPassDescriptor = NanoProgramType.MakeBuiltIn(this, "MTLRenderPassDescriptor*"));
     }
 
     public void AddPreambleStatement(string line) {
@@ -374,8 +411,7 @@ namespace NanoGraph {
       NanoProgramType programType = NanoProgramType.MakeType(this, name);
 
       foreach (var field in type.Fields) {
-        // TODO: Handle arrays.
-        programType.AddField(GetProgramType(field.Type, nameHint: $"{nameHint}_{field.Name}"), field.Name);
+        programType.AddField(GetProgramType(field.Type, nameHint: $"{nameHint}_{field.Name}"), field.Name, field.Attributes);
       }
       _types.Add(programType);
       _typeByDeclMap[type] = programType;
@@ -386,7 +422,7 @@ namespace NanoGraph {
     private NanoProgramType BuildProtoType(TypeDecl type) {
       NanoProgramType programType = NanoProgramType.MakeType(this, "Proto");
       foreach (var field in type.Fields) {
-        programType.AddField(BuildProtoType(field.Type), field.Name);
+        programType.AddField(BuildProtoType(field.Type), field.Name, field.Attributes);
       }
       return programType;
     }
@@ -439,6 +475,8 @@ namespace NanoGraph {
           return Float3Type;
         case PrimitiveType.Float4:
           return Float4Type;
+        case PrimitiveType.Texture:
+          return Texture;
       }
       return null;
     }

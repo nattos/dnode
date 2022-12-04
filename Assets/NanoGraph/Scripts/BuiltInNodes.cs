@@ -209,6 +209,7 @@ namespace NanoGraph {
     }
   }
 
+  // TODO: Pack primitives (ie. float4).
   public class PackNode : DataNode, ICodeNode {
     public TypeDeclMode TypeDeclMode = TypeDeclMode.External;
     public TypeDecl InternalType;
@@ -247,6 +248,90 @@ namespace NanoGraph {
       string initializerStr = string.Join("\n", initializerParts);
       context.Function.AddStatement($"{context.Function.GetTypeIdentifier(TypeSpec.MakeType(PackToType))} {context.OutputLocals[0].Identifier} = {{ {initializerStr} }};");
       context.ArraySizeFunction.AddStatement($"{NanoProgram.IntIdentifier} {context.OutputLocals[0].ArraySizeIdentifier} = 1;");
+    }
+  }
+
+  // TODO: Unpack primitives (ie. float4).
+  public class UnpackNode : DataNode, ICodeNode, IAutoTypeNode {
+    public TypeDeclMode TypeDeclMode = TypeDeclMode.External;
+    public TypeSpec InternalType;
+
+    public IReadOnlyList<DataEdge> Inputs;
+    public IReadOnlyList<DataEdge> Outputs;
+
+    public override DataSpec InputSpec => DataSpec.FromFields(DataField.MakeType("In", PackToType));
+    public override DataSpec OutputSpec {
+      get {
+        TypeSpec type = PackToType;
+        bool isArray = type.IsArray;
+        if (isArray) {
+          return DataSpec.FromFields(PackToType.Type.Fields.Select(field => {
+            return new DataField { Name = field.Name, Type = TypeSpec.MakeArray(field.Type) };
+          }).ToArray());
+        } else {
+          return DataSpec.FromFields(PackToType.Type.Fields.Select(field => {
+            return new DataField { Name = field.Name, Type = field.Type };
+          }).ToArray());
+        }
+      }
+    }
+
+    void IAutoTypeNode.UpdateTypesFromInputs() {}
+
+    public TypeSpec PackToType {
+      get {
+        switch (TypeDeclMode) {
+          case TypeDeclMode.Internal:
+          default:
+            return InternalType;
+          case TypeDeclMode.External: {
+            TypeSpec? field = Graph.GetEdgeToDestinationOrNull(new DataPlug { Node = this, FieldName = "In" })?.SourceFieldOrNull?.Type;
+            if (field == null || field?.Primitive != null) {
+              bool isArray = field?.IsArray ?? false;
+              return new TypeSpec { IsArray = isArray, Type = TypeDecl.Empty };
+            }
+            return field.Value;
+          }
+        }
+      }
+    }
+
+    public void EmitCode(CodeContext context) {
+      CodeLocal inputLocal = context.InputLocals[0];
+      NanoProgramType inputType = context.Function.Program.GetProgramType(inputLocal.Type);
+      TypeSpec type = PackToType;
+      bool isArray = type.IsArray;
+      if (isArray) {
+        string inputLengthLocal = context.Function.AllocLocal("Length");
+        context.Function.AddStatement($"{NanoProgram.IntIdentifier} {inputLengthLocal} = GetLength({inputLocal.Identifier});");
+        int index = 0;
+        foreach (var field in type.Type.Fields) {
+          CodeLocal outputLocal = context.OutputLocals[index++];
+          string outputArrayTypeIdentifier = context.Function.GetArrayTypeIdentifier(field.Type);
+          string outputElementTypeIdentifier = context.Function.GetElementTypeIdentifier(field.Type);
+          context.Function.AddStatement($"{outputArrayTypeIdentifier} {outputLocal.Identifier}(NanoTypedBuffer<{outputElementTypeIdentifier}>::Allocate({inputLengthLocal}));");
+          context.ArraySizeFunction.AddStatement($"{NanoProgram.IntIdentifier} {outputLocal.ArraySizeIdentifier} = {inputLocal.ArraySizeIdentifier};");
+        }
+        index = 0;
+        string indexLocal = context.Function.AllocLocal("Index");
+        context.Function.AddStatement($"for ({NanoProgram.IntIdentifier} {indexLocal} = 0; {indexLocal} < {inputLengthLocal}; ++{indexLocal}) {{");
+        foreach (var field in type.Type.Fields) {
+          CodeLocal outputLocal = context.OutputLocals[index++];
+          string inputField = inputType.GetField(field.Name);
+          string inputExpr = $"{context.Function.Context.EmitSampleBuffer(inputLocal.Identifier, indexLocal)}.{inputField}";
+          context.Function.AddStatement($"  {context.Function.Context.EmitWriteBuffer(outputLocal.Identifier, indexLocal, inputExpr)};");
+        }
+        context.Function.AddStatement($"}}");
+      } else {
+        int index = 0;
+        foreach (var field in type.Type.Fields) {
+          CodeLocal outputLocal = context.OutputLocals[index++];
+          string outputTypeIdentifier = context.Function.GetTypeIdentifier(field.Type);
+          string inputField = inputType.GetField(field.Name);
+          context.Function.AddStatement($"{outputTypeIdentifier} {outputLocal.Identifier} = {inputLocal.Identifier}.{inputField};");
+          context.ArraySizeFunction.AddStatement($"{NanoProgram.IntIdentifier} {outputLocal.ArraySizeIdentifier} = {inputLocal.ArraySizeIdentifier};");
+        }
+      }
     }
   }
 
@@ -301,13 +386,28 @@ namespace NanoGraph {
 
     [EditableAttribute]
     public bool IsArray;
-    public List<Field> Fields = new List<Field>();
-    public TypeDecl Type => new TypeDecl(Fields.Select(field => new TypeField { Name = field.Name, Type = field.IsArray ? TypeSpec.MakeArray(TypeSpec.MakePrimitive(field.Primitive)) : TypeSpec.MakePrimitive(field.Primitive) }).ToArray());
+
+    [EditableAttribute]
+    public bool HasVertexPosition;
+
+    public List<Field> EditableFields = new List<Field>();
+    public TypeDecl Type => new TypeDecl(AllTypeFields.ToArray());
 
     public override DataSpec InputSpec => DataSpec.Empty;
     public override DataSpec OutputSpec =>
         IsArray ? DataSpec.FromFields(DataField.MakeType("Out", TypeSpec.MakeArray(TypeSpec.MakeType(Type))))
                 : DataSpec.FromFields(DataField.MakeType("Out", TypeSpec.MakeType(Type)));
+
+    public IEnumerable<TypeField> EditableTypeFields => EditableFields.Select(field => new TypeField { Name = field.Name, Type = field.IsArray ? TypeSpec.MakeArray(TypeSpec.MakePrimitive(field.Primitive)) : TypeSpec.MakePrimitive(field.Primitive) });
+    public IEnumerable<TypeField> AllTypeFields {
+      get {
+        IEnumerable<TypeField> fields = EditableTypeFields;
+        if (HasVertexPosition) {
+          fields = new[] { new TypeField { Name = "Position", Type = TypeSpec.MakePrimitive(PrimitiveType.Float4), Attributes = new[] { "[[position]]" } } }.Concat(fields);
+        }
+        return fields;
+      }
+    }
 
     public override IReadOnlyList<EditableAttribute> EditableAttributes {
       get {
@@ -318,20 +418,20 @@ namespace NanoGraph {
         attribs.Add(new EditableAttribute {
           Name = $"Field Count",
           Type = typeof(int),
-          Getter = node => Fields.Count,
+          Getter = node => EditableFields.Count,
           Setter = (node, value) => {
             int count = Math.Max(0, value as int? ?? 0);
-            while (Fields.Count > count) {
-              Fields.RemoveAt(Fields.Count - 1);
+            while (EditableFields.Count > count) {
+              EditableFields.RemoveAt(EditableFields.Count - 1);
             }
-            while (Fields.Count < count) {
-              Fields.Add(new Field { Name = $"{Fields.Count}" });
+            while (EditableFields.Count < count) {
+              EditableFields.Add(new Field { Name = $"{EditableFields.Count}" });
             }
           },
         });
 
         int fieldIndex = 0;
-        foreach (Field field in Fields) {
+        foreach (Field field in EditableFields) {
           attribs.Add(new EditableAttribute {
             Name = $"{fieldIndex} Name",
             Type = typeof(string),

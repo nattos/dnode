@@ -8,6 +8,7 @@ namespace NanoGraph {
   public class TypeField {
     public string Name;
     public TypeSpec Type;
+    public IReadOnlyList<string> Attributes = Array.Empty<string>();
 
     public static TypeField MakePrimitive(string name, PrimitiveType type) {
       return new TypeField { Name = name, Type = TypeSpec.MakePrimitive(type) };
@@ -36,7 +37,9 @@ namespace NanoGraph {
     Float2,
     Float3,
     Float4,
+    Texture,
     TypeDecl,
+    Vertices,
   }
 
   public struct TypeSpec {

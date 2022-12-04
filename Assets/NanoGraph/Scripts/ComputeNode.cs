@@ -23,6 +23,11 @@ namespace NanoGraph {
     Individual,
   }
 
+  public enum TypeDeclMode {
+    Internal,
+    External,
+  }
+
   public abstract class ComputeNode : DataNode, IComputeNode {
     [EditableAttribute]
     public ExecutionMode ExecutionMode = ExecutionMode.OncePerFrame;
@@ -50,7 +55,7 @@ namespace NanoGraph {
       }
     }
 
-    private DataField[] TypeDeclFields => new[] { new DataField { Name = "TypeDecl", IsCompileTimeOnly = true, Type = TypeSpec.MakePrimitive(PrimitiveType.TypeDecl) } };
+    protected DataField[] TypeDeclFields => new[] { new DataField { Name = "TypeDecl", IsCompileTimeOnly = true, Type = TypeSpec.MakePrimitive(PrimitiveType.TypeDecl) } };
 
     public virtual TypeField[] InputTypeFields => InputOutputTypeFields;
     public virtual TypeField[] OutputTypeFields => InputOutputTypeFields;
@@ -75,99 +80,189 @@ namespace NanoGraph {
     public virtual void EmitStoreAuxSizesCode(CodeContext context, CodeCachedResult cachedResult) {
     }
 
-    public void EmitLoadOutputsCode(CodeContext context, CodeCachedResult cachedResult) {
-      var outputSpec = OutputSpec;
-      for (int i = 0; i < outputSpec.Fields.Count; ++i) {
-        var field = outputSpec.Fields[i];
-        string outputLocal = context.OutputLocals[i].Identifier;
-        string outputSizeLocal = context.OutputLocals[i].ArraySizeIdentifier;
-        context.Function.AddStatement($"{context.Function.GetTypeIdentifier(field.Type)} {outputLocal} = {context.Function.Context.EmitFunctionInput(cachedResult, field, i)};");
-        context.ArraySizeFunction.AddStatement($"{NanoProgram.IntIdentifier} {outputLocal} = {cachedResult.Result.ArraySizeIdentifier}.{cachedResult.ArraySizesResultType.GetField(field.Name)};");
-      }
-    }
-
     public abstract string EmitTotalThreadCount(NanoFunction func, CodeCachedResult cachedResult);
-  }
 
-  public enum ThreadCountMode {
-    Integer,
-    ArraySize,
-  }
+    public abstract IComputeNodeEmitCodeOperation CreateEmitCodeOperation(ComputeNodeEmitCodeOperationContext context);
 
-  public enum TypeDeclMode {
-    Internal,
-    External,
-  }
 
-  public class VectorComputeNode : ComputeNode, IAutoTypeNode {
-    // TODO: Support multiple buffer modes.
-    public override INanoCodeContext CodeContext => NanoProgram.GpuContext;
-    public override DataSpec AuxSizesOutputSpec => DataSpec.FromFields(ThreadCountFields);
 
-    public override DataSpec ComputeInputSpec => base.ComputeInputSpec;
-    public override DataSpec InputSpec => DataSpec.ExtendWithFields(base.InputSpec, ThreadCountFields);
 
-    public override DataSpec OutputSpec {
-      get {
-        return DataSpec.FromFields(DataField.MakeType("Out", TypeSpec.MakeArray(TypeSpec.MakeType(new TypeDecl(OutputTypeFields.ToArray())))));
+
+    public abstract class EmitterBase : IComputeNodeEmitCodeOperation {
+      public EmitterBase(ComputeNode node, ComputeNodeEmitCodeOperationContext context) {
+        computeNode = node;
+        errors = context.errors;
+        graph = context.graph;
+        program = context.program;
+        executeFunction = context.executeFunction;
+        createPipelinesFunction = context.createPipelinesFunction;
+        dependentComputeNodes = context.dependentComputeNodes;
+        dependentComputeInputs = context.dependentComputeInputs;
       }
-    }
 
-    public DataField[] ThreadCountFields {
-      get {
-        switch (ThreadCountMode) {
-          case ThreadCountMode.Integer:
-            return new[] { DataField.MakePrimitive("ThreadCount", PrimitiveType.Int) };
-          case ThreadCountMode.ArraySize:
-          default:
-            return new[] { DataField.MakeType("ThreadCountFromArray", TypeSpec.MakeArray(ThreadCountFromArrayElementType)) };
+      // TODO: Rename all!!
+      public readonly List<string> errors;
+      public readonly ComputeNode computeNode;
+      public readonly NanoGraph graph;
+      public readonly NanoProgram program;
+
+      public NanoFunction func;
+      public NanoFunction arraySizesFunc;
+      public NanoFunction validateSizesCacheFunction;
+      public NanoFunction validateCacheFunction;
+      public TypeSpec resultTypeSpec { get; private set; }
+      public NanoProgramType resultType { get; private set; }
+      public NanoProgramType arraySizeResultType { get; private set; }
+      public DataSpec computeOutputSpec { get; private set; }
+
+      public readonly NanoFunction executeFunction;
+      public readonly NanoFunction createPipelinesFunction;
+
+      public readonly IReadOnlyList<ComputeNodeResultEntry> dependentComputeNodes;
+      public readonly IReadOnlyList<DataPlug> dependentComputeInputs;
+
+      public IReadOnlyDictionary<DataPlug, CodeLocal> resultLocalMap { get; private set; }
+
+      public Dictionary<IComputeNode, List<(DataField field, int inputIndex)>> descendantInputs = new Dictionary<IComputeNode, List<(DataField field, int inputIndex)>>();
+
+      public CodeLocal cachedResult { get; private set; }
+      // public string cachedResultIdentifier;
+      // public string cachedResultSizesIdentifier;
+
+      protected virtual IEnumerable<DataPlug> DependentComputeInputsToLoad => dependentComputeInputs;
+
+      public void EmitFunctionSignature() {
+        // Define a type to hold the result value.
+        DataSpec computeInputSpec = computeNode.ComputeInputSpec;
+        DataSpec computeArrayInputSpec = computeNode.AuxSizesOutputSpec;
+        this.computeOutputSpec = computeNode.OutputSpec;
+        TypeDecl resultTypeDecl = TypeDeclFromDataFields(computeOutputSpec.Fields);
+        // DataField[] compileTimeOnlyInputs = CompileTimeOnlyFields(computeInputSpec.Fields);
+        this.resultTypeSpec = TypeSpec.MakeType(resultTypeDecl);
+        this.resultType = program.AddType(resultTypeDecl, $"Result_{computeNode.ShortName}");
+        this.arraySizeResultType = program.AddType(TypeDeclFromDataFields(computeOutputSpec.Fields.Concat(computeArrayInputSpec.Fields).Select(field => new DataField { Name = field.Name, Type = TypeSpec.MakePrimitive(PrimitiveType.Int), IsCompileTimeOnly = field.IsCompileTimeOnly }).ToArray()), $"ResultSizes_{computeNode.ShortName}");
+        // Define a field to hold the cached result.
+        string cachedResultIdentifier = program.AddInstanceField(resultType, $"Result_{computeNode.ShortName}");
+        string cachedResultSizesIdentifier = program.AddInstanceField(arraySizeResultType, $"ResultSizes_{computeNode.ShortName}");
+        this.cachedResult = new CodeLocal { Type = resultTypeSpec, Identifier = cachedResultIdentifier, ArraySizeIdentifier = cachedResultSizesIdentifier };
+      }
+
+      public abstract void EmitFunctionPreamble(out NanoFunction func, out NanoFunction arraySizesFunc);
+
+      public void EmitLoadFunctionInputs() {
+        int inputIndex = 0;
+        foreach (var input in CollectComputeInputs(DependentComputeInputsToLoad)) {
+          input.Operation.RecordLoadInputForDescendantNode(computeNode, input.Field, inputIndex++);
         }
       }
-    }
 
-    [EditableAttribute]
-    public ThreadCountMode ThreadCountMode = ThreadCountMode.Integer;
-    [EditableAttribute]
-    public AutoType ThreadCountFromArrayAutoType = AutoType.Auto;
-    public TypeSpec ThreadCountFromArrayElementType;
-
-    public void UpdateTypesFromInputs() {
-      AutoTypeUtils.UpdateAutoType(Graph.GetEdgeToDestinationOrNull(this, "ThreadCountFromArray"), ref ThreadCountFromArrayElementType, forceIsArray: false);
-    }
-
-    public override void EmitStoreAuxSizesCode(CodeContext context, CodeCachedResult cachedResult) {
-      string threadCountFieldName;
-      string threadCountExpr;
-      switch (ThreadCountMode) {
-        case ThreadCountMode.Integer:
-          threadCountFieldName = "ThreadCount";
-          threadCountExpr = $"{context.InputLocals[0].Identifier}";
-          break;
-        case ThreadCountMode.ArraySize:
-        default:
-          threadCountFieldName = "ThreadCountFromArray";
-          threadCountExpr = $"{context.InputLocals[0].ArraySizeIdentifier}";
-          break;
+      public void ConsumeFunctionBodyResult(IReadOnlyDictionary<DataPlug, CodeLocal> resultLocalMap) {
+        this.resultLocalMap = resultLocalMap;
       }
-      context.ArraySizeFunction.AddStatement($"{cachedResult.Result.ArraySizeIdentifier}.{cachedResult.ArraySizesResultType.GetField(threadCountFieldName)} = {threadCountExpr};");
-    }
+      public abstract void EmitFunctionReturn(out CodeCachedResult? result);
 
-    public override string EmitTotalThreadCount(NanoFunction func, CodeCachedResult cachedResult) {
-      switch (ThreadCountMode) {
-        case ThreadCountMode.Integer:
-          return $"{cachedResult.Result.ArraySizeIdentifier}.{cachedResult.ArraySizesResultType.GetField("ThreadCount")}";
-        case ThreadCountMode.ArraySize:
-        default:
-          return $"{cachedResult.Result.ArraySizeIdentifier}.{cachedResult.ArraySizesResultType.GetField("ThreadCountFromArray")}";
+      public void EmitValidateSizesCacheFunction() {
+        validateSizesCacheFunction = program.AddFunction($"UpdateSizes_{computeNode.ShortName}", NanoProgram.CpuContext, Array.Empty<NanoProgramType>(), program.VoidType);
+        validateSizesCacheFunction.AddStatement($"{cachedResult.ArraySizeIdentifier} = {arraySizesFunc.Identifier}();");
+        foreach (var field in computeNode.OutputSpec.Fields) {
+          if (field.IsCompileTimeOnly) {
+            continue;
+          }
+          if (!field.Type.IsArray) {
+            continue;
+          }
+          validateSizesCacheFunction.AddStatement($"if (!{cachedResult.Identifier}.{resultType.GetField(field.Name)}) {{");
+          validateSizesCacheFunction.AddStatement($"  {cachedResult.Identifier}.{resultType.GetField(field.Name)}.reset(NanoTypedBuffer<{validateSizesCacheFunction.GetElementTypeIdentifier(field.Type)}>::Allocate({cachedResult.ArraySizeIdentifier}.{arraySizeResultType.GetField(field.Name)}));");
+          validateSizesCacheFunction.AddStatement($"}} else {{");
+          validateSizesCacheFunction.AddStatement($"  {cachedResult.Identifier}.{resultType.GetField(field.Name)}->Resize({cachedResult.ArraySizeIdentifier}.{arraySizeResultType.GetField(field.Name)});");
+          validateSizesCacheFunction.AddStatement($"}}");
+        }
       }
-    }
-  }
 
-  public class ScalarComputeNode : ComputeNode {
-    public override INanoCodeContext CodeContext => NanoProgram.CpuContext;
+      public abstract void EmitValidateCacheFunction();
 
-    public override string EmitTotalThreadCount(NanoFunction func, CodeCachedResult cachedResult) {
-      return func.EmitLiteral(1);
+      public void EmitExecuteFunctionCode() {
+        executeFunction.AddStatement($"{validateCacheFunction.Identifier}();");
+      }
+
+      public void RecordLoadInputForDescendantNode(IComputeNode descendant, DataField field, int inputIndex) {
+        if (!descendantInputs.TryGetValue(descendant, out var result)) {
+          result = new List<(DataField field, int inputIndex)>();
+          descendantInputs[descendant] = result;
+        }
+        result.Add((field, inputIndex));
+      }
+
+      public DataField[] GetInputsForDescendantNode(IComputeNode descendant) {
+        if (!descendantInputs.TryGetValue(descendant, out var result)) {
+          return Array.Empty<DataField>();
+        }
+        return result.Select(entry => entry.field).ToArray();
+      }
+
+      public void EmitLoadInputsForDescendantNode(IComputeNode descendant, CodeContext context) {
+        if (!descendantInputs.TryGetValue(descendant, out var inputs)) {
+          return;
+        }
+
+        int index = 0;
+        foreach (var input in inputs) {
+          var fieldName = input.field.Name;
+          var inputIndex = input.inputIndex;
+          var intoLocal = context.OutputLocals[index++];
+          EmitLoadOutput(context, fieldName, inputIndex, intoLocal);
+        }
+      }
+
+      protected virtual void EmitLoadOutput(CodeContext context, string fieldName, int inputIndex, CodeLocal intoLocal) {
+        string outputLocal = intoLocal.Identifier;
+        string outputSizeLocal = intoLocal.ArraySizeIdentifier;
+        // TODO: Unwind this. Caller can provide expression.
+        context.Function.AddStatement($"{context.Function.GetTypeIdentifier(intoLocal.Type)} {outputLocal} = {context.Function.Context.EmitFunctionInput(program, cachedResult, fieldName, inputIndex)};");
+        context.ArraySizeFunction.AddStatement($"{NanoProgram.IntIdentifier} {outputSizeLocal} = {cachedResult.ArraySizeIdentifier}.{arraySizeResultType.GetField(fieldName)};");
+      }
+
+      private static TypeDecl TypeDeclFromDataFields(IEnumerable<DataField> fields) {
+        return new TypeDecl(fields.Where(field => !field.IsCompileTimeOnly).Select(field => new TypeField { Name = field.Name, Type = field.Type, Attributes = field.Attributes }).ToArray());
+      }
+
+
+      protected struct ComputeInput {
+        public DataPlug Plug;
+        public DataField Field;
+        public NanoProgramType FieldType;
+        public IComputeNodeEmitCodeOperation Operation;
+        public string Expression;
+      }
+
+      protected IEnumerable<ComputeInput> CollectComputeInputs(IEnumerable<DataPlug> inputs) {
+        foreach (DataPlug input in inputs) {
+          var resultOrNull = dependentComputeNodes.FirstOrNull(dependency => dependency.Node == input.Node);
+          if (resultOrNull == null) {
+            errors.Add($"Dependency {input.Node} for {computeNode} not yet ready.");
+            continue;
+          }
+          ComputeNodeResultEntry result = resultOrNull.Value;
+          string resultIdentifier = result.Result?.Result.Identifier;
+          DataField? outputFieldOrNull = input.Node.OutputSpec.Fields.FirstOrNull(field => field.Name == input.FieldName);
+          if (outputFieldOrNull == null) {
+            errors.Add($"Dependency {input.Node} for {computeNode} does not have output field {input.FieldName}.");
+            continue;
+          }
+          DataField field = outputFieldOrNull.Value;
+          if (field.IsCompileTimeOnly) {
+            continue;
+          }
+          var fieldType = program.GetProgramType(field.Type, field.Name);
+          yield return new ComputeInput {
+            Plug = input,
+            Field = field,
+            FieldType = fieldType,
+            Operation = result.Operation,
+            Expression = $"{resultIdentifier}.{result.Result?.ResultType.GetField(field.Name)}",
+          };
+        }
+      }
     }
   }
 }
