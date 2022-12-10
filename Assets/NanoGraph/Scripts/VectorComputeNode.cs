@@ -46,33 +46,6 @@ namespace NanoGraph {
       AutoTypeUtils.UpdateAutoType(Graph.GetEdgeToDestinationOrNull(this, "ThreadCountFromArray"), ref ThreadCountFromArrayElementType, forceIsArray: false);
     }
 
-    public override void EmitStoreAuxSizesCode(CodeContext context, CodeCachedResult cachedResult) {
-      string threadCountFieldName;
-      string threadCountExpr;
-      switch (ThreadCountMode) {
-        case ThreadCountMode.Integer:
-          threadCountFieldName = "ThreadCount";
-          threadCountExpr = $"{context.InputLocals[0].Identifier}";
-          break;
-        case ThreadCountMode.ArraySize:
-        default:
-          threadCountFieldName = "ThreadCountFromArray";
-          threadCountExpr = $"{context.InputLocals[0].ArraySizeIdentifier}";
-          break;
-      }
-      context.ArraySizeFunction.AddStatement($"{cachedResult.Result.ArraySizeIdentifier}.{cachedResult.ArraySizesResultType.GetField(threadCountFieldName)} = {threadCountExpr};");
-    }
-
-    public override string EmitTotalThreadCount(NanoFunction func, CodeCachedResult cachedResult) {
-      switch (ThreadCountMode) {
-        case ThreadCountMode.Integer:
-          return $"{cachedResult.Result.ArraySizeIdentifier}.{cachedResult.ArraySizesResultType.GetField("ThreadCount")}";
-        case ThreadCountMode.ArraySize:
-        default:
-          return $"{cachedResult.Result.ArraySizeIdentifier}.{cachedResult.ArraySizesResultType.GetField("ThreadCountFromArray")}";
-      }
-    }
-
     public override IComputeNodeEmitCodeOperation CreateEmitCodeOperation(ComputeNodeEmitCodeOperationContext context) => new EmitterGpu(this, context);
   
     private class EmitterGpu : EmitterBase {
@@ -89,49 +62,52 @@ namespace NanoGraph {
       public override void EmitFunctionPreamble(out NanoFunction func, out NanoFunction arraySizesFunc) {
         // Begin generating the main results function.
         string[] functionModifiers = { "kernel" };
-        this.func = func = program.AddFunction(computeNode.ShortName, computeNode.CodeContext, paramTypes: Array.Empty<NanoProgramType>(), program.VoidType, functionModifiers);
-        this.arraySizesFunc = arraySizesFunc = program.AddFunction($"{computeNode.ShortName}_Sizes", NanoProgram.CpuContext, paramTypes: Array.Empty<NanoProgramType>(), arraySizeResultType);
+        this.func = func = program.AddFunction(computeNode.ShortName, computeNode.CodeContext, program.VoidType, functionModifiers);
+        this.arraySizesFunc = arraySizesFunc = program.AddFunction($"{computeNode.ShortName}_Sizes", NanoProgram.CpuContext, arraySizeResultType);
         // Load inputs.
         // Note: Only load inputs that we really read.
         int bufferIndex = 0;
-        int inputIndex = 0;
-        foreach (var computeInput in CollectComputeInputs(DependentComputeInputsToLoad)) {
-          gpuInputBuffers.Add(new NanoGpuBufferRef {
-            FieldName = computeInput.Field.Name,
-            Expression = computeInput.Expression,
-            Index = bufferIndex,
-            Type = computeInput.Field.Type,
-          });
-          var fieldType = computeInput.FieldType;
-          string[] modifiers = { "constant", "const" };
-          string suffix = $"[[buffer({bufferIndex++})]]";
-          bool isReference = true;
-          if (fieldType.IsArray) {
-            modifiers = Array.Empty<string>();
-            isReference = false;
-          }
-          func.AddParam(modifiers, fieldType, $"input{inputIndex++}", suffix, new NanoParameterOptions { IsConst = true, IsReference = isReference });
-        }
+        AddGpuFuncInputs(func, CollectComputeInputs(DependentComputeInputsToLoad), gpuInputBuffers, ref bufferIndex);
+        // int bufferIndex = 0;
+        // int inputIndex = 0;
+        // foreach (var computeInput in CollectComputeInputs(DependentComputeInputsToLoad)) {
+        //   gpuInputBuffers.Add(new NanoGpuBufferRef {
+        //     FieldName = computeInput.Field.Name,
+        //     Expression = computeInput.Expression,
+        //     Index = bufferIndex,
+        //     Type = computeInput.Field.Type,
+        //   });
+        //   var fieldType = computeInput.FieldType;
+        //   string[] modifiers = { "constant", "const" };
+        //   string suffix = $"[[buffer({bufferIndex++})]]";
+        //   bool isReference = true;
+        //   if (fieldType.IsArray) {
+        //     modifiers = Array.Empty<string>();
+        //     isReference = false;
+        //   }
+        //   func.AddParam(modifiers, fieldType, $"input{inputIndex++}", suffix, new NanoParameterOptions { IsConst = true, IsReference = isReference });
+        // }
 
         // Define outputs.
-        for (int i = 0; i < computeOutputSpec.Fields.Count; ++i) {
-          var field = computeOutputSpec.Fields[i];
-          if (field.IsCompileTimeOnly) {
-            continue;
-          }
-          var fieldType = field.Type;
-          gpuOutputBuffers.Add(new NanoGpuBufferRef {
-            FieldName = field.Name,
-            Index = bufferIndex,
-            Type = fieldType,
-          });
-          string[] modifiers = {};
-          string suffix = $"[[buffer({bufferIndex++})]]";
-          if (fieldType.IsArray) {
-            modifiers = Array.Empty<string>();
-          }
-          func.AddParam(modifiers, program.GetProgramType(fieldType, field.Name), $"output{i}", suffix, new NanoParameterOptions { IsConst = false });
-        }
+        AddGpuFuncOutputs(func, computeOutputSpec.Fields, gpuOutputBuffers, ref bufferIndex);
+        // for (int i = 0; i < computeOutputSpec.Fields.Count; ++i) {
+        //   var field = computeOutputSpec.Fields[i];
+        //   if (field.IsCompileTimeOnly) {
+        //     continue;
+        //   }
+        //   var fieldType = field.Type;
+        //   gpuOutputBuffers.Add(new NanoGpuBufferRef {
+        //     FieldName = field.Name,
+        //     Index = bufferIndex,
+        //     Type = fieldType,
+        //   });
+        //   string[] modifiers = {};
+        //   string suffix = $"[[buffer({bufferIndex++})]]";
+        //   if (fieldType.IsArray) {
+        //     modifiers = Array.Empty<string>();
+        //   }
+        //   func.AddParam(modifiers, program.GetProgramType(fieldType, field.Name), $"output{i}", suffix, new NanoParameterOptions { IsConst = false });
+        // }
         func.AddParam(Array.Empty<string>(), program.GetPrimitiveType(PrimitiveType.Uint), $"gid_uint", "[[thread_position_in_grid]]");
         func.AddStatement($"{func.GetTypeIdentifier(PrimitiveType.Int)} gid = gid_uint;");
       }
@@ -171,7 +147,7 @@ namespace NanoGraph {
           auxSizesCodeInputLocals[i] = new CodeLocal { Identifier = inputLocal, Type = sourceCachedResult.Value.Result.Type, ArraySizeIdentifier = inputSizeLocal };
         }
         var emitStoreAuxSizesCodeCachedResult = new CodeCachedResult { ResultType = resultType, ArraySizesResultType = arraySizeResultType, Result = new CodeLocal { ArraySizeIdentifier = returnSizesLocal } };
-        computeNode.EmitStoreAuxSizesCode(new CodeContext {
+        EmitStoreAuxSizesCode(new CodeContext {
           Function = func,
           ArraySizeFunction = arraySizesFunc,
           InputLocals = auxSizesCodeInputLocals,
@@ -200,59 +176,89 @@ namespace NanoGraph {
             func.AddStatement($"output{i} = {inputLocal?.Identifier};");
           }
           // arraySizesFunc.AddStatement($"{returnSizesLocal}.{arraySizeResultType.GetField(field.Name)} = {inputSizeLocal};");
-          arraySizesFunc.AddStatement($"{returnSizesLocal}.{arraySizeResultType.GetField(field.Name)} = {computeNode.EmitTotalThreadCount(arraySizesFunc, codeCachedResult)};");
+          arraySizesFunc.AddStatement($"{returnSizesLocal}.{arraySizeResultType.GetField(field.Name)} = {EmitTotalThreadCount(arraySizesFunc)};");
         }
         arraySizesFunc.AddStatement($"return {returnSizesLocal};");
         result = codeCachedResult;
       }
 
+      private string EmitTotalThreadCount(NanoFunction func) {
+        switch (Node.ThreadCountMode) {
+          case ThreadCountMode.Integer:
+            return $"{codeCachedResult.Result.ArraySizeIdentifier}.{codeCachedResult.ArraySizesResultType.GetField("ThreadCount")}";
+          case ThreadCountMode.ArraySize:
+          default:
+            return $"{codeCachedResult.Result.ArraySizeIdentifier}.{codeCachedResult.ArraySizesResultType.GetField("ThreadCountFromArray")}";
+        }
+      }
+
+      private void EmitStoreAuxSizesCode(CodeContext context, CodeCachedResult cachedResult) {
+        string threadCountFieldName;
+        string threadCountExpr;
+        switch (Node.ThreadCountMode) {
+          case ThreadCountMode.Integer:
+            threadCountFieldName = "ThreadCount";
+            threadCountExpr = $"{context.InputLocals[0].Identifier}";
+            break;
+          case ThreadCountMode.ArraySize:
+          default:
+            threadCountFieldName = "ThreadCountFromArray";
+            threadCountExpr = $"{context.InputLocals[0].ArraySizeIdentifier}";
+            break;
+        }
+        context.ArraySizeFunction.AddStatement($"{cachedResult.Result.ArraySizeIdentifier}.{cachedResult.ArraySizesResultType.GetField(threadCountFieldName)} = {threadCountExpr};");
+      }
+
       public override void EmitValidateCacheFunction() {
-        validateCacheFunction = program.AddFunction($"Update_{computeNode.ShortName}", NanoProgram.CpuContext, Array.Empty<NanoProgramType>(), program.VoidType);
+        validateCacheFunction = program.AddFunction($"Update_{computeNode.ShortName}", NanoProgram.CpuContext, program.VoidType);
         validateCacheFunction.AddStatement($"{validateSizesCacheFunction.Identifier}();");
         string pipelineStateIdentifier = program.AddInstanceField(program.MTLComputePipelineStateType, $"{computeNode.ShortName}_GpuPipeline");
 
         // Sync buffers to GPU.
-        foreach (var inputBuffer in gpuInputBuffers) {
-          if (inputBuffer.Type.IsArray) {
-            validateCacheFunction.AddStatement($"{inputBuffer.Expression}->SyncToGpu();");
-          }
-        }
-        foreach (var outputBuffer in gpuOutputBuffers) {
-          var fieldName = resultType.GetField(outputBuffer.FieldName);
-          if (outputBuffer.Type.IsArray) {
-            validateCacheFunction.AddStatement($"{cachedResult.Identifier}.{fieldName}->EnsureGpuBuffer();");
-          }
-        }
+        EmitSyncBuffersToGpu(validateCacheFunction, cachedResult, gpuInputBuffers, gpuOutputBuffers);
+        // foreach (var inputBuffer in gpuInputBuffers) {
+        //   if (inputBuffer.Type.IsArray) {
+        //     validateCacheFunction.AddStatement($"{inputBuffer.Expression}->SyncToGpu();");
+        //   }
+        // }
+        // foreach (var outputBuffer in gpuOutputBuffers) {
+        //   var fieldName = resultType.GetField(outputBuffer.FieldName);
+        //   if (outputBuffer.Type.IsArray) {
+        //     validateCacheFunction.AddStatement($"{cachedResult.Identifier}.{fieldName}->EnsureGpuBuffer();");
+        //   }
+        // }
         validateCacheFunction.AddStatement($"id<MTLComputeCommandEncoder> encoder = [GetCurrentCommandBuffer() computeCommandEncoder];");
         validateCacheFunction.AddStatement($"[encoder setComputePipelineState:{pipelineStateIdentifier}];");
         // Bind buffers.
-        foreach (var inputBuffer in gpuInputBuffers) {
-          string expression = inputBuffer.Expression;
-          int bufferIndex = inputBuffer.Index;
-          if (inputBuffer.Type.IsArray) {
-            validateCacheFunction.AddStatement($"[encoder setBuffer:{expression}->GetGpuBuffer() offset:0 atIndex:{bufferIndex}];");
-          } else {
-            validateCacheFunction.AddStatement($"[encoder setBytes:&{expression} length:sizeof({expression}) atIndex:{bufferIndex}];");
-          }
-        }
-        foreach (var outputBuffer in gpuOutputBuffers) {
-          var fieldName = resultType.GetField(outputBuffer.FieldName);
-          int bufferIndex = outputBuffer.Index;
-          if (outputBuffer.Type.IsArray) {
-            validateCacheFunction.AddStatement($"[encoder setBuffer:{cachedResult.Identifier}.{fieldName}->GetGpuBuffer() offset:0 atIndex:{bufferIndex}];");
-          }
-        }
+        EmitBindBuffers(validateCacheFunction, cachedResult, gpuInputBuffers, gpuOutputBuffers);
+        // foreach (var inputBuffer in gpuInputBuffers) {
+        //   string expression = inputBuffer.Expression;
+        //   int bufferIndex = inputBuffer.Index;
+        //   if (inputBuffer.Type.IsArray) {
+        //     validateCacheFunction.AddStatement($"[encoder setBuffer:{expression}->GetGpuBuffer() offset:0 atIndex:{bufferIndex}];");
+        //   } else {
+        //     validateCacheFunction.AddStatement($"[encoder setBytes:&{expression} length:sizeof({expression}) atIndex:{bufferIndex}];");
+        //   }
+        // }
+        // foreach (var outputBuffer in gpuOutputBuffers) {
+        //   var fieldName = resultType.GetField(outputBuffer.FieldName);
+        //   int bufferIndex = outputBuffer.Index;
+        //   if (outputBuffer.Type.IsArray) {
+        //     validateCacheFunction.AddStatement($"[encoder setBuffer:{cachedResult.Identifier}.{fieldName}->GetGpuBuffer() offset:0 atIndex:{bufferIndex}];");
+        //   }
+        // }
         // Run command queue.
-        validateCacheFunction.AddStatement($"MTLSize batchSize = {{ (NSUInteger)({computeNode.EmitTotalThreadCount(validateCacheFunction, codeCachedResult)}), 1, 1 }};");
+        validateCacheFunction.AddStatement($"MTLSize batchSize = {{ (NSUInteger)({EmitTotalThreadCount(validateCacheFunction)}), 1, 1 }};");
         validateCacheFunction.AddStatement($"MTLSize threadgroupSize = {{ {pipelineStateIdentifier}.maxTotalThreadsPerThreadgroup, 1, 1 }};");
         validateCacheFunction.AddStatement($"[encoder dispatchThreads:batchSize threadsPerThreadgroup:threadgroupSize];");
         validateCacheFunction.AddStatement($"[encoder endEncoding];");
-        foreach (var outputBuffer in gpuOutputBuffers) {
-          var fieldName = resultType.GetField(outputBuffer.FieldName);
-          if (outputBuffer.Type.IsArray) {
-            validateCacheFunction.AddStatement($"{cachedResult.Identifier}.{fieldName}->MarkGpuBufferChanged();");
-          }
-        }
+        EmitMarkBuffersDirty(validateCacheFunction, cachedResult, gpuInputBuffers, gpuOutputBuffers);
+        // foreach (var outputBuffer in gpuOutputBuffers) {
+        //   var fieldName = resultType.GetField(outputBuffer.FieldName);
+        //   if (outputBuffer.Type.IsArray) {
+        //     validateCacheFunction.AddStatement($"{cachedResult.Identifier}.{fieldName}->MarkGpuBufferChanged();");
+        //   }
+        // }
 
         // Emit pipeline creation code.
         createPipelinesFunction.AddStatement($"{pipelineStateIdentifier} = [device newComputePipelineStateWithFunction:[defaultLibrary newFunctionWithName:@\"{func.Identifier}\"] error:&error];");

@@ -16,10 +16,6 @@ namespace NanoGraph {
       }
     }
 
-    public override string EmitTotalThreadCount(NanoFunction func, CodeCachedResult cachedResult) {
-      return func.EmitLiteral(1);
-    }
-
     public override IComputeNodeEmitCodeOperation CreateEmitCodeOperation(ComputeNodeEmitCodeOperationContext context) => new EmitterGpu(this, context);
   
     public class EmitterGpu : EmitterBase {
@@ -35,8 +31,8 @@ namespace NanoGraph {
       public override void EmitFunctionPreamble(out NanoFunction func, out NanoFunction arraySizesFunc) {
         // Begin generating the main results function.
         string[] functionModifiers = { "vertex" };
-        this.func = func = program.AddFunction(computeNode.ShortName, computeNode.CodeContext, paramTypes: Array.Empty<NanoProgramType>(), resultType, functionModifiers);
-        this.arraySizesFunc = arraySizesFunc = program.AddFunction($"{computeNode.ShortName}_Sizes", NanoProgram.CpuContext, paramTypes: Array.Empty<NanoProgramType>(), arraySizeResultType);
+        this.func = func = program.AddFunction(computeNode.ShortName, computeNode.CodeContext, resultType, functionModifiers);
+        this.arraySizesFunc = arraySizesFunc = program.AddFunction($"{computeNode.ShortName}_Sizes", NanoProgram.CpuContext, arraySizeResultType);
 
         func.AddParam(Array.Empty<string>(), program.GetPrimitiveType(PrimitiveType.Uint), $"gid_uint", "[[vertex_id]]");
         func.AddStatement($"{func.GetTypeIdentifier(PrimitiveType.Int)} gid = gid_uint;");
@@ -44,24 +40,25 @@ namespace NanoGraph {
         // Load inputs.
         // Note: Only load inputs that we really read.
         int bufferIndex = 0;
-        int inputIndex = 0;
-        foreach (var computeInput in CollectComputeInputs(DependentComputeInputsToLoad)) {
-          gpuInputBuffers.Add(new NanoGpuBufferRef {
-            FieldName = computeInput.Field.Name,
-            Expression = computeInput.Expression,
-            Index = bufferIndex,
-            Type = computeInput.Field.Type,
-          });
-          var fieldType = computeInput.FieldType;
-          string[] modifiers = { "constant", "const" };
-          string suffix = $"[[buffer({bufferIndex++})]]";
-          bool isReference = true;
-          if (fieldType.IsArray) {
-            modifiers = Array.Empty<string>();
-            isReference = false;
-          }
-          func.AddParam(modifiers, fieldType, $"input{inputIndex++}", suffix, new NanoParameterOptions { IsConst = true, IsReference = isReference });
-        }
+        AddGpuFuncInputs(func, CollectComputeInputs(DependentComputeInputsToLoad), gpuInputBuffers, ref bufferIndex);
+        // int inputIndex = 0;
+        // foreach (var computeInput in CollectComputeInputs(DependentComputeInputsToLoad)) {
+        //   gpuInputBuffers.Add(new NanoGpuBufferRef {
+        //     FieldName = computeInput.Field.Name,
+        //     Expression = computeInput.Expression,
+        //     Index = bufferIndex,
+        //     Type = computeInput.Field.Type,
+        //   });
+        //   var fieldType = computeInput.FieldType;
+        //   string[] modifiers = { "constant", "const" };
+        //   string suffix = $"[[buffer({bufferIndex++})]]";
+        //   bool isReference = true;
+        //   if (fieldType.IsArray) {
+        //     modifiers = Array.Empty<string>();
+        //     isReference = false;
+        //   }
+        //   func.AddParam(modifiers, fieldType, $"input{inputIndex++}", suffix, new NanoParameterOptions { IsConst = true, IsReference = isReference });
+        // }
       }
 
       public override void EmitFunctionReturn(out CodeCachedResult? result) {
@@ -101,7 +98,7 @@ namespace NanoGraph {
       }
 
       public override void EmitValidateCacheFunction() {
-        validateCacheFunction = program.AddFunction($"Update_{computeNode.ShortName}", NanoProgram.CpuContext, Array.Empty<NanoProgramType>(), program.VoidType);
+        validateCacheFunction = program.AddFunction($"Update_{computeNode.ShortName}", NanoProgram.CpuContext, program.VoidType);
         validateCacheFunction.AddStatement($"{validateSizesCacheFunction.Identifier}();");
         // All pipeline code goes in the fragment shader node.
       }

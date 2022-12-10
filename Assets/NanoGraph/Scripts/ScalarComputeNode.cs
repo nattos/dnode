@@ -8,13 +8,9 @@ namespace NanoGraph {
   public class ScalarComputeNode : ComputeNode {
     public override INanoCodeContext CodeContext => NanoProgram.CpuContext;
 
-    public override string EmitTotalThreadCount(NanoFunction func, CodeCachedResult cachedResult) {
-      return func.EmitLiteral(1);
-    }
-
     public override IComputeNodeEmitCodeOperation CreateEmitCodeOperation(ComputeNodeEmitCodeOperationContext context) => new EmitterCpu(this, context);
 
-    private class EmitterCpu : EmitterBase {
+    protected class EmitterCpu : EmitterBase {
       public readonly ScalarComputeNode Node;
 
       public EmitterCpu(ScalarComputeNode node, ComputeNodeEmitCodeOperationContext context) : base(node, context) {
@@ -23,8 +19,8 @@ namespace NanoGraph {
 
       public override void EmitFunctionPreamble(out NanoFunction func, out NanoFunction arraySizesFunc) {
         // Begin generating the main results function.
-        this.func = func = program.AddFunction(computeNode.ShortName, computeNode.CodeContext, paramTypes: Array.Empty<NanoProgramType>(), resultType);
-        this.arraySizesFunc = arraySizesFunc = program.AddFunction($"{computeNode.ShortName}_Sizes", NanoProgram.CpuContext, paramTypes: Array.Empty<NanoProgramType>(), arraySizeResultType);
+        this.func = func = program.AddFunction(computeNode.ShortName, computeNode.CodeContext, resultType);
+        this.arraySizesFunc = arraySizesFunc = program.AddFunction($"{computeNode.ShortName}_Sizes", NanoProgram.CpuContext, arraySizeResultType);
       }
 
       public override void EmitFunctionReturn(out CodeCachedResult? result) {
@@ -54,7 +50,7 @@ namespace NanoGraph {
       }
 
       public override void EmitValidateCacheFunction() {
-        validateCacheFunction = program.AddFunction($"Update_{computeNode.ShortName}", NanoProgram.CpuContext, Array.Empty<NanoProgramType>(), program.VoidType);
+        validateCacheFunction = program.AddFunction($"Update_{computeNode.ShortName}", NanoProgram.CpuContext, program.VoidType);
         validateCacheFunction.AddStatement($"{validateSizesCacheFunction.Identifier}();");
         // Treat buffers correctly.
         foreach (var dependency in dependentComputeNodes) {

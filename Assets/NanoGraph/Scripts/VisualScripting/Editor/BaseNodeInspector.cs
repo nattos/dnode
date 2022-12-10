@@ -42,6 +42,10 @@ namespace NanoGraph.VisualScripting {
             resultValue = EditorGUI.TextField(rect, attrib.Name, attrib.Getter.Invoke(attributesProvider) as string ?? "");
           } else if (attrib.Type == typeof(int)) {
             resultValue = EditorGUI.IntField(rect, attrib.Name, attrib.Getter.Invoke(attributesProvider) as int? ?? 0);
+          } else if (attrib.Type == typeof(float)) {
+            resultValue = EditorGUI.FloatField(rect, attrib.Name, attrib.Getter.Invoke(attributesProvider) as float? ?? 0.0f);
+          } else if (attrib.Type == typeof(double)) {
+            resultValue = (double)EditorGUI.FloatField(rect, attrib.Name, (float)(attrib.Getter.Invoke(attributesProvider) as double? ?? 0.0));
           } else if (attrib.Type == typeof(bool)) {
             resultValue = EditorGUI.Toggle(rect, attrib.Name, attrib.Getter.Invoke(attributesProvider) as bool? ?? false);
           } else if (attrib.Type.IsEnum) {

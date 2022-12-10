@@ -69,6 +69,7 @@ namespace NanoGraph.VisualScripting {
             case PrimitiveType.Float:
               value = (DValue)0;
               break;
+            case PrimitiveType.Uint2:
             case PrimitiveType.Float2:
               value = Vector2.zero;
               break;
@@ -164,19 +165,30 @@ namespace NanoGraph.VisualScripting {
         var inputConnection = inputPort.connections.FirstOrDefault();
         IDataNode inputNode = (inputConnection?.source.unit as BaseNode)?.Node;
         if (inputNode == null) {
+          // TODO: Update nodes if types differ.
           // Link a LiteralNode if appropriate.
-          if (!_fieldNameToLiteralNodes.TryGetValue(inputPort.key, out LiteralNode literalNode)) {
-            DataField? field = inputSpec.Fields.FirstOrNull(field => field.Name == inputPort.key);
-            bool isArray = field?.Type.IsArray ?? false;
-            PrimitiveType? primitiveType = field?.Type.Primitive;
-            if (primitiveType != null) {
-              Func<DValue> valueProvider = () => defaultValues.GetValueOrDefault(inputPort.key) as DValue? ?? default;
-              literalNode = new LiteralNode { Name = "Value", Type = primitiveType.Value, ValueSource = InputSource.Internal, InternalValueProvider = valueProvider };
-              _fieldNameToLiteralNodes[inputPort.key] = literalNode;
-
-              graph.AddNode(literalNode);
-              edgesToAdd.Add(new DataEdge { Source = new DataPlug { Node = literalNode, FieldName = "Out" }, Destination = new DataPlug { Node = Node, FieldName = inputPort.key } });
+          bool relinkNode = false;
+          DataField? field = inputSpec.Fields.FirstOrNull(field => field.Name == inputPort.key);
+          if (field?.Type.Primitive == null) {
+            continue;
+          }
+          PrimitiveType fieldPrimitiveType = (field?.Type.Primitive).Value;
+          if (_fieldNameToLiteralNodes.TryGetValue(inputPort.key, out LiteralNode literalNode)) {
+            if (literalNode.Type != fieldPrimitiveType) {
+              RemoveLiteralNode(new KeyValuePair<string, LiteralNode>(inputPort.key, literalNode));
+              relinkNode = true;
             }
+          } else {
+            relinkNode = true;
+          }
+          if (relinkNode) {
+            bool isArray = field?.Type.IsArray ?? false;
+            Func<DValue> valueProvider = () => defaultValues.GetValueOrDefault(inputPort.key) as DValue? ?? default;
+            literalNode = new LiteralNode { Name = "Value", Type = fieldPrimitiveType, ValueSource = InputSource.Internal, InternalValueProvider = valueProvider };
+            _fieldNameToLiteralNodes[inputPort.key] = literalNode;
+
+            graph.AddNode(literalNode);
+            edgesToAdd.Add(new DataEdge { Source = new DataPlug { Node = literalNode, FieldName = "Out" }, Destination = new DataPlug { Node = Node, FieldName = inputPort.key } });
           }
           continue;
         }
@@ -231,7 +243,9 @@ namespace NanoGraph.VisualScripting {
   public class ScalarCompute : NodeOfType<ScalarComputeNode> {}
   public class VertexCompute : NodeOfType<VertexShaderComputeNode> {}
   public class FragmentCompute : NodeOfType<FragmentShaderComputeNode> {}
+  public class TextureCompute : NodeOfType<TextureComputeNode> {}
   public class Read : NodeOfType<ReadNode> {}
+  public class ReadTexture : NodeOfType<ReadTextureNode> {}
   public class Math : NodeOfType<MathNode> {}
   public class MakeArray : NodeOfType<MakeArrayNode>{}
   public class Concat : NodeOfType<ConcatNode>{}
@@ -239,6 +253,8 @@ namespace NanoGraph.VisualScripting {
   public class Pack : NodeOfType<PackNode>{}
   public class Unpack : NodeOfType<UnpackNode>{}
   public class Literal : NodeOfType<LiteralNode>{}
+  public class ValueIn : NodeOfType<ValueInputNode>{}
+  public class TextureIn : NodeOfType<TextureInputNode>{}
 
   public class TypeDecl : NodeOfType<TypeDeclNode>{}
 }

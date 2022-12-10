@@ -10,6 +10,7 @@ namespace NanoGraph {
     string EmitBufferType(NanoProgramType type);
     string EmitWritableBufferType(NanoProgramType type);
     string EmitSampleBuffer(string source, string index);
+    string EmitSampleTexture(string source, string index);
     string EmitWriteBuffer(string destination, string index, string value);
     string EmitFunctionInput(NanoProgram program, CodeLocal cachedResult, string fieldName, int index);
     string EmitThreadId();
@@ -19,6 +20,7 @@ namespace NanoGraph {
     public string EmitBufferType(NanoProgramType type) => $"std::shared_ptr<NanoTypedBuffer<{type.EmitIdentifier(this)}>>";
     public string EmitWritableBufferType(NanoProgramType type) => $"std::shared_ptr<NanoTypedBuffer<{type.EmitIdentifier(this)}>>";
     public string EmitSampleBuffer(string source, string index) => $"SampleBuffer({source}, {index})";
+    public string EmitSampleTexture(string source, string index) => $"SampleTexture({source}, {index})"; // TODO: Invalid.
     public string EmitWriteBuffer(string destination, string index, string value) => $"WriteBuffer({destination}, {index}, {value})";
     public string EmitFunctionInput(NanoProgram program, CodeLocal cachedResult, string fieldName, int index) => $"{cachedResult.Identifier}.{program.GetProgramType(cachedResult.Type).GetField(fieldName)}";
     public string EmitThreadId() => throw new NotSupportedException();
@@ -35,6 +37,7 @@ namespace NanoGraph {
     public string EmitBufferType(NanoProgramType type) => $"device const {type.EmitIdentifier(this)}*";
     public string EmitWritableBufferType(NanoProgramType type) => $"device {type.EmitIdentifier(this)}*";
     public string EmitSampleBuffer(string source, string index) => $"SampleBuffer({source}, {index})";
+    public string EmitSampleTexture(string source, string index) => $"SampleTexture({source}, {index})";
     public string EmitWriteBuffer(string destination, string index, string value) => $"WriteBuffer({destination}, {index}, {value})";
     public string EmitFunctionInput(NanoProgram program, CodeLocal cachedResult, string fieldName, int index) => $"input{index}";
     public string EmitThreadId() => "gid";
@@ -140,11 +143,20 @@ namespace NanoGraph {
       return Program.GetPrimitiveType(type)?.EmitIdentifier(Context);
     }
 
+    public string EmitLiteral(string value) {
+      string escaped = value.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n");
+      return $"\"{escaped}\"";
+    }
+
     public string EmitLiteral(bool value) {
       return value ? "true" : "false";
     }
 
     public string EmitLiteral(int value) {
+      return value.ToString();
+    }
+
+    public string EmitUnsignedLiteral(int value) {
       return value.ToString();
     }
 
@@ -163,6 +175,27 @@ namespace NanoGraph {
         result = $"{result}.0";
       }
       return $"{result}f";
+    }
+
+    public string EmitLiteral(double value) {
+      if (double.IsNaN(value)) {
+        return "std::numeric_limits<double>::quiet_NaN()";
+      }
+      if (double.IsPositiveInfinity(value)) {
+        return "std::numeric_limits<double>::infinity()";
+      }
+      if (double.IsNegativeInfinity(value)) {
+        return "(-std::numeric_limits<double>::infinity())";
+      }
+      string result = value.ToString("G9");
+      if (!result.Contains(".")) {
+        result = $"{result}.0";
+      }
+      return result;
+    }
+
+    public string EmitUnsignedLiteral(UnityEngine.Vector2Int value) {
+      return $"(vector_uint2 {{ {EmitLiteral(value.x)}, {EmitLiteral(value.y)} }})";
     }
 
     public string EmitLiteral(UnityEngine.Vector2 value) {
@@ -188,7 +221,9 @@ namespace NanoGraph {
           case PrimitiveType.Int:
             return EmitLiteral((int)Math.Round(value.FloatFromRow(0)));
           case PrimitiveType.Uint:
-            return EmitLiteral((int)Math.Round(value.FloatFromRow(0)));
+            return EmitUnsignedLiteral((int)Math.Round(value.FloatFromRow(0)));
+          case PrimitiveType.Uint2:
+            return EmitUnsignedLiteral(UnityEngine.Vector2Int.RoundToInt(value.Vector2FromRow(0)));
           case PrimitiveType.Float:
             return EmitLiteral(value.FloatFromRow(0));
           case PrimitiveType.Float2:
@@ -237,6 +272,9 @@ namespace NanoGraph {
         }
         return $"ConvertArray<{fromElementType.Identifier}, {toElementType.Identifier}>({expr})";
       }
+      if (fromType == Program.Texture) {
+        return EmitConvert(Program.Float4Type, toType, $"SampleTexture(({expr}), gid_xy_norm)");
+      }
       if (fromType.IsBuiltIn && toType.IsBuiltIn) {
         // TODO: Convert to templated function.
         return $"Convert_{fromType.Identifier}_To_{toType.Identifier}({expr})";
@@ -257,6 +295,7 @@ namespace NanoGraph {
     public readonly bool IsBuiltIn;
     public readonly bool IsArray;
     public readonly NanoProgramType ElementType;
+
 
     private readonly List<Field> _fields = new List<Field>();
     private readonly Dictionary<string, string> _fieldMap = new Dictionary<string, string>();
@@ -319,11 +358,20 @@ namespace NanoGraph {
     }
   }
 
+  public struct NanoValueInputDecl {
+    public string Name;
+    public double DefaultValue;
+    public double MinValue;
+    public double MaxValue;
+  }
+
   public class NanoProgram {
     public readonly string Identifier;
 
     public static readonly NanoCpuContext CpuContext = new NanoCpuContext();
     public static readonly NanoGpuContext GpuContext = new NanoGpuContext();
+
+    public int TextureInputCount { get; private set; }
 
     private readonly List<NanoProgramType> _types = new List<NanoProgramType>();
     private readonly Dictionary<TypeDecl, NanoProgramType> _typeByDeclMap = new Dictionary<TypeDecl, NanoProgramType>();
@@ -336,17 +384,22 @@ namespace NanoGraph {
     private readonly List<string> _fieldsCode = new List<string>();
     private readonly Dictionary<string, string> _fieldMap = new Dictionary<string, string>();
 
+    public IReadOnlyList<NanoValueInputDecl> ValueInputs => _valueInputs;
+    private readonly List<NanoValueInputDecl> _valueInputs = new List<NanoValueInputDecl>();
+
     public static readonly string IntIdentifier = "int32_t";
     public static readonly string UintIdentifier = "uint32_t";
     public readonly NanoProgramType VoidType;
     public readonly NanoProgramType BoolType;
     public readonly NanoProgramType IntType;
     public readonly NanoProgramType UintType;
+    public readonly NanoProgramType Uint2Type;
     public readonly NanoProgramType FloatType;
     public readonly NanoProgramType Float2Type;
     public readonly NanoProgramType Float3Type;
     public readonly NanoProgramType Float4Type;
     public readonly NanoProgramType Texture;
+    public readonly NanoProgramType WriteTexture;
     public readonly NanoProgramType MTLComputePipelineStateType;
     public readonly NanoProgramType MTLRenderPipelineState;
     public readonly NanoProgramType MTLRenderPassDescriptor;
@@ -357,28 +410,48 @@ namespace NanoGraph {
       _types.Add(BoolType = NanoProgramType.MakeBuiltIn(this, "bool"));
       _types.Add(IntType = NanoProgramType.MakeBuiltIn(this, IntIdentifier));
       _types.Add(UintType = NanoProgramType.MakeBuiltIn(this, UintIdentifier));
+      _types.Add(Uint2Type = NanoProgramType.MakeBuiltIn(this, "vector_uint2"));
       _types.Add(FloatType = NanoProgramType.MakeBuiltIn(this, "float"));
       _types.Add(Float2Type = NanoProgramType.MakeBuiltIn(this, "vector_float2"));
       _types.Add(Float3Type = NanoProgramType.MakeBuiltIn(this, "vector_float3"));
       _types.Add(Float4Type = NanoProgramType.MakeBuiltIn(this, "vector_float4"));
       _types.Add(Texture = NanoProgramType.MakeBuiltIn(this, "NanoTexture"));
+      _types.Add(WriteTexture = NanoProgramType.MakeBuiltIn(this, "NanoWriteTexture"));
       _types.Add(MTLComputePipelineStateType = NanoProgramType.MakeBuiltIn(this, "id<MTLComputePipelineState>"));
       _types.Add(MTLRenderPipelineState = NanoProgramType.MakeBuiltIn(this, "id<MTLRenderPipelineState>"));
       _types.Add(MTLRenderPassDescriptor = NanoProgramType.MakeBuiltIn(this, "MTLRenderPassDescriptor*"));
+    }
+
+    public int AllocateTextureInput() {
+      int index = TextureInputCount;
+      ++TextureInputCount;
+      return index;
+    }
+
+    public int AllocateValueInput(string name, double defaultValue, double minValue, double maxValue) {
+      int index = _valueInputs.Count();
+      _valueInputs.Add(new NanoValueInputDecl {
+        Name = name,
+        DefaultValue = defaultValue,
+        MinValue = minValue,
+        MaxValue = maxValue,
+      });
+      return index;
     }
 
     public void AddPreambleStatement(string line) {
       _preambleStatements.Add(line);
     }
 
-    public NanoFunction AddOverrideFunction(string name, INanoCodeContext context, IReadOnlyList<NanoProgramType> paramTypes, NanoProgramType returnType) {
+    public NanoFunction AddOverrideFunction(string name, INanoCodeContext context, NanoProgramType returnType, string[] modifiers = null) {
+      modifiers = modifiers ?? Array.Empty<string>();
       int index = _functions.Count;
-      NanoFunction func = new NanoFunction(this, context, name, returnType, modifiers: Array.Empty<string>());
+      NanoFunction func = new NanoFunction(this, context, name, returnType, modifiers);
       _functions.Add(func);
       return func;
     }
 
-    public NanoFunction AddFunction(string nameHint, INanoCodeContext context, IReadOnlyList<NanoProgramType> paramTypes, NanoProgramType returnType, string[] modifiers = null) {
+    public NanoFunction AddFunction(string nameHint, INanoCodeContext context, NanoProgramType returnType, string[] modifiers = null) {
       modifiers = modifiers ?? Array.Empty<string>();
       int index = _functions.Count;
       string name = $"Func_{NanoProgram.SanitizeIdentifierFragment(nameHint)}_{index:D3}";
@@ -467,6 +540,8 @@ namespace NanoGraph {
           return IntType;
         case PrimitiveType.Uint:
           return UintType;
+        case PrimitiveType.Uint2:
+          return Uint2Type;
         case PrimitiveType.Float:
           return FloatType;
         case PrimitiveType.Float2:

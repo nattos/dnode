@@ -198,13 +198,70 @@ namespace NanoGraph {
     }
   }
 
-  public class VectorIndexNode : DataNode, ICodeNode {
-    public override DataSpec InputSpec => DataSpec.Empty;
-
-    public override DataSpec OutputSpec => DataSpec.FromFields(DataField.MakePrimitive("Out", PrimitiveType.Int));
+  public class ReadTextureNode : DataNode, ICodeNode {
+    public override DataSpec InputSpec => DataSpec.FromFields(DataField.MakePrimitive("In", PrimitiveType.Texture), DataField.MakePrimitive("Index", PrimitiveType.Float2));
+    public override DataSpec OutputSpec => DataSpec.FromFields(DataField.MakePrimitive("Out", PrimitiveType.Float4));
 
     public void EmitCode(CodeContext context) {
-      context.Function.AddStatement($"{context.Function.GetTypeIdentifier(PrimitiveType.Int)} {context.OutputLocals[0].Identifier} = gid;");
+      context.Function.AddStatement($"{context.Function.GetTypeIdentifier(context.OutputLocals[0].Type)} {context.OutputLocals[0].Identifier} = {context.Function.Context.EmitSampleTexture(context.InputLocals[0].Identifier, context.InputLocals[1].Identifier)};");
+      context.ArraySizeFunction.AddStatement($"{NanoProgram.IntIdentifier} {context.OutputLocals[0].ArraySizeIdentifier} = 1;");
+    }
+  }
+
+  public class VectorIndexNode : DataNode, ICodeNode {
+    public enum DimensionType {
+      Linear,
+      Grid2D,
+      Grid3D,
+      IntGrid2D,
+      IntGrid3D,
+    }
+
+    [EditableAttribute]
+    public DimensionType Dimensions = DimensionType.Linear;
+
+    public override DataSpec InputSpec => DataSpec.Empty;
+
+    public override DataSpec OutputSpec => DataSpec.FromFields(DataField.MakePrimitive("Out", IndexType));
+
+    public PrimitiveType IndexType {
+      get {
+        switch (Dimensions) {
+          case DimensionType.Linear:
+          default:
+            return PrimitiveType.Int;
+          case DimensionType.Grid2D:
+            return PrimitiveType.Float2;
+          case DimensionType.Grid3D:
+            return PrimitiveType.Float3;
+          // TODO: Support Int2 and Int3.
+        }
+      }
+    }
+
+    public void EmitCode(CodeContext context) {
+      PrimitiveType indexType = IndexType;
+      string indexExpr;
+      switch (Dimensions) {
+        case DimensionType.Linear:
+        default:
+          indexExpr = "gid";
+          break;
+        case DimensionType.Grid2D:
+          indexExpr = "gid_xy_norm";
+          break;
+        case DimensionType.IntGrid2D:
+          indexExpr = "gid_xy";
+          break;
+        case DimensionType.Grid3D:
+          indexExpr = "gid_xyz_norm";
+          break;
+        case DimensionType.IntGrid3D:
+          indexExpr = "gid_xyz";
+          break;
+      }
+
+      context.Function.AddStatement($"{context.Function.GetTypeIdentifier(indexType)} {context.OutputLocals[0].Identifier} = {indexExpr};");
       context.ArraySizeFunction.AddStatement($"{NanoProgram.IntIdentifier} {context.OutputLocals[0].ArraySizeIdentifier} = 1;");
     }
   }
@@ -341,6 +398,7 @@ namespace NanoGraph {
   }
 
   public class LiteralNode : DataNode, ICodeNode {
+    // TODO: Only allow values that can actually be input :P
     [EditableAttribute]
     public PrimitiveType Type = PrimitiveType.Float;
 

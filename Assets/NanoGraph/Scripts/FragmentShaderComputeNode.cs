@@ -16,10 +16,6 @@ namespace NanoGraph {
 
     public override DataSpec OutputSpec => DataSpec.FromFields(new DataField { Name = "Out", Type = TypeSpec.MakePrimitive(PrimitiveType.Texture) });
 
-    public override string EmitTotalThreadCount(NanoFunction func, CodeCachedResult cachedResult) {
-      return func.EmitLiteral(1);
-    }
-
     public override IComputeNodeEmitCodeOperation CreateEmitCodeOperation(ComputeNodeEmitCodeOperationContext context) => new EmitterGpu(this, context);
   
     public class EmitterGpu : EmitterBase {
@@ -41,8 +37,8 @@ namespace NanoGraph {
       public override void EmitFunctionPreamble(out NanoFunction func, out NanoFunction arraySizesFunc) {
         // Begin generating the main results function.
         string[] functionModifiers = { "fragment" };
-        this.func = func = program.AddFunction(computeNode.ShortName, computeNode.CodeContext, paramTypes: Array.Empty<NanoProgramType>(), program.Float4Type, functionModifiers);
-        this.arraySizesFunc = arraySizesFunc = program.AddFunction($"{computeNode.ShortName}_Sizes", NanoProgram.CpuContext, paramTypes: Array.Empty<NanoProgramType>(), arraySizeResultType);
+        this.func = func = program.AddFunction(computeNode.ShortName, computeNode.CodeContext, program.Float4Type, functionModifiers);
+        this.arraySizesFunc = arraySizesFunc = program.AddFunction($"{computeNode.ShortName}_Sizes", NanoProgram.CpuContext, arraySizeResultType);
 
 
         // Identify which vertex shader is the input.
@@ -74,21 +70,22 @@ namespace NanoGraph {
             inputIndex++;
             continue;
           }
-          gpuInputBuffers.Add(new NanoGpuBufferRef {
-            FieldName = computeInput.Field.Name,
-            Expression = computeInput.Expression,
-            Index = bufferIndex,
-            Type = computeInput.Field.Type,
-          });
-          var fieldType = computeInput.FieldType;
-          string[] modifiers = { "constant", "const" };
-          string suffix = $"[[buffer({bufferIndex++})]]";
-          bool isReference = true;
-          if (fieldType.IsArray) {
-            modifiers = Array.Empty<string>();
-            isReference = false;
-          }
-          func.AddParam(modifiers, fieldType, $"input{inputIndex++}", suffix, new NanoParameterOptions { IsConst = true, IsReference = isReference });
+          AddGpuFuncInput(func, computeInput, $"input{inputIndex++}", gpuInputBuffers, ref bufferIndex);
+          // gpuInputBuffers.Add(new NanoGpuBufferRef {
+          //   FieldName = computeInput.Field.Name,
+          //   Expression = computeInput.Expression,
+          //   Index = bufferIndex,
+          //   Type = computeInput.Field.Type,
+          // });
+          // var fieldType = computeInput.FieldType;
+          // string[] modifiers = { "constant", "const" };
+          // string suffix = $"[[buffer({bufferIndex++})]]";
+          // bool isReference = true;
+          // if (fieldType.IsArray) {
+          //   modifiers = Array.Empty<string>();
+          //   isReference = false;
+          // }
+          // func.AddParam(modifiers, fieldType, $"input{inputIndex++}", suffix, new NanoParameterOptions { IsConst = true, IsReference = isReference });
         }
       }
 
@@ -120,7 +117,7 @@ namespace NanoGraph {
         string renderPassDescriptorIdentifier = program.AddInstanceField(program.MTLRenderPassDescriptor, $"{computeNode.ShortName}_RenderPassDescriptor");
         string renderTargetIdentifier = program.AddInstanceField(program.Texture, $"{computeNode.ShortName}_RenderTarget");
 
-        validateCacheFunction = program.AddFunction($"Update_{computeNode.ShortName}", NanoProgram.CpuContext, Array.Empty<NanoProgramType>(), program.VoidType);
+        validateCacheFunction = program.AddFunction($"Update_{computeNode.ShortName}", NanoProgram.CpuContext, program.VoidType);
         validateCacheFunction.AddStatement($"{validateSizesCacheFunction.Identifier}();");
 
 
@@ -154,45 +151,48 @@ namespace NanoGraph {
         string outputTextureExpr = renderTargetIdentifier;
 
         // Sync buffers to GPU.
-        foreach (var inputBuffer in gpuVertexInputBuffers.Concat(gpuFragmentInputBuffers)) {
-          if (inputBuffer.Type.IsArray) {
-            validateCacheFunction.AddStatement($"{inputBuffer.Expression}->SyncToGpu();");
-          }
-        }
+        EmitSyncBuffersToGpu(validateCacheFunction, gpuVertexInputBuffers.Concat(gpuFragmentInputBuffers).ToArray());
+        // foreach (var inputBuffer in gpuVertexInputBuffers.Concat(gpuFragmentInputBuffers)) {
+        //   if (inputBuffer.Type.IsArray) {
+        //     validateCacheFunction.AddStatement($"{inputBuffer.Expression}->SyncToGpu();");
+        //   }
+        // }
 
         // Create a MTLRenderCommandEncoder.
         validateCacheFunction.AddStatement($"{NanoProgram.IntIdentifier} {vertexCountLocal} = {vertexCountExpr};");
         validateCacheFunction.AddStatement($"MTLRenderPassDescriptor* renderPassDescriptor = {renderPassDescriptorIdentifier};");
         validateCacheFunction.AddStatement($"renderPassDescriptor.colorAttachments[0].texture = {outputTextureExpr};");
-        validateCacheFunction.AddStatement($"id<MTLRenderCommandEncoder> renderEncoder = [GetCurrentCommandBuffer() renderCommandEncoderWithDescriptor:renderPassDescriptor];");
-        validateCacheFunction.AddStatement($"renderEncoder.label = @\"{computeNode.ShortName}\";");
-        validateCacheFunction.AddStatement($"[renderEncoder setCullMode:MTLCullModeNone];");
-        validateCacheFunction.AddStatement($"[renderEncoder setRenderPipelineState:{pipelineStateIdentifier}];");
+        validateCacheFunction.AddStatement($"id<MTLRenderCommandEncoder> encoder = [GetCurrentCommandBuffer() renderCommandEncoderWithDescriptor:renderPassDescriptor];");
+        validateCacheFunction.AddStatement($"encoder.label = @\"{computeNode.ShortName}\";");
+        validateCacheFunction.AddStatement($"[encoder setCullMode:MTLCullModeNone];");
+        validateCacheFunction.AddStatement($"[encoder setRenderPipelineState:{pipelineStateIdentifier}];");
 
         // Bind all inputs for the vertex shader.
-        foreach (var inputBuffer in gpuVertexInputBuffers) {
-          string expression = inputBuffer.Expression;
-          int bufferIndex = inputBuffer.Index;
-          if (inputBuffer.Type.IsArray) {
-            validateCacheFunction.AddStatement($"[renderEncoder setVertexBuffer:{expression}->GetGpuBuffer() offset:0 atIndex:{bufferIndex}];");
-          } else {
-            validateCacheFunction.AddStatement($"[renderEncoder setVertexBytes:&{expression} length:sizeof({expression}) atIndex:{bufferIndex}];");
-          }
-        }
+        EmitBindBuffers(validateCacheFunction, gpuVertexInputBuffers, variant: "Vertex");
+        // foreach (var inputBuffer in gpuVertexInputBuffers) {
+        //   string expression = inputBuffer.Expression;
+        //   int bufferIndex = inputBuffer.Index;
+        //   if (inputBuffer.Type.IsArray) {
+        //     validateCacheFunction.AddStatement($"[encoder setVertexBuffer:{expression}->GetGpuBuffer() offset:0 atIndex:{bufferIndex}];");
+        //   } else {
+        //     validateCacheFunction.AddStatement($"[encoder setVertexBytes:&{expression} length:sizeof({expression}) atIndex:{bufferIndex}];");
+        //   }
+        // }
         // Bind all inputs for the fragment shader.
-        foreach (var inputBuffer in gpuFragmentInputBuffers) {
-          string expression = inputBuffer.Expression;
-          int bufferIndex = inputBuffer.Index;
-          if (inputBuffer.Type.IsArray) {
-            validateCacheFunction.AddStatement($"[renderEncoder setFragmentBuffer:{expression}->GetGpuBuffer() offset:0 atIndex:{bufferIndex}];");
-          } else {
-            validateCacheFunction.AddStatement($"[renderEncoder setFragmentBytes:&{expression} length:sizeof({expression}) atIndex:{bufferIndex}];");
-          }
-        }
+        EmitBindBuffers(validateCacheFunction, gpuFragmentInputBuffers, variant: "Fragment");
+        // foreach (var inputBuffer in gpuFragmentInputBuffers) {
+        //   string expression = inputBuffer.Expression;
+        //   int bufferIndex = inputBuffer.Index;
+        //   if (inputBuffer.Type.IsArray) {
+        //     validateCacheFunction.AddStatement($"[encoder setFragmentBuffer:{expression}->GetGpuBuffer() offset:0 atIndex:{bufferIndex}];");
+        //   } else {
+        //     validateCacheFunction.AddStatement($"[encoder setFragmentBytes:&{expression} length:sizeof({expression}) atIndex:{bufferIndex}];");
+        //   }
+        // }
 
         // Draw primitives.
-        validateCacheFunction.AddStatement($"[renderEncoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:(uint)({vertexCountLocal})];");
-        validateCacheFunction.AddStatement($"[renderEncoder endEncoding];");
+        validateCacheFunction.AddStatement($"[encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:(uint)({vertexCountLocal})];");
+        validateCacheFunction.AddStatement($"[encoder endEncoding];");
 
         // Store the result.
         validateCacheFunction.AddStatement($"{cachedResult.Identifier}.{program.GetProgramType(cachedResult.Type).GetField("Out")} = {renderTargetIdentifier};");

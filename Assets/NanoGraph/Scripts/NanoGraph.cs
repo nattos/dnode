@@ -376,8 +376,8 @@ namespace NanoGraph {
       List<string> errors = new List<string>();
 
       var program = new NanoProgram(EffectName);
-      var executeFunction = program.AddOverrideFunction("Execute", NanoProgram.CpuContext, Array.Empty<NanoProgramType>(), program.VoidType);
-      var createPipelinesFunction = program.AddOverrideFunction("CreatePipelines", NanoProgram.CpuContext, Array.Empty<NanoProgramType>(), program.VoidType);
+      var executeFunction = program.AddOverrideFunction("Execute", NanoProgram.CpuContext, program.VoidType);
+      var createPipelinesFunction = program.AddOverrideFunction("CreatePipelines", NanoProgram.CpuContext, program.VoidType);
       string objCPlaceholderClassIdentifier = $"{program.Identifier}_Placeholder";
       createPipelinesFunction.AddStatement($"NSError* error;");
       createPipelinesFunction.AddStatement($"id<MTLDevice> device = GetDevice();");
@@ -511,330 +511,6 @@ namespace NanoGraph {
         emitOp.EmitValidateCacheFunction();
         emitOp.EmitExecuteFunctionCode();
         computeNodeResults[computeNode] = (codeCachedResult, emitOp);
-
-        // // Define a type to hold the result value.
-        // DataSpec computeInputSpec = computeNode.ComputeInputSpec;
-        // DataSpec computeArrayInputSpec = computeNode.AuxSizesOutputSpec;
-        // DataSpec computeOutputSpec = computeNode.OutputSpec;
-        // TypeDecl resultTypeDecl = TypeDeclFromDataFields(computeOutputSpec.Fields);
-        // DataField[] compileTimeOnlyInputs = CompileTimeOnlyFields(computeInputSpec.Fields);
-        // TypeSpec resultTypeSpec = TypeSpec.MakeType(resultTypeDecl);
-        // NanoProgramType resultType = program.AddType(resultTypeDecl, $"Result_{computeNode.ShortName}");
-        // NanoProgramType arraySizeResultType = program.AddType(TypeDeclFromDataFields(computeOutputSpec.Fields.Concat(computeArrayInputSpec.Fields).Select(field => new DataField { Name = field.Name, Type = TypeSpec.MakePrimitive(PrimitiveType.Int) }).ToArray()), $"ResultSizes_{computeNode.ShortName}");
-        // // Define a field to hold the cached result.
-        // string cachedResultIdentifier = program.AddInstanceField(resultType, $"Result_{computeNode.ShortName}");
-        // string cachedResultSizesIdentifier = program.AddInstanceField(arraySizeResultType, $"ResultSizes_{computeNode.ShortName}");
-
-        // // Begin generating the main results function.
-        // var funcContext = computeNode.CodeContext;
-        // bool isGpuContext = funcContext is NanoGpuContext;
-        // string[] functionModifiers = isGpuContext ? new[] { "kernel" } : Array.Empty<string>();
-        // var func = program.AddFunction(computeNode.ShortName, funcContext, paramTypes: Array.Empty<NanoProgramType>(), isGpuContext ? program.VoidType : resultType, functionModifiers);
-        // List<string> dependentInputBuffers = new List<string>();
-        // foreach (var dependency in dependentCalcNodes) {
-        //   if (!computeNodeResults.TryGetValue(dependency.Node, out var result)) {
-        //     errors.Add($"Dependency {dependency.Node} for {computeNode} not yet ready.");
-        //     continue;
-        //   }
-        //   string resultIdentifier = dependency.InputResult.Value.Result.Identifier;
-        //   foreach (var field in dependency.Node.OutputSpec.Fields) {
-        //     var fieldType = program.GetProgramType(field.Type, field.Name);
-        //     if (fieldType.IsArray) {
-        //       dependentInputBuffers.Add($"{resultIdentifier}.{dependency.InputResult.Value.ResultType.GetField(field.Name)}");
-        //     }
-        //   }
-        // }
-        // List<(string, int, TypeSpec)> gpuInputBuffers = new List<(string, int, TypeSpec)>();
-        // List<(string, int, TypeSpec)> gpuOutputBuffers = new List<(string, int, TypeSpec)>();
-        // if (isGpuContext) {
-        //   // Load inputs.
-        //   // TODO: Only load inputs that we really read.
-        //   int bufferIndex = 0;
-        //   int inputIndex = 0;
-        //   foreach (var dependency in dependentCalcNodes) {
-        //     if (!computeNodeResults.TryGetValue(dependency.Node, out var result)) {
-        //       errors.Add($"Dependency {dependency.Node} for {computeNode} not yet ready.");
-        //       continue;
-        //     }
-        //     string resultIdentifier = dependency.InputResult.Value.Result.Identifier;
-        //     foreach (var field in dependency.Node.OutputSpec.Fields) {
-        //       if (field.IsCompileTimeOnly) {
-        //         continue;
-        //       }
-        //       gpuInputBuffers.Add(($"{resultIdentifier}.{dependency.InputResult.Value.ResultType.GetField(field.Name)}", bufferIndex, field.Type));
-        //       var fieldType = program.GetProgramType(field.Type, field.Name);
-        //       string[] modifiers = { "constant", "const" };
-        //       string suffix = $"[[buffer({bufferIndex++})]]";
-        //       bool isReference = true;
-        //       if (fieldType.IsArray) {
-        //         modifiers = Array.Empty<string>();
-        //         isReference = false;
-        //       }
-        //       func.AddParam(modifiers, fieldType, $"input{inputIndex++}", suffix, new NanoParameterOptions { IsConst = true, IsReference = isReference });
-        //     }
-        //   }
-
-        //   // Define outputs.
-        //   for (int i = 0; i < computeOutputSpec.Fields.Count; ++i) {
-        //     var field = computeOutputSpec.Fields[i];
-        //     if (field.IsCompileTimeOnly) {
-        //       continue;
-        //     }
-        //     var fieldType = field.Type;
-        //     gpuOutputBuffers.Add((field.Name, bufferIndex, fieldType));
-        //     string[] modifiers = {};
-        //     string suffix = $"[[buffer({bufferIndex++})]]";
-        //     if (fieldType.IsArray) {
-        //       modifiers = Array.Empty<string>();
-        //     }
-        //     func.AddParam(modifiers, program.GetProgramType(fieldType, field.Name), $"output{i}", suffix, new NanoParameterOptions { IsConst = false });
-        //   }
-        //   func.AddParam(Array.Empty<string>(), program.GetPrimitiveType(PrimitiveType.Uint), $"gid_uint", "[[thread_position_in_grid]]");
-        //   func.AddStatement($"{func.GetTypeIdentifier(PrimitiveType.Int)} gid = gid_uint;");
-        // }
-        // var arraySizesFunc = program.AddFunction($"{computeNode.ShortName}_Sizes", NanoProgram.CpuContext, paramTypes: Array.Empty<NanoProgramType>(), arraySizeResultType);
-
-        // Dictionary<DataPlug, string> resultLocalMap = new Dictionary<DataPlug, string>();
-        // Dictionary<DataPlug, string> resultSizesLocalMap = new Dictionary<DataPlug, string>();
-        // foreach (ICodeGenerator codeGenerator in computePlan) {
-        //   var inputSpecFields = codeGenerator.InputSpec.Fields.Where(field => !field.IsCompileTimeOnly).ToArray();
-        //   var outputSpec = codeGenerator.OutputSpec;
-
-        //   CodeLocal[] inputLocals = new CodeLocal[inputSpecFields.Length];
-        //   for (int i = 0; i < inputSpecFields.Length; ++i) {
-        //     var field = inputSpecFields[i];
-        //     if (field.IsCompileTimeOnly) {
-        //       continue;
-        //     }
-        //     var edge = _edgesByDest.GetOrDefault(new DataPlug { Node = codeGenerator.SourceNode, FieldName = field.Name });
-        //     if (edge == null) {
-        //       // Input is not connected. This may or may not be desired.
-        //       continue;
-        //     }
-        //     string inputLocal = resultLocalMap.GetOrDefault(edge.Source);
-        //     string inputSizeLocal = resultSizesLocalMap.GetOrDefault(edge.Source);
-        //     if (inputLocal == null || inputSizeLocal == null) {
-        //       errors.Add($"Input {field.Name} for {codeGenerator.SourceNode} is not defined.");
-        //       continue;
-        //     }
-
-        //     TypeSpec inputType = edge.SourceFieldOrNull?.Type ?? default;
-        //     TypeSpec desiredType = field.Type;
-        //     var inputProgramType = program.GetProgramType(inputType);
-        //     var desiredProgramType = program.GetProgramType(desiredType);
-
-        //     string actualInputLocal = inputLocal;
-        //     TypeSpec actualType = inputType;
-        //     if (inputProgramType != desiredProgramType) {
-        //       actualInputLocal = func.AllocLocal("Converted");
-        //       func.AddStatement($"{func.GetTypeIdentifier(desiredProgramType)} {actualInputLocal} = {func.EmitConvert(inputProgramType, desiredProgramType, inputLocal)};");
-        //       actualType = desiredType;
-        //     }
-
-        //     inputLocals[i] = new CodeLocal { Identifier = actualInputLocal, Type = actualType, ArraySizeIdentifier = inputSizeLocal };
-        //   }
-
-        //   List<CodeLocal> outputLocals =  new List<CodeLocal>();
-        //   foreach (var field in outputSpec.Fields) {
-        //     if (field.IsCompileTimeOnly) {
-        //       continue;
-        //     }
-        //     string outputLocal = func.AllocLocal($"{codeGenerator.SourceNode.ShortName}_{field.Name}");
-        //     string outputSizeLocal = arraySizesFunc.AllocLocal($"{codeGenerator.SourceNode.ShortName}_{field.Name}");
-        //     resultLocalMap[new DataPlug { Node = codeGenerator.SourceNode, FieldName = field.Name }] = outputLocal;
-        //     resultSizesLocalMap[new DataPlug { Node = codeGenerator.SourceNode, FieldName = field.Name }] = outputSizeLocal;
-        //     outputLocals.Add(new CodeLocal { Identifier = outputLocal, Type = field.Type, ArraySizeIdentifier = outputSizeLocal });
-        //   }
-
-        //   codeGenerator.EmitCode(new CodeContext {
-        //     Function = func,
-        //     ArraySizeFunction = arraySizesFunc,
-        //     InputLocals = inputLocals,
-        //     OutputLocals = outputLocals,
-        //     // CompileTimeOnlyInputs = compileTimeOnlyInputs,
-        //     Errors = errors,
-        //   });
-        // }
-
-        // if (isGpuContext) {
-        //   // TODO: Store results.
-        //   string returnSizesLocal = arraySizesFunc.AllocLocal("Return");
-        //   var cachedResult = new CodeCachedResult { ResultType = resultType, ArraySizesResultType = arraySizeResultType, Result = new CodeLocal { Identifier = cachedResultIdentifier, Type = resultTypeSpec, ArraySizeIdentifier = cachedResultSizesIdentifier } };
-        //   arraySizesFunc.AddStatement($"{arraySizesFunc.GetTypeIdentifier(arraySizeResultType)} {returnSizesLocal};");
-
-        //   var auxSizesOutputSpec = computeNode.AuxSizesOutputSpec;
-        //   CodeLocal[] auxSizesCodeInputLocals = new CodeLocal[auxSizesOutputSpec.Fields.Count];
-        //   for (int i = 0; i < auxSizesOutputSpec.Fields.Count; ++i) {
-        //     var field = auxSizesOutputSpec.Fields[i];
-        //     if (field.IsCompileTimeOnly) {
-        //       continue;
-        //     }
-        //     var edge = _edgesByDest.GetOrDefault(new DataPlug { Node = computeNode, FieldName = field.Name });
-        //     if (edge == null) {
-        //       continue;
-        //     }
-        //     if (!(edge.Source.Node is IComputeNode sourceComputeNode)) {
-        //       errors.Add($"Node {computeNode} depends on an output that is not a compute node ({edge.Source.Node}).");
-        //       continue;
-        //     }
-        //     if (!computeNodeResults.TryGetValue(sourceComputeNode, out CodeCachedResult sourceCachedResult)) {
-        //       errors.Add($"Node {computeNode} depends on a compute node that is not yet ready ({edge.Source.Node}).");
-        //       continue;
-        //     }
-        //     string inputLocal = $"{sourceCachedResult.Result.Identifier}.{sourceCachedResult.ArraySizesResultType.GetField(edge.Source.FieldName)}";
-        //     string inputSizeLocal = resultSizesLocalMap.GetOrDefault(edge.Source);
-        //     if (inputLocal == null || inputSizeLocal == null) {
-        //       errors.Add($"Input {field.Name} for {computeNode} is not defined.");
-        //       continue;
-        //     }
-        //     auxSizesCodeInputLocals[i] = new CodeLocal { Identifier = inputLocal, Type = sourceCachedResult.Result.Type, ArraySizeIdentifier = inputSizeLocal };
-        //   }
-        //   var emitStoreAuxSizesCodeCachedResult = new CodeCachedResult { ResultType = resultType, ArraySizesResultType = arraySizeResultType, Result = new CodeLocal { ArraySizeIdentifier = returnSizesLocal } };
-        //   computeNode.EmitStoreAuxSizesCode(new CodeContext {
-        //     Function = func,
-        //     ArraySizeFunction = arraySizesFunc,
-        //     InputLocals = auxSizesCodeInputLocals,
-        //     OutputLocals = null,
-        //     // CompileTimeOnlyInputs = compileTimeOnlyInputs,
-        //     Errors = errors,
-        //   }, emitStoreAuxSizesCodeCachedResult);
-
-        //   // TODO: Map inputs to outputs somehow.
-        //   for (int i = 0; i < computeOutputSpec.Fields.Count; ++i) {
-        //     var field = computeOutputSpec.Fields[i];
-        //     if (field.IsCompileTimeOnly) {
-        //       continue;
-        //     }
-        //     var edge = _edgesByDest.GetOrDefault(new DataPlug { Node = computeNode, FieldName = field.Name });
-        //     if (edge == null) {
-        //       continue;
-        //     }
-        //     string inputLocal = resultLocalMap.GetOrDefault(edge.Source);
-        //     string inputSizeLocal = resultSizesLocalMap.GetOrDefault(edge.Source);
-        //     if (inputLocal == null || inputSizeLocal == null) {
-        //       errors.Add($"Input {field.Name} for {computeNode} is not defined.");
-        //       continue;
-        //     }
-        //     if (field.Type.IsArray) {
-        //       func.AddStatement($"{func.Context.EmitWriteBuffer($"output{i}", func.Context.EmitThreadId(), inputLocal)};");
-        //     } else {
-        //       func.AddStatement($"output{i} = {inputLocal};");
-        //     }
-        //     // arraySizesFunc.AddStatement($"{returnSizesLocal}.{arraySizeResultType.GetField(field.Name)} = {inputSizeLocal};");
-        //     arraySizesFunc.AddStatement($"{returnSizesLocal}.{arraySizeResultType.GetField(field.Name)} = {computeNode.EmitTotalThreadCount(arraySizesFunc, cachedResult)};");
-        //   }
-        //   arraySizesFunc.AddStatement($"return {returnSizesLocal};");
-        //   computeNodeResults[computeNode] = cachedResult;
-        // } else {
-        //   string returnLocal = func.AllocLocal("Return");
-        //   string returnSizesLocal = arraySizesFunc.AllocLocal("Return");
-        //   func.AddStatement($"{func.GetTypeIdentifier(resultType)} {returnLocal};");
-        //   arraySizesFunc.AddStatement($"{arraySizesFunc.GetTypeIdentifier(arraySizeResultType)} {returnSizesLocal};");
-        //   foreach (var field in computeOutputSpec.Fields) {
-        //     if (field.IsCompileTimeOnly) {
-        //       continue;
-        //     }
-        //     var edge = _edgesByDest.GetOrDefault(new DataPlug { Node = computeNode, FieldName = field.Name });
-        //     if (edge == null) {
-        //       continue;
-        //     }
-        //     string inputLocal = resultLocalMap.GetOrDefault(edge.Source);
-        //     string inputSizeLocal = resultSizesLocalMap.GetOrDefault(edge.Source);
-        //     if (inputLocal == null || inputSizeLocal == null) {
-        //       errors.Add($"Input {field.Name} for {computeNode} is not defined.");
-        //       continue;
-        //     }
-        //     func.AddStatement($"{returnLocal}.{resultType.GetField(field.Name)} = {inputLocal};");
-        //     arraySizesFunc.AddStatement($"{returnSizesLocal}.{arraySizeResultType.GetField(field.Name)} = {inputSizeLocal};");
-        //   }
-        //   func.AddStatement($"return {returnLocal};");
-        //   arraySizesFunc.AddStatement($"return {returnSizesLocal};");
-        //   computeNodeResults[computeNode] = new CodeCachedResult { ResultType = resultType, ArraySizesResultType = arraySizeResultType, Result = new CodeLocal { Identifier = cachedResultIdentifier, Type = resultTypeSpec, ArraySizeIdentifier = cachedResultSizesIdentifier } };
-        // }
-
-        // NanoFunction validateSizesCacheFunction = program.AddFunction($"UpdateSizes_{computeNode.ShortName}", NanoProgram.CpuContext, Array.Empty<NanoProgramType>(), program.VoidType);
-        // validateSizesCacheFunction.AddStatement($"{cachedResultSizesIdentifier} = {arraySizesFunc.Identifier}();");
-        // foreach (var field in computeNode.OutputSpec.Fields) {
-        //   if (field.IsCompileTimeOnly) {
-        //     continue;
-        //   }
-        //   if (!field.Type.IsArray) {
-        //     continue;
-        //   }
-        //   validateSizesCacheFunction.AddStatement($"if (!{cachedResultIdentifier}.{resultType.GetField(field.Name)}) {{");
-        //   validateSizesCacheFunction.AddStatement($"  {cachedResultIdentifier}.{resultType.GetField(field.Name)}.reset(NanoTypedBuffer<{validateSizesCacheFunction.GetElementTypeIdentifier(field.Type)}>::Allocate({cachedResultSizesIdentifier}.{arraySizeResultType.GetField(field.Name)}));");
-        //   validateSizesCacheFunction.AddStatement($"}} else {{");
-        //   validateSizesCacheFunction.AddStatement($"  {cachedResultIdentifier}.{resultType.GetField(field.Name)}->Resize({cachedResultSizesIdentifier}.{arraySizeResultType.GetField(field.Name)});");
-        //   validateSizesCacheFunction.AddStatement($"}}");
-        // }
-
-        // NanoFunction validateCacheFunction = program.AddFunction($"Update_{computeNode.ShortName}", NanoProgram.CpuContext, Array.Empty<NanoProgramType>(), program.VoidType);
-        // validateCacheFunction.AddStatement($"{validateSizesCacheFunction.Identifier}();");
-        // if (isGpuContext) {
-        //   string pipelineStateIdentifier = program.AddInstanceField(program.MTLComputePipelineStateType, $"{computeNode.ShortName}_GpuPipeline");
-
-        //   // TODO: Sync buffers to GPU.
-        //   foreach (var (identifier, bufferIndex, fieldType) in gpuInputBuffers) {
-        //     if (fieldType.IsArray) {
-        //       validateCacheFunction.AddStatement($"{identifier}->SyncToGpu();");
-        //     }
-        //   }
-        //   foreach (var (rawFieldName, bufferIndex, fieldType) in gpuOutputBuffers) {
-        //     var fieldName = resultType.GetField(rawFieldName);
-        //     if (fieldType.IsArray) {
-        //       validateCacheFunction.AddStatement($"{cachedResultIdentifier}.{fieldName}->EnsureGpuBuffer();");
-        //     }
-        //   }
-        //   validateCacheFunction.AddStatement($"id<MTLComputeCommandEncoder> encoder = [GetCurrentCommandBuffer() computeCommandEncoder];");
-        //   validateCacheFunction.AddStatement($"[encoder setComputePipelineState:{pipelineStateIdentifier}];"); // TODO: Get pipeline state.
-        //   // TODO: Bind buffers.
-        //   foreach (var (identifier, bufferIndex, fieldType) in gpuInputBuffers) {
-        //     if (fieldType.IsArray) {
-        //       validateCacheFunction.AddStatement($"[encoder setBuffer:{identifier}->GetGpuBuffer() offset:0 atIndex:{bufferIndex}];");
-        //     } else {
-        //       validateCacheFunction.AddStatement($"[encoder setBytes:&{identifier} length:sizeof({identifier}) atIndex:{bufferIndex}];");
-        //     }
-        //   }
-        //   foreach (var (rawFieldName, bufferIndex, fieldType) in gpuOutputBuffers) {
-        //     var fieldName = resultType.GetField(rawFieldName);
-        //     if (fieldType.IsArray) {
-        //       validateCacheFunction.AddStatement($"[encoder setBuffer:{cachedResultIdentifier}.{fieldName}->GetGpuBuffer() offset:0 atIndex:{bufferIndex}];");
-        //     }
-        //   }
-        //   // Run command queue.
-        //   validateCacheFunction.AddStatement($"MTLSize batchSize = {{ (NSUInteger)({computeNode.EmitTotalThreadCount(validateCacheFunction, computeNodeResults[computeNode])}), 1, 1 }};");
-        //   validateCacheFunction.AddStatement($"MTLSize threadgroupSize = {{ {pipelineStateIdentifier}.maxTotalThreadsPerThreadgroup, 1, 1 }};");
-        //   validateCacheFunction.AddStatement($"[encoder dispatchThreads:batchSize threadsPerThreadgroup:threadgroupSize];");
-        //   validateCacheFunction.AddStatement($"[encoder endEncoding];");
-        //   foreach (var (rawFieldName, bufferIndex, fieldType) in gpuOutputBuffers) {
-        //     var fieldName = resultType.GetField(rawFieldName);
-        //     if (fieldType.IsArray) {
-        //       validateCacheFunction.AddStatement($"{cachedResultIdentifier}.{fieldName}->MarkGpuBufferChanged();");
-        //     }
-        //   }
-
-        //   // Emit pipeline creation code.
-        //   createPipelinesFunction.AddStatement($"{pipelineStateIdentifier} = [device newComputePipelineStateWithFunction:[defaultLibrary newFunctionWithName:@\"{func.Identifier}\"] error:&error];");
-        // } else {
-        //   // Treat buffers correctly.
-        //   foreach (string inputBuffer in dependentInputBuffers) {
-        //     func.AddStatement($"{inputBuffer}->SyncToCpu();");
-        //   }
-        //   string funcResultLocal = arraySizesFunc.AllocLocal("Result");
-        //   validateCacheFunction.AddStatement($"{validateCacheFunction.GetTypeIdentifier(resultType)} {funcResultLocal} = {func.Identifier}();");
-        //   foreach (var field in computeNode.OutputSpec.Fields) {
-        //     if (field.IsCompileTimeOnly) {
-        //       continue;
-        //     }
-        //     var fieldName = resultType.GetField(field.Name);
-        //     if (field.Type.IsArray) {
-        //       validateCacheFunction.AddStatement($"{cachedResultIdentifier}.{fieldName}->CopyCpuFrom({funcResultLocal}.{fieldName}.get());");
-        //     } else {
-        //       validateCacheFunction.AddStatement($"{cachedResultIdentifier}.{fieldName} = {funcResultLocal}.{fieldName};");
-        //     }
-        //   }
-        // }
-        // executeFunction.AddStatement($"{validateCacheFunction.Identifier}();");
       }
 
       // Store final outputs.
@@ -850,10 +526,26 @@ namespace NanoGraph {
             continue;
           }
           string fieldIdentifier = cachedResult.result?.ResultType.GetField(field.Name);
-          var getOutputFunc = program.AddOverrideFunction($"GetOutput{finalOutputIndex}", NanoProgram.CpuContext, Array.Empty<NanoProgramType>(), program.GetProgramType(field.Type));
+          var getOutputFunc = program.AddOverrideFunction($"GetOutput{finalOutputIndex}", NanoProgram.CpuContext, program.GetProgramType(field.Type));
           getOutputFunc.AddStatement($"return {cachedResult.result?.Result.Identifier}.{fieldIdentifier};");
           finalOutputIndex++;
         }
+
+        var getTextureInputCountFunc = program.AddOverrideFunction($"GetTextureInputCount", NanoProgram.CpuContext, program.IntType, modifiers: new[] { "virtual" });
+        getTextureInputCountFunc.AddStatement($"return {getTextureInputCountFunc.EmitLiteral(program.TextureInputCount)};");
+
+        var getParamsFunc = program.AddOverrideFunction($"GetParameterDecls", NanoProgram.CpuContext, NanoProgramType.MakeBuiltIn(program, "std::vector<ParameterDecl>"), modifiers: new[] { "virtual" });
+        getParamsFunc.AddStatement("std::vector<ParameterDecl> parameters = {");
+        foreach (var valueInput in program.ValueInputs) {
+          getParamsFunc.AddStatement($"  ParameterDecl {{");
+          getParamsFunc.AddStatement($"    .Name = {getParamsFunc.EmitLiteral(valueInput.Name)},");
+          getParamsFunc.AddStatement($"    .DefaultValue = {getParamsFunc.EmitLiteral(valueInput.DefaultValue)},");
+          getParamsFunc.AddStatement($"    .MinValue = {getParamsFunc.EmitLiteral(valueInput.MinValue)},");
+          getParamsFunc.AddStatement($"    .MaxValue = {getParamsFunc.EmitLiteral(valueInput.MaxValue)},");
+          getParamsFunc.AddStatement($"  }}");
+        }
+        getParamsFunc.AddStatement("};");
+        getParamsFunc.AddStatement($"return parameters;");
       }
 
       string outerCpuCode = program.OuterCpuCode;

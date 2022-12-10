@@ -67,7 +67,6 @@ namespace NanoGraph {
     DataSpec ComputeInputSpec { get; }
     DataSpec AuxSizesOutputSpec { get; }
     INanoCodeContext CodeContext { get; }
-    void EmitStoreAuxSizesCode(CodeContext context, CodeCachedResult cachedResult);
     IComputeNodeEmitCodeOperation CreateEmitCodeOperation(ComputeNodeEmitCodeOperationContext context);
   }
 

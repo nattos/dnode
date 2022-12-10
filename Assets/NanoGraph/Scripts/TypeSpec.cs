@@ -33,6 +33,7 @@ namespace NanoGraph {
     Bool,
     Int,
     Uint,
+    Uint2,
     Float,
     Float2,
     Float3,
