@@ -17,6 +17,20 @@ namespace NanoGraph {
     public static TypeField MakeType(string name, TypeSpec type) {
       return new TypeField { Name = name, Type = type };
     }
+
+    public static TypeField ToArray(TypeField field, bool isArray) {
+      if (isArray) {
+        return new TypeField { Name = field.Name, Attributes = field.Attributes, Type = TypeSpec.MakeArray(field.Type) };
+      }
+      return field;
+    }
+
+    public static IReadOnlyList<TypeField> ToArray(IReadOnlyList<TypeField> fields, bool isArray) {
+      if (isArray) {
+        return fields.Select(field => ToArray(field, true)).ToArray();
+      }
+      return fields;
+    }
   }
 
   public class TypeDecl {
@@ -78,6 +92,13 @@ namespace NanoGraph {
         return new TypeSpec { IsArray = true, Primitive = elementType.Primitive };
       }
       return new TypeSpec { IsArray = true, Type = elementType.Type };
+    }
+
+    public static TypeSpec ToArray(TypeSpec elementType, bool isArray) {
+      if (isArray) {
+        return MakeArray(elementType);
+      }
+      return elementType;
     }
 
     public static bool IsConvertible(TypeSpec a, TypeSpec b) {

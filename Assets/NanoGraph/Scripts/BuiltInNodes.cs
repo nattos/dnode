@@ -266,18 +266,129 @@ namespace NanoGraph {
     }
   }
 
+  public enum PackableType {
+    Custom,
+    Float2,
+    Float3,
+    Float4,
+  }
+
+  public class PackableTypeInfo {
+    public PackableType Type { get; private set; }
+    public PrimitiveType Primitive { get; private set; }
+    public IReadOnlyList<TypeField> Fields { get; private set; }
+
+    private static readonly IReadOnlyDictionary<PackableType, PackableTypeInfo> _types = new Dictionary<PackableType, PackableTypeInfo> {
+      {
+        PackableType.Float2,
+        new PackableTypeInfo {
+          Type = PackableType.Float2,
+          Primitive = PrimitiveType.Float2,
+          Fields = new[] {
+            TypeField.MakePrimitive("x", PrimitiveType.Float),
+            TypeField.MakePrimitive("y", PrimitiveType.Float),
+          }
+        }
+      },
+      {
+        PackableType.Float3,
+        new PackableTypeInfo {
+          Type = PackableType.Float3,
+          Primitive = PrimitiveType.Float3,
+          Fields = new[] {
+            TypeField.MakePrimitive("x", PrimitiveType.Float),
+            TypeField.MakePrimitive("y", PrimitiveType.Float),
+            TypeField.MakePrimitive("z", PrimitiveType.Float),
+          }
+        }
+      },
+      {
+        PackableType.Float4,
+        new PackableTypeInfo {
+          Type = PackableType.Float4,
+          Primitive = PrimitiveType.Float4,
+          Fields = new[] {
+            TypeField.MakePrimitive("x", PrimitiveType.Float),
+            TypeField.MakePrimitive("y", PrimitiveType.Float),
+            TypeField.MakePrimitive("z", PrimitiveType.Float),
+            TypeField.MakePrimitive("w", PrimitiveType.Float),
+          }
+        }
+      },
+    };
+    private static readonly IReadOnlyDictionary<PrimitiveType, PackableTypeInfo> _primitiveTypes;
+
+    static PackableTypeInfo() {
+      _primitiveTypes = _types.Values.ToDictionary(type => type.Primitive, type => type);
+    }
+
+    public static PackableTypeInfo GetTypeInfo(PackableType type) {
+      return _types.GetValueOrDefault(type);
+    }
+
+    public static PackableTypeInfo GetTypeInfo(PrimitiveType type) {
+      return _primitiveTypes.GetValueOrDefault(type);
+    }
+  }
+
   // TODO: Pack primitives (ie. float4).
-  public class PackNode : DataNode, ICodeNode {
+  public class PackNode : DataNode, ICodeNode, IAutoTypeNode {
+    [EditableAttribute]
+    public PackableType Type = PackableType.Custom;
+
+    public bool IsArray = false;
+
     public TypeDeclMode TypeDeclMode = TypeDeclMode.External;
     public TypeDecl InternalType;
 
     public IReadOnlyList<DataEdge> Inputs;
     public IReadOnlyList<DataEdge> Outputs;
 
-    public override DataSpec InputSpec => DataSpec.FromFields(new[] { new DataField { Name = "TypeDecl", IsCompileTimeOnly = true, Type = TypeSpec.MakePrimitive(PrimitiveType.TypeDecl) } }.Concat(DataField.FromTypeFields(PackToType?.Fields)).ToArray());
-    public override DataSpec OutputSpec => DataSpec.FromFields(DataField.MakeType("Out", TypeSpec.MakeType(PackToType)));
+    void IAutoTypeNode.UpdateTypesFromInputs() {
+      IsArray = false;
+      foreach (var edge in Graph.GetInputEdges(this)) {
+        if (edge.SourceFieldOrNull?.Type.IsArray == true) {
+          IsArray = true;
+          return;
+        }
+      }
+    }
 
-    public TypeDecl PackToType {
+    public override DataSpec InputSpec {
+      get {
+        PackableTypeInfo packableTypeInfo = PackableTypeInfo.GetTypeInfo(Type);
+        if (packableTypeInfo != null) {
+          return DataSpec.FromFields(DataField.FromTypeFields(PackFromFields));
+        }
+        return DataSpec.FromFields(new[] { new DataField { Name = "TypeDecl", IsCompileTimeOnly = true, Type = TypeSpec.MakePrimitive(PrimitiveType.TypeDecl) } }.Concat(DataField.FromTypeFields(PackFromFields)).ToArray());
+      }
+    }
+    public override DataSpec OutputSpec => DataSpec.FromFields(DataField.MakeType("Out", PackToType));
+
+    public TypeSpec PackToType => TypeSpec.ToArray(PackToTypeElement, IsArray);
+    public IReadOnlyList<TypeField> PackFromFields => TypeField.ToArray(PackFromFieldsElement, IsArray);
+
+    public TypeSpec PackToTypeElement {
+      get {
+        PackableTypeInfo packableTypeInfo = PackableTypeInfo.GetTypeInfo(Type);
+        if (packableTypeInfo != null) {
+          return TypeSpec.MakePrimitive(packableTypeInfo.Primitive);
+        }
+        return TypeSpec.MakeType(CustomPackToTypeElement);
+      }
+    }
+
+    public IReadOnlyList<TypeField> PackFromFieldsElement {
+      get {
+        PackableTypeInfo packableTypeInfo = PackableTypeInfo.GetTypeInfo(Type);
+        if (packableTypeInfo != null) {
+          return packableTypeInfo.Fields;
+        }
+        return CustomPackToTypeElement.Fields;
+      }
+    }
+
+    public TypeDecl CustomPackToTypeElement {
       get {
         switch (TypeDeclMode) {
           case TypeDeclMode.Internal:
@@ -285,10 +396,7 @@ namespace NanoGraph {
             return InternalType;
           case TypeDeclMode.External: {
             TypeSpec? field = Graph.GetEdgeToDestinationOrNull(new DataPlug { Node = this, FieldName = "TypeDecl" })?.SourceFieldOrNull?.Type;
-            if (field?.IsArray == true) {
-              return new TypeDecl(TypeField.MakeType("Out", field.Value));
-            }
-            return field?.Type;
+            return field?.Type ?? TypeDecl.Empty;
           }
         }
       }
@@ -296,14 +404,16 @@ namespace NanoGraph {
 
     public void EmitCode(CodeContext context) {
       List<string> initializerParts = new List<string>();
-      var resultType = context.Function.Program.GetProgramType(TypeSpec.MakeType(PackToType), this.ToString());
-      for (int i = 0; i < PackToType.Fields.Count; ++i) {
-        var field = PackToType.Fields[i];
+      var resultType = context.Function.Program.GetProgramType(PackToType, this.ToString());
+      var fields = PackFromFields;
+      for (int i = 0; i < fields.Count; ++i) {
+        var field = fields[i];
+        string fieldAssignment = resultType.IsBuiltIn ? "" : $".{resultType.GetField(field.Name)} = ";
         string inputIdentifier = context.InputLocals[i].Identifier;
-        initializerParts.Add($".{resultType.GetField(field.Name)} = ({context.Function.EmitConvert(context.InputLocals[i].Type, field.Type, inputIdentifier)}),");
+        initializerParts.Add($"{fieldAssignment}({context.Function.EmitConvert(context.InputLocals[i].Type, field.Type, inputIdentifier)}),");
       }
       string initializerStr = string.Join("\n", initializerParts);
-      context.Function.AddStatement($"{context.Function.GetTypeIdentifier(TypeSpec.MakeType(PackToType))} {context.OutputLocals[0].Identifier} = {{ {initializerStr} }};");
+      context.Function.AddStatement($"{context.Function.GetTypeIdentifier(resultType)} {context.OutputLocals[0].Identifier} = {{ {initializerStr} }};");
       context.ArraySizeFunction.AddStatement($"{NanoProgram.IntIdentifier} {context.OutputLocals[0].ArraySizeIdentifier} = 1;");
     }
   }
@@ -317,21 +427,7 @@ namespace NanoGraph {
     public IReadOnlyList<DataEdge> Outputs;
 
     public override DataSpec InputSpec => DataSpec.FromFields(DataField.MakeType("In", PackToType));
-    public override DataSpec OutputSpec {
-      get {
-        TypeSpec type = PackToType;
-        bool isArray = type.IsArray;
-        if (isArray) {
-          return DataSpec.FromFields(PackToType.Type.Fields.Select(field => {
-            return new DataField { Name = field.Name, Type = TypeSpec.MakeArray(field.Type) };
-          }).ToArray());
-        } else {
-          return DataSpec.FromFields(PackToType.Type.Fields.Select(field => {
-            return new DataField { Name = field.Name, Type = field.Type };
-          }).ToArray());
-        }
-      }
-    }
+    public override DataSpec OutputSpec => DataSpec.FromTypeFields(PackToTypeFields.ToArray());
 
     void IAutoTypeNode.UpdateTypesFromInputs() {}
 
@@ -343,7 +439,15 @@ namespace NanoGraph {
             return InternalType;
           case TypeDeclMode.External: {
             TypeSpec? field = Graph.GetEdgeToDestinationOrNull(new DataPlug { Node = this, FieldName = "In" })?.SourceFieldOrNull?.Type;
-            if (field == null || field?.Primitive != null) {
+            if (field?.Primitive != null) {
+              PrimitiveType primitiveType = field.Value.Primitive.Value;
+              PackableTypeInfo packableTypeInfo = PackableTypeInfo.GetTypeInfo(primitiveType);
+              if (packableTypeInfo != null) {
+                bool isArray = field?.IsArray ?? false;
+                return new TypeSpec { IsArray = isArray, Primitive = packableTypeInfo.Primitive };
+              }
+            }
+            if (field == null) {
               bool isArray = field?.IsArray ?? false;
               return new TypeSpec { IsArray = isArray, Type = TypeDecl.Empty };
             }
@@ -353,16 +457,50 @@ namespace NanoGraph {
       }
     }
 
+    public IReadOnlyList<TypeField> PackToTypeFields {
+      get {
+        if (PackToType.IsArray) {
+          return PackToTypeFieldsElementTypes.Select(field => new TypeField { Name = field.Name, Type = TypeSpec.MakeArray(field.Type) }).ToArray();
+        }
+        return PackToTypeFieldsElementTypes;
+      }
+    }
+
+    public IReadOnlyList<TypeField> PackToTypeFieldsElementTypes {
+      get {
+        switch (TypeDeclMode) {
+          case TypeDeclMode.Internal:
+          default:
+            return InternalType.Type.Fields;
+          case TypeDeclMode.External: {
+            TypeSpec? field = Graph.GetEdgeToDestinationOrNull(new DataPlug { Node = this, FieldName = "In" })?.SourceFieldOrNull?.Type;
+            if (field?.Primitive != null) {
+              PrimitiveType primitiveType = field.Value.Primitive.Value;
+              PackableTypeInfo packableTypeInfo = PackableTypeInfo.GetTypeInfo(primitiveType);
+              if (packableTypeInfo != null) {
+                return packableTypeInfo.Fields;
+              }
+            }
+            if (field == null || field.Value.Type == null) {
+              return Array.Empty<TypeField>();
+            }
+            return field.Value.Type.Fields;
+          }
+        }
+      }
+    }
+
     public void EmitCode(CodeContext context) {
       CodeLocal inputLocal = context.InputLocals[0];
       NanoProgramType inputType = context.Function.Program.GetProgramType(inputLocal.Type);
       TypeSpec type = PackToType;
+      IReadOnlyList<TypeField> typeFields = PackToTypeFieldsElementTypes;
       bool isArray = type.IsArray;
       if (isArray) {
         string inputLengthLocal = context.Function.AllocLocal("Length");
         context.Function.AddStatement($"{NanoProgram.IntIdentifier} {inputLengthLocal} = GetLength({inputLocal.Identifier});");
         int index = 0;
-        foreach (var field in type.Type.Fields) {
+        foreach (var field in typeFields) {
           CodeLocal outputLocal = context.OutputLocals[index++];
           string outputArrayTypeIdentifier = context.Function.GetArrayTypeIdentifier(field.Type);
           string outputElementTypeIdentifier = context.Function.GetElementTypeIdentifier(field.Type);
@@ -372,19 +510,19 @@ namespace NanoGraph {
         index = 0;
         string indexLocal = context.Function.AllocLocal("Index");
         context.Function.AddStatement($"for ({NanoProgram.IntIdentifier} {indexLocal} = 0; {indexLocal} < {inputLengthLocal}; ++{indexLocal}) {{");
-        foreach (var field in type.Type.Fields) {
+        foreach (var field in typeFields) {
           CodeLocal outputLocal = context.OutputLocals[index++];
-          string inputField = inputType.GetField(field.Name);
+          string inputField = inputType.IsBuiltIn ? field.Name : inputType.GetField(field.Name);
           string inputExpr = $"{context.Function.Context.EmitSampleBuffer(inputLocal.Identifier, indexLocal)}.{inputField}";
           context.Function.AddStatement($"  {context.Function.Context.EmitWriteBuffer(outputLocal.Identifier, indexLocal, inputExpr)};");
         }
         context.Function.AddStatement($"}}");
       } else {
         int index = 0;
-        foreach (var field in type.Type.Fields) {
+        foreach (var field in typeFields) {
           CodeLocal outputLocal = context.OutputLocals[index++];
           string outputTypeIdentifier = context.Function.GetTypeIdentifier(field.Type);
-          string inputField = inputType.GetField(field.Name);
+          string inputField = inputType.IsBuiltIn ? field.Name : inputType.GetField(field.Name);
           context.Function.AddStatement($"{outputTypeIdentifier} {outputLocal.Identifier} = {inputLocal.Identifier}.{inputField};");
           context.ArraySizeFunction.AddStatement($"{NanoProgram.IntIdentifier} {outputLocal.ArraySizeIdentifier} = {inputLocal.ArraySizeIdentifier};");
         }
@@ -415,13 +553,6 @@ namespace NanoGraph {
 
     public override DataSpec InputSpec => ValueSource == InputSource.Internal ? DataSpec.Empty : DataSpec.FromFields(DataField.MakePrimitive("In", Type));
     public override DataSpec OutputSpec => DataSpec.FromFields(DataField.MakeType("Out", OutTypeSpec));
-
-    public LiteralNode() {
-    }
-
-    public LiteralNode(PrimitiveType type) {
-      Type = type;
-    }
 
     public void EmitCode(CodeContext context) {
       TypeSpec type = OutTypeSpec;
