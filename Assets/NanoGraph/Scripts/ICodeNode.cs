@@ -72,4 +72,8 @@ namespace NanoGraph {
   }
 
   public interface ICompileTimeOnlyNode : IDataNode {}
+
+  public interface IInternalNode : IDataNode {
+    bool IsInternal { get; }
+  }
 }

@@ -49,10 +49,18 @@ namespace NanoGraph {
     }
 
     public static void UpdateAutoType(IReadOnlyList<DataEdge> inputs, ref TypeSpec internalType, bool? forceIsArray = null) {
+      PrimitiveType? fallbackType = null;
       foreach (DataEdge edge in inputs) {
         TypeSpec? sourceType = edge.SourceFieldOrNull?.Type;
         if (sourceType == null) {
           continue;
+        }
+        // TODO: Handle other kinds of nodes other than LiteralNode.
+        if (edge.Source.Node is IInternalNode internalNode) {
+          if (internalNode.IsInternal) {
+            fallbackType = sourceType?.Primitive;
+            continue;
+          }
         }
         internalType.Primitive = sourceType.Value.Primitive;
         internalType.Type = sourceType.Value.Type;
@@ -61,6 +69,12 @@ namespace NanoGraph {
         } else {
           internalType.IsArray = forceIsArray.Value;
         }
+        return;
+      }
+      if (fallbackType != null) {
+        internalType.Primitive = fallbackType;
+        internalType.IsArray = false;
+        internalType.Type = default;
       }
     }
   }

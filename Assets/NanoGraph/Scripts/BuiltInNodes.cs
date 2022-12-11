@@ -397,7 +397,7 @@ namespace NanoGraph {
     External,
   }
 
-  public class LiteralNode : DataNode, ICodeNode {
+  public class LiteralNode : DataNode, ICodeNode, IInternalNode {
     // TODO: Only allow values that can actually be input :P
     [EditableAttribute]
     public PrimitiveType Type = PrimitiveType.Float;
@@ -405,6 +405,8 @@ namespace NanoGraph {
     public InputSource ValueSource = InputSource.External;
     public DValue InternalValue;
     public Func<DValue> InternalValueProvider;
+
+    bool IInternalNode.IsInternal => ValueSource == InputSource.Internal;
 
     private DValue EffectiveInternalValue => InternalValueProvider?.Invoke() ?? InternalValue;
 

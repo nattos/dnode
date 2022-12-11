@@ -93,6 +93,8 @@ namespace NanoGraph.VisualScripting {
         _fieldNameToCustomInspectorData[field.Name] = new DCustomInspectorData {
           DefaultValue = value,
           Dimensions = value?.Columns,
+          MinValue = -1.0,
+          MaxValue = 1.0,
         };
       }
       foreach (var field in outputSpec.Fields) {
@@ -103,6 +105,7 @@ namespace NanoGraph.VisualScripting {
       foreach (var input in inputs) {
         _fieldNameToInputPortMap[input.key] = input;
       }
+      Node.Graph.MarkNodeDirty(Node);
       Node.Graph.ValidateLater();
     }
 

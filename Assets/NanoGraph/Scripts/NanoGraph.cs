@@ -14,7 +14,7 @@ namespace NanoGraph {
     private readonly List<DataEdge> _edges = new List<DataEdge>();
     private readonly Dictionary<IDataNode, List<DataEdge>> _inputEdgesForNode = new Dictionary<IDataNode, List<DataEdge>>();
     private readonly Dictionary<IDataNode, List<DataEdge>> _outputEdgesForNode = new Dictionary<IDataNode, List<DataEdge>>();
-    private readonly Dictionary<DataPlug, DataEdge> _edgesBySource = new Dictionary<DataPlug, DataEdge>();
+    private readonly Dictionary<DataPlug, List<DataEdge>> _edgesBySource = new Dictionary<DataPlug, List<DataEdge>>();
     private readonly Dictionary<DataPlug, DataEdge> _edgesByDest = new Dictionary<DataPlug, DataEdge>();
 
     private readonly Dictionary<IDataNode, List<Action>> _nodeInvalidatedHanders = new Dictionary<IDataNode, List<Action>>();
@@ -25,7 +25,8 @@ namespace NanoGraph {
       node.Graph = this;
       node.CacheData = new DataNodeCacheData();
       _nodes.Add(node);
-      _dirtyNodes.Add(node);
+      MarkNodeDirty(node);
+      ValidateLater();
     }
 
     public void RemoveNode(IDataNode node) {
@@ -43,6 +44,8 @@ namespace NanoGraph {
       _outputEdgesForNode.Remove(node);
       _nodes.Remove(node);
       _dirtyNodes.Remove(node);
+
+      ValidateLater();
     }
 
     public void Connect(IDataNode sourceNode, string sourcePlugName, IDataNode destNode, string destPlugName) {
@@ -57,8 +60,8 @@ namespace NanoGraph {
       DataPlug sourcePlug = new DataPlug { Node = sourceNode, FieldName = sourcePlugName };
       DataPlug destPlug = new DataPlug { Node = destNode, FieldName = destPlugName };
 
-      // TODO: Allow multiple output connections.
-      RemoveEdgeForPlug(sourcePlug, _edgesBySource, _outputEdgesForNode);
+      // Note: Allow multiple output connections.
+      // RemoveEdgeForPlug(sourcePlug, _edgesBySource, _outputEdgesForNode);
       RemoveEdgeForPlug(destPlug, _edgesByDest, _inputEdgesForNode);
 
       DataEdge edge = new DataEdge { Source = sourcePlug, Destination = destPlug };
@@ -66,10 +69,11 @@ namespace NanoGraph {
       AddEdgeForPlug(sourcePlug, edge, _edgesBySource, _outputEdgesForNode);
       AddEdgeForPlug(destPlug, edge, _edgesByDest, _inputEdgesForNode);
 
-      _dirtyNodes.Add(sourceNode);
-      _dirtyNodes.Add(destNode);
+      MarkNodeDirty(sourceNode);
+      MarkNodeDirty(destNode);
 
       Debug.Log($"Connected {sourcePlug} => {destPlug}");
+      ValidateLater();
     }
 
     public void Disconnect(IDataNode sourceNode, string sourcePlugName, IDataNode destNode, string destPlugName) {
@@ -77,13 +81,15 @@ namespace NanoGraph {
         return;
       }
 
-      RemoveEdgeForPlug(edge.Source, _edgesBySource, _outputEdgesForNode);
+      RemoveEdgeForPlug(edge.Source, edge, _edgesBySource, _outputEdgesForNode);
       RemoveEdgeForPlug(edge.Destination, _edgesByDest, _inputEdgesForNode);
       _edges.Remove(edge);
 
-      _dirtyNodes.Add(edge.Source.Node);
-      _dirtyNodes.Add(edge.Destination.Node);
+      MarkNodeDirty(edge.Source.Node);
+      MarkNodeDirty(edge.Destination.Node);
+
       Debug.Log($"Disconnected {edge.Source} => {edge.Destination}");
+      ValidateLater();
     }
 
     private void RemoveEdgeForPlug(DataPlug plug, Dictionary<DataPlug, DataEdge> edgeMap, Dictionary<IDataNode, List<DataEdge>> nodeEdgeMap) {
@@ -95,8 +101,34 @@ namespace NanoGraph {
       }
     }
 
+    private void RemoveEdgeForPlug(DataPlug plug, DataEdge edge, Dictionary<DataPlug, List<DataEdge>> edgeMap, Dictionary<IDataNode, List<DataEdge>> nodeEdgeMap) {
+      if (edgeMap.TryGetValue(plug, out List<DataEdge> edges)) {
+        edges.Remove(edge);
+        if (edges.Count == 0) {
+          edgeMap.Remove(plug);
+        }
+      }
+      _edges.Remove(edge);
+      if (nodeEdgeMap.TryGetValue(plug.Node, out List<DataEdge> nodeEdges)) {
+        nodeEdges.Remove(edge);
+      }
+    }
+
     private void AddEdgeForPlug(DataPlug plug, DataEdge edge, Dictionary<DataPlug, DataEdge> edgeMap, Dictionary<IDataNode, List<DataEdge>> nodeEdgeMap) {
       edgeMap[plug] = edge;
+      if (!nodeEdgeMap.TryGetValue(plug.Node, out List<DataEdge> nodeEdges)) {
+        nodeEdges = new List<DataEdge>();
+        nodeEdgeMap[plug.Node] = nodeEdges;
+      }
+      nodeEdges.Add(edge);
+    }
+
+    private void AddEdgeForPlug(DataPlug plug, DataEdge edge, Dictionary<DataPlug, List<DataEdge>> edgeMap, Dictionary<IDataNode, List<DataEdge>> nodeEdgeMap) {
+      if (!edgeMap.TryGetValue(plug, out List<DataEdge> existingEdges)) {
+        existingEdges = new List<DataEdge>();
+        edgeMap[plug] = existingEdges;
+      }
+      existingEdges.Add(edge);
       if (!nodeEdgeMap.TryGetValue(plug.Node, out List<DataEdge> nodeEdges)) {
         nodeEdges = new List<DataEdge>();
         nodeEdgeMap[plug.Node] = nodeEdges;
@@ -150,9 +182,23 @@ namespace NanoGraph {
       });
     }
 
+    public void MarkNodeDirty(IDataNode node) {
+      _dirtyNodes.Add(node);
+    }
+
     public void Validate() {
+      try {
+        ValidateInner();
+      } catch (Exception e) {
+        Debug.LogException(e);
+        _dirtyNodes.Clear();
+      }
+    }
+
+    private void ValidateInner() {
       List<Action> cleanupActions = new List<Action>();
 
+      _dirtyNodes.RemoveWhere(node => node.Graph != this);
       Queue<IDataNode> toVisit = new Queue<IDataNode>(_dirtyNodes);
       HashSet<IDataNode> alreadyQueued = new HashSet<IDataNode>(_dirtyNodes);
       void TryEnqueue(IDataNode node) {
@@ -183,6 +229,8 @@ namespace NanoGraph {
 
       HashSet<IDataNode> invalidatedNodes = new HashSet<IDataNode>();
       while (toVisit.TryDequeue(out IDataNode node)) {
+        // TODO: Probably not the right place to do this?
+        (node as IAutoTypeNode)?.UpdateTypesFromInputs();
         var inputSpec = node.InputSpec;
         var outputSpec = node.OutputSpec;
         var cacheData = node.CacheData;
@@ -191,7 +239,7 @@ namespace NanoGraph {
         node.Validate(cleanupActions);
 
         // Check if input spec changed.
-        if (!StructuralComparisons.StructuralEqualityComparer.Equals(cacheData.InputSpec, inputSpec.Fields)) {
+        if (!FieldsEqual(cacheData.InputSpec, inputSpec.Fields)) {
           invalidatedNodes.Add(node);
           cacheData.InputSpec = inputSpec.Fields.ToArray();
           // Invalidate all input connections.
@@ -204,14 +252,16 @@ namespace NanoGraph {
           // TODO: Be more precise. Only update the fields that actually changed.
         }
         // Check if output spec changed.
-        if (!StructuralComparisons.StructuralEqualityComparer.Equals(cacheData.OutputSpec, outputSpec.Fields)) {
+        if (!FieldsEqual(cacheData.OutputSpec, outputSpec.Fields)) {
           invalidatedNodes.Add(node);
           cacheData.OutputSpec = outputSpec.Fields.ToArray();
           // Invalidate all output connections.
           foreach (var field in outputSpec.Fields) {
             var key = new DataPlug { Node = node, FieldName = field.Name };
-            if (_edgesBySource.TryGetValue(key, out DataEdge edge)) {
-              TryEnqueue(edge.Destination.Node);
+            if (_edgesBySource.TryGetValue(key, out List<DataEdge> edges)) {
+              foreach (var edge in edges) {
+                TryEnqueue(edge.Destination.Node);
+              }
             }
           }
           // TODO: Be more precise. Only update the fields that actually changed.
@@ -226,8 +276,10 @@ namespace NanoGraph {
         // Check all output edge data types match.
         foreach (var field in outputSpec.Fields) {
           var key = new DataPlug { Node = node, FieldName = field.Name };
-          if (_edgesBySource.TryGetValue(key, out DataEdge edge)) {
-            ValidateFieldsMatch(edge, field, edge.DestinationFieldOrNull);
+          if (_edgesBySource.TryGetValue(key, out List<DataEdge> edges)) {
+            foreach (var edge in edges) {
+              ValidateFieldsMatch(edge, field, edge.DestinationFieldOrNull);
+            }
           }
         }
         // TODO: Scrub dangling edges by source and dest.
@@ -250,6 +302,70 @@ namespace NanoGraph {
         // Some additional nodes were marked dirty while cleaning up.
         Validate();
       }
+    }
+
+    private static bool FieldsEqual(IReadOnlyList<DataField> lhs, IReadOnlyList<DataField> rhs) {
+      if (lhs == rhs) {
+        return true;
+      }
+      if (lhs == null || rhs == null) {
+        return false;
+      }
+      if (lhs.Count != rhs.Count) {
+        return false;
+      }
+      for (int i = 0; i < lhs.Count; ++i) {
+        DataField lhsField = lhs[i];
+        DataField rhsField = rhs[i];
+        if (lhsField.Name != rhsField.Name ||
+            lhsField.IsCompileTimeOnly != rhsField.IsCompileTimeOnly) {
+          return false;
+        }
+        if (!StructuralComparisons.StructuralEqualityComparer.Equals(lhsField.Attributes ?? Array.Empty<string>(), rhsField.Attributes ?? Array.Empty<string>())) {
+          return false;
+        }
+        if (!TypeSpecsEqual(lhsField.Type, rhsField.Type)) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    private static bool TypeSpecsEqual(TypeSpec lhs, TypeSpec rhs) {
+      if (lhs.IsArray != rhs.IsArray ||
+          lhs.Primitive != rhs.Primitive) {
+        return false;
+      }
+      if (lhs.Type == null || rhs.Type == null) {
+        return lhs.Type == null && rhs.Type == null;
+      }
+      return TypeFieldsEqual(lhs.Type.Fields, rhs.Type.Fields);
+    }
+
+    private static bool TypeFieldsEqual(IReadOnlyList<TypeField> lhs, IReadOnlyList<TypeField> rhs) {
+      if (lhs == rhs) {
+        return true;
+      }
+      if (lhs == null || rhs == null) {
+        return false;
+      }
+      if (lhs.Count != rhs.Count) {
+        return false;
+      }
+      for (int i = 0; i < lhs.Count; ++i) {
+        TypeField lhsField = lhs[i];
+        TypeField rhsField = rhs[i];
+        if (lhsField.Name != rhsField.Name) {
+          return false;
+        }
+        if (!StructuralComparisons.StructuralEqualityComparer.Equals(lhsField.Attributes ?? Array.Empty<string>(), rhsField.Attributes ?? Array.Empty<string>())) {
+          return false;
+        }
+        if (!TypeSpecsEqual(lhsField.Type, rhsField.Type)) {
+          return false;
+        }
+      }
+      return true;
     }
 
     private interface ICodeGenerator {
