@@ -110,35 +110,6 @@ namespace NanoGraph {
         var outputColorBuffer = gpuOutputBuffers.First(buffer => buffer.FieldName == "Out");
         func.AddStatement($"WriteTexture({outputColorBuffer.Expression}, gid_xy_uint, {outputColorLocal.Identifier});");
 
-        // var auxSizesOutputSpec = computeNode.AuxSizesOutputSpec;
-        // CodeLocal[] auxSizesCodeInputLocals = new CodeLocal[auxSizesOutputSpec.Fields.Count];
-        // for (int i = 0; i < auxSizesOutputSpec.Fields.Count; ++i) {
-        //   var field = auxSizesOutputSpec.Fields[i];
-        //   if (field.IsCompileTimeOnly) {
-        //     continue;
-        //   }
-        //   var edge = graph.GetEdgeToDestinationOrNull(computeNode, field.Name);
-        //   if (edge == null) {
-        //     continue;
-        //   }
-        //   if (!(edge.Source.Node is IComputeNode sourceComputeNode)) {
-        //     errors.Add($"Node {computeNode} depends on an output that is not a compute node ({edge.Source.Node}).");
-        //     continue;
-        //   }
-        //   CodeCachedResult? sourceCachedResult = dependentComputeNodes.FirstOrNull(dependency => dependency.Node == sourceComputeNode)?.Result;
-        //   if (sourceCachedResult == null) {
-        //     errors.Add($"Node {computeNode} depends on a compute node that is not yet ready ({edge.Source.Node}).");
-        //     continue;
-        //   }
-        //   string inputLocal = $"{sourceCachedResult?.Result.Identifier}.{sourceCachedResult?.ArraySizesResultType.GetField(edge.Source.FieldName)}";
-        //   string inputSizeLocal = resultLocalMap.GetOrNull(edge.Source)?.ArraySizeIdentifier;
-        //   if (inputLocal == null || inputSizeLocal == null) {
-        //     errors.Add($"Input {field.Name} for {computeNode} is not defined.");
-        //     continue;
-        //   }
-        //   auxSizesCodeInputLocals[i] = new CodeLocal { Identifier = inputLocal, Type = sourceCachedResult.Value.Result.Type, ArraySizeIdentifier = inputSizeLocal };
-        // }
-
         string gridSizeExpr = null;
         switch (Node.SizeMode) {
           default:
@@ -156,30 +127,6 @@ namespace NanoGraph {
         arraySizesFunc.AddStatement($"{program.Uint2Type.Identifier} {gridSizeLocal} = ({program.Uint2Type.Identifier}){gridSizeExpr};");
         arraySizesFunc.AddStatement($"{returnSizesLocal}.{arraySizeResultType.GetField("GridSizeX")} = {gridSizeLocal}.x;");
         arraySizesFunc.AddStatement($"{returnSizesLocal}.{arraySizeResultType.GetField("GridSizeY")} = {gridSizeLocal}.y;");
-
-        // // TODO: Map inputs to outputs somehow.
-        // for (int i = 0; i < computeOutputSpec.Fields.Count; ++i) {
-        //   var field = computeOutputSpec.Fields[i];
-        //   if (field.IsCompileTimeOnly) {
-        //     continue;
-        //   }
-        //   var edge = graph.GetEdgeToDestinationOrNull(computeNode, field.Name);
-        //   if (edge == null) {
-        //     continue;
-        //   }
-        //   CodeLocal? inputLocal = resultLocalMap.GetOrNull(edge.Source);
-        //   if (inputLocal == null) {
-        //     errors.Add($"Input {field.Name} for {computeNode} is not defined.");
-        //     continue;
-        //   }
-        //   if (field.Type.IsArray) {
-        //     func.AddStatement($"{func.Context.EmitWriteBuffer($"output{i}", func.Context.EmitThreadId(), inputLocal?.Identifier)};");
-        //   } else {
-        //     func.AddStatement($"output{i} = {inputLocal?.Identifier};");
-        //   }
-        //   // arraySizesFunc.AddStatement($"{returnSizesLocal}.{arraySizeResultType.GetField(field.Name)} = {inputSizeLocal};");
-        //   // arraySizesFunc.AddStatement($"{returnSizesLocal}.{arraySizeResultType.GetField(field.Name)} = {"TODO"};");
-        // }
         arraySizesFunc.AddStatement($"return {returnSizesLocal};");
         result = codeCachedResult;
       }
@@ -189,11 +136,17 @@ namespace NanoGraph {
         validateCacheFunction.AddStatement($"{validateSizesCacheFunction.Identifier}();");
         string pipelineStateIdentifier = program.AddInstanceField(program.MTLComputePipelineStateType, $"{computeNode.ShortName}_GpuPipeline");
 
+        string gridSizeXExpr = $"{codeCachedResult.Result.ArraySizeIdentifier}.{codeCachedResult.ArraySizesResultType.GetField("GridSizeX")}";
+        string gridSizeYExpr = $"{codeCachedResult.Result.ArraySizeIdentifier}.{codeCachedResult.ArraySizesResultType.GetField("GridSizeY")}";
+        string totalThreadCountExpr = $"(({gridSizeXExpr}) * ({gridSizeYExpr}))";
+        foreach (var dependency in dependentComputeNodes.Where(dependency => dependency.Operation is ISplitComputeNodeEmitCodeOperation)) {
+          var op = dependency.Operation as ISplitComputeNodeEmitCodeOperation;
+          op?.EmitPreValidateCache(validateCacheFunction, Node, totalThreadCountExpr);
+        }
+
         // Sync buffers to GPU.
         EmitSyncBuffersToGpu(validateCacheFunction, cachedResult, gpuInputBuffers, gpuOutputBuffers);
 
-        string gridSizeXExpr = $"{codeCachedResult.Result.ArraySizeIdentifier}.{codeCachedResult.ArraySizesResultType.GetField("GridSizeX")}";
-        string gridSizeYExpr = $"{codeCachedResult.Result.ArraySizeIdentifier}.{codeCachedResult.ArraySizesResultType.GetField("GridSizeY")}";
         string outIdentifier = $"{codeCachedResult.Result.Identifier}.{codeCachedResult.ResultType.GetField("Out")}";
         validateCacheFunction.AddStatement($"{outIdentifier} = ResizeTexture({outIdentifier}, {gridSizeXExpr}, {gridSizeYExpr});");
 
@@ -209,6 +162,11 @@ namespace NanoGraph {
         validateCacheFunction.AddStatement($"[encoder dispatchThreads:batchSize threadsPerThreadgroup:threadgroupSize];");
         validateCacheFunction.AddStatement($"[encoder endEncoding];");
         EmitMarkBuffersDirty(validateCacheFunction, cachedResult, gpuInputBuffers, gpuOutputBuffers);
+
+        foreach (var dependency in dependentComputeNodes.Where(dependency => dependency.Operation is ISplitComputeNodeEmitCodeOperation)) {
+          var op = dependency.Operation as ISplitComputeNodeEmitCodeOperation;
+          op?.EmitPostValidateCache(validateCacheFunction, Node);
+        }
 
         // Emit pipeline creation code.
         createPipelinesFunction.AddStatement($"{pipelineStateIdentifier} = [device newComputePipelineStateWithFunction:[defaultLibrary newFunctionWithName:@\"{func.Identifier}\"] error:&error];");

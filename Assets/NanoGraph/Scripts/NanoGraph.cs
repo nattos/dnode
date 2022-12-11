@@ -338,7 +338,7 @@ namespace NanoGraph {
       }
 
       while (queue.TryDequeue(out IDataNode node)) {
-        if (node is ICodeNode codeNode) {
+        if (node is ICodeNode || node is ISplitComputeNode) {
           foreach (var field in node.InputSpec.Fields) {
             var edge = _edgesByDest.GetOrDefault(new DataPlug { Node = node, FieldName = field.Name });
             if (edge?.Source.Node == null) {
@@ -409,6 +409,17 @@ namespace NanoGraph {
         List<CodeGeneratorFromComputeNode> dependentComputeNodes = new List<CodeGeneratorFromComputeNode>();
         List<DataPlug> dependentComputeInputs = new List<DataPlug>();
         List<ICodeGenerator> computePlan = GenerateComputePlan(node, dependentComputeNodes, dependentComputeInputs, errors);
+        if (node is ISplitComputeNode) {
+          if (dependentComputeNodes.Count > 1) {
+            errors.Add($"Node {node} is in multiple compute nodes. It must depend on exactly one node.");
+            continue;
+          }
+          // TODO: Verify that the dependee is actually the same as the dependency.
+          // Do not actually compute anything for this node.
+          computePlan.Clear();
+          dependentComputeNodes.Clear();
+          dependentComputeInputs.Clear();
+        }
         computePlans.Add((node, computePlan, dependentComputeNodes, dependentComputeInputs));
         foreach (var dependency in dependentComputeNodes) {
           QueueComputeNode(dependency.Node);
@@ -444,12 +455,9 @@ namespace NanoGraph {
         emitOp.EmitFunctionPreamble(out NanoFunction func, out NanoFunction arraySizesFunc);
         emitOp.EmitLoadFunctionInputs();
 
-        // Emit the meat of the function.
         Dictionary<DataPlug, CodeLocal> resultLocalMap = new Dictionary<DataPlug, CodeLocal>();
-        // Dictionary<DataPlug, string> resultSizesLocalMap = new Dictionary<DataPlug, string>();
-        foreach (ICodeGenerator codeGenerator in computePlan) {
-          var inputSpecFields = codeGenerator.InputSpec.Fields.Where(field => !field.IsCompileTimeOnly).ToArray();
-          var outputSpec = codeGenerator.OutputSpec;
+        CodeLocal[] GetInputLocals(IDataNode sourceNode, DataSpec inputSpec) {
+          var inputSpecFields = inputSpec.Fields.Where(field => !field.IsCompileTimeOnly).ToArray();
 
           CodeLocal[] inputLocals = new CodeLocal[inputSpecFields.Length];
           for (int i = 0; i < inputSpecFields.Length; ++i) {
@@ -457,18 +465,18 @@ namespace NanoGraph {
             if (field.IsCompileTimeOnly) {
               continue;
             }
-            var edge = _edgesByDest.GetOrDefault(new DataPlug { Node = codeGenerator.SourceNode, FieldName = field.Name });
+            var edge = _edgesByDest.GetOrDefault(new DataPlug { Node = sourceNode, FieldName = field.Name });
             if (edge == null) {
               // Input is not connected. This may or may not be desired.
               continue;
             }
             CodeLocal? inputLocal = resultLocalMap.GetOrNull(edge.Source);
             if (inputLocal == null) {
-              errors.Add($"Input {field.Name} for {codeGenerator.SourceNode} is not defined.");
+              errors.Add($"Input {field.Name} for {sourceNode} is not defined.");
               continue;
             }
 
-            TypeSpec inputType = edge.SourceFieldOrNull?.Type ?? default;
+            TypeSpec inputType = inputLocal?.Type ?? default;
             TypeSpec desiredType = field.Type;
             var inputProgramType = program.GetProgramType(inputType);
             var desiredProgramType = program.GetProgramType(desiredType);
@@ -483,6 +491,16 @@ namespace NanoGraph {
 
             inputLocals[i] = new CodeLocal { Identifier = actualInputLocal, Type = actualType, ArraySizeIdentifier = inputLocal?.ArraySizeIdentifier };
           }
+          return inputLocals;
+        }
+
+        // Emit the meat of the function.
+        // Dictionary<DataPlug, string> resultSizesLocalMap = new Dictionary<DataPlug, string>();
+        foreach (ICodeGenerator codeGenerator in computePlan) {
+          var inputSpecFields = codeGenerator.InputSpec.Fields.Where(field => !field.IsCompileTimeOnly).ToArray();
+          var outputSpec = codeGenerator.OutputSpec;
+
+          CodeLocal[] inputLocals = GetInputLocals(codeGenerator.SourceNode, codeGenerator.InputSpec);
 
           List<CodeLocal> outputLocals =  new List<CodeLocal>();
           foreach (var field in outputSpec.Fields) {
@@ -500,7 +518,28 @@ namespace NanoGraph {
             ArraySizeFunction = arraySizesFunc,
             InputLocals = inputLocals,
             OutputLocals = outputLocals,
-            // CompileTimeOnlyInputs = compileTimeOnlyInputs,
+            Errors = errors,
+          });
+        }
+
+        var splitComputeDependencies = dependentComputeNodes.Where(dependency => dependency.SourceNode is ISplitComputeNode).ToArray();
+        foreach (var dependency in splitComputeDependencies) {
+          ISplitComputeNode splitComputeNode = dependency.SourceNode as ISplitComputeNode;
+          if (dependency.Operation == null) {
+            errors.Add($"Node {splitComputeNode} is not ready.");
+            continue;
+          }
+          if (!(dependency.Operation is ISplitComputeNodeEmitCodeOperation op)) {
+            errors.Add($"Node {splitComputeNode} does not implement {nameof(ISplitComputeNodeEmitCodeOperation)}.");
+            continue;
+          }
+
+          CodeLocal[] inputLocals = GetInputLocals(splitComputeNode, splitComputeNode.InputSpec);
+          op.EmitLateUpdateCode(computeNode, new CodeContext {
+            Function = func,
+            ArraySizeFunction = arraySizesFunc,
+            InputLocals = inputLocals,
+            OutputLocals = Array.Empty<CodeLocal>(),
             Errors = errors,
           });
         }

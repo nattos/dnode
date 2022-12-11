@@ -68,46 +68,8 @@ namespace NanoGraph {
         // Note: Only load inputs that we really read.
         int bufferIndex = 0;
         AddGpuFuncInputs(func, CollectComputeInputs(DependentComputeInputsToLoad), gpuInputBuffers, ref bufferIndex);
-        // int bufferIndex = 0;
-        // int inputIndex = 0;
-        // foreach (var computeInput in CollectComputeInputs(DependentComputeInputsToLoad)) {
-        //   gpuInputBuffers.Add(new NanoGpuBufferRef {
-        //     FieldName = computeInput.Field.Name,
-        //     Expression = computeInput.Expression,
-        //     Index = bufferIndex,
-        //     Type = computeInput.Field.Type,
-        //   });
-        //   var fieldType = computeInput.FieldType;
-        //   string[] modifiers = { "constant", "const" };
-        //   string suffix = $"[[buffer({bufferIndex++})]]";
-        //   bool isReference = true;
-        //   if (fieldType.IsArray) {
-        //     modifiers = Array.Empty<string>();
-        //     isReference = false;
-        //   }
-        //   func.AddParam(modifiers, fieldType, $"input{inputIndex++}", suffix, new NanoParameterOptions { IsConst = true, IsReference = isReference });
-        // }
-
         // Define outputs.
         AddGpuFuncOutputs(func, computeOutputSpec.Fields, gpuOutputBuffers, ref bufferIndex);
-        // for (int i = 0; i < computeOutputSpec.Fields.Count; ++i) {
-        //   var field = computeOutputSpec.Fields[i];
-        //   if (field.IsCompileTimeOnly) {
-        //     continue;
-        //   }
-        //   var fieldType = field.Type;
-        //   gpuOutputBuffers.Add(new NanoGpuBufferRef {
-        //     FieldName = field.Name,
-        //     Index = bufferIndex,
-        //     Type = fieldType,
-        //   });
-        //   string[] modifiers = {};
-        //   string suffix = $"[[buffer({bufferIndex++})]]";
-        //   if (fieldType.IsArray) {
-        //     modifiers = Array.Empty<string>();
-        //   }
-        //   func.AddParam(modifiers, program.GetProgramType(fieldType, field.Name), $"output{i}", suffix, new NanoParameterOptions { IsConst = false });
-        // }
         func.AddParam(Array.Empty<string>(), program.GetPrimitiveType(PrimitiveType.Uint), $"gid_uint", "[[thread_position_in_grid]]");
         func.AddStatement($"{func.GetTypeIdentifier(PrimitiveType.Int)} gid = gid_uint;");
       }

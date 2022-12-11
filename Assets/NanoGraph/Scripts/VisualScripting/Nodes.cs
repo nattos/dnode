@@ -253,6 +253,7 @@ namespace NanoGraph.VisualScripting {
   public class Pack : NodeOfType<PackNode>{}
   public class Unpack : NodeOfType<UnpackNode>{}
   public class Literal : NodeOfType<LiteralNode>{}
+  public class Latch : NodeOfType<LatchNode>{}
   public class ValueIn : NodeOfType<ValueInputNode>{}
   public class TextureIn : NodeOfType<TextureInputNode>{}
 

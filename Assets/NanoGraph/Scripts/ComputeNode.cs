@@ -41,6 +41,7 @@ namespace NanoGraph {
     public TypeDecl InternalType;
 
     public virtual DataSpec ComputeInputSpec => DataSpec.ExtendWithFields(GetInputOutputDataSpec(FieldPortsMode.Combined, InputTypeFields), TypeDeclFields);
+    public virtual DataSpec ComputeOutputSpec => OutputSpec;
     public virtual DataSpec AuxSizesOutputSpec => DataSpec.Empty;
     public override DataSpec InputSpec => DataSpec.ExtendWithFields(GetInputOutputDataSpec(InputPortsMode, InputTypeFields), TypeDeclFields);
     public override DataSpec OutputSpec => GetInputOutputDataSpec(OutputPortsMode, OutputTypeFields);
@@ -130,7 +131,7 @@ namespace NanoGraph {
         // Define a type to hold the result value.
         DataSpec computeInputSpec = computeNode.ComputeInputSpec;
         DataSpec computeArrayInputSpec = computeNode.AuxSizesOutputSpec;
-        this.computeOutputSpec = computeNode.OutputSpec;
+        this.computeOutputSpec = computeNode.ComputeOutputSpec;
         TypeDecl resultTypeDecl = TypeDeclFromDataFields(computeOutputSpec.Fields);
         // DataField[] compileTimeOnlyInputs = CompileTimeOnlyFields(computeInputSpec.Fields);
         this.resultTypeSpec = TypeSpec.MakeType(resultTypeDecl);
@@ -228,6 +229,7 @@ namespace NanoGraph {
         public NanoProgramType FieldType;
         public IComputeNodeEmitCodeOperation Operation;
         public string Expression;
+        public bool ReadWrite;
       }
 
       protected IEnumerable<ComputeInput> CollectComputeInputs(IEnumerable<DataPlug> inputs) {
@@ -239,11 +241,15 @@ namespace NanoGraph {
           }
           ComputeNodeResultEntry result = resultOrNull.Value;
           string resultIdentifier = result.Result?.Result.Identifier;
-          DataField? outputFieldOrNull = input.Node.OutputSpec.Fields.FirstOrNull(field => field.Name == input.FieldName);
+          DataField? outputFieldOrNull = result.Node.ComputeOutputSpec.Fields.FirstOrNull(field => field.Name == input.FieldName);
           if (outputFieldOrNull == null) {
             errors.Add($"Dependency {input.Node} for {computeNode} does not have output field {input.FieldName}.");
             continue;
           }
+
+          // TODO: Figure out how to do this...
+          bool readWrite = result.Node is ISplitComputeNode;
+
           DataField field = outputFieldOrNull.Value;
           if (field.IsCompileTimeOnly) {
             continue;
@@ -255,6 +261,7 @@ namespace NanoGraph {
             FieldType = fieldType,
             Operation = result.Operation,
             Expression = $"{resultIdentifier}.{result.Result?.ResultType.GetField(field.Name)}",
+            ReadWrite = readWrite,
           };
         }
       }
@@ -269,10 +276,10 @@ namespace NanoGraph {
       }
 
       protected static void AddGpuFuncInput(NanoFunction func, ComputeInput input, string paramName, List<NanoGpuBufferRef> gpuInputBuffers, ref int bufferIndex) {
-        AddGpuFuncInput(func, input.Field, input.Expression, paramName, gpuInputBuffers, ref bufferIndex);
+        AddGpuFuncInput(func, input.Field, input.Expression, paramName, gpuInputBuffers, ref bufferIndex, isReadWrite: input.ReadWrite);
       }
 
-      protected static void AddGpuFuncInput(NanoFunction func, DataField field, string inputExpression, string paramName, List<NanoGpuBufferRef> gpuInputBuffers, ref int bufferIndex) {
+      protected static void AddGpuFuncInput(NanoFunction func, DataField field, string inputExpression, string paramName, List<NanoGpuBufferRef> gpuInputBuffers, ref int bufferIndex, bool isReadWrite = false) {
         gpuInputBuffers.Add(new NanoGpuBufferRef {
           FieldName = field.Name,
           Expression = inputExpression,
@@ -291,7 +298,7 @@ namespace NanoGraph {
           modifiers = Array.Empty<string>();
           isReference = false;
         }
-        func.AddParam(modifiers, fieldType, paramName, suffix, new NanoParameterOptions { IsConst = true, IsReference = isReference });
+        func.AddParam(modifiers, fieldType, paramName, suffix, new NanoParameterOptions { IsConst = !isReadWrite, IsReference = isReference });
         bufferIndex++;
       }
 

@@ -65,6 +65,7 @@ namespace NanoGraph {
 
   public interface IComputeNode : IDataNode {
     DataSpec ComputeInputSpec { get; }
+    DataSpec ComputeOutputSpec { get; }
     DataSpec AuxSizesOutputSpec { get; }
     INanoCodeContext CodeContext { get; }
     IComputeNodeEmitCodeOperation CreateEmitCodeOperation(ComputeNodeEmitCodeOperationContext context);
