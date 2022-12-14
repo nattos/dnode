@@ -50,8 +50,8 @@ namespace NanoGraph.VisualScripting {
       (Node as IAutoTypeNode)?.UpdateTypesFromInputs();
     }
 
-    public void NotifyOutputConnectionsChanged() {
-    }
+    // public void NotifyOutputConnectionsChanged() {
+    // }
 
     protected override void Definition() {
       EnsureNode();
@@ -156,17 +156,17 @@ namespace NanoGraph.VisualScripting {
           edgesToRemove.Add(oldInputEdge);
           continue;
         }
-        IDataNode newSourceNode = (inputConnection.source.unit as BaseNode)?.Node;
-        if (oldSourceNode != newSourceNode || inputConnection.source.key != oldInputEdge.Source.FieldName) {
+        IDataNode newSourceNode = GetSourceBaseNodesOrNull(inputConnection.source.unit, inputConnection.source.key, out string actualKey)?.Node;
+        if (oldSourceNode != newSourceNode || actualKey != oldInputEdge.Source.FieldName) {
           edgesToRemove.Add(oldInputEdge);
-          edgesToAdd.Add(new DataEdge { Source = new DataPlug { Node = newSourceNode, FieldName = inputConnection.source.key }, Destination = oldInputEdge.Destination });
+          edgesToAdd.Add(new DataEdge { Source = new DataPlug { Node = newSourceNode, FieldName = actualKey }, Destination = oldInputEdge.Destination });
           continue;
         }
       }
       // Look for new connections.
       foreach (IUnitInputPort inputPort in inputs) {
         var inputConnection = inputPort.connections.FirstOrDefault();
-        IDataNode inputNode = (inputConnection?.source.unit as BaseNode)?.Node;
+        IDataNode inputNode = GetSourceBaseNodesOrNull(inputConnection?.source.unit, inputConnection?.source.key, out string actualKey)?.Node;
         if (inputNode == null) {
           // TODO: Update nodes if types differ.
           // Link a LiteralNode if appropriate.
@@ -200,7 +200,7 @@ namespace NanoGraph.VisualScripting {
           continue;
         }
         // Input is connected and not in the existing edges. Add it.
-        edgesToAdd.Add(new DataEdge { Source = new DataPlug { Node = inputNode, FieldName = inputConnection.source.key }, Destination = new DataPlug { Node = Node, FieldName = inputPort.key } });
+        edgesToAdd.Add(new DataEdge { Source = new DataPlug { Node = inputNode, FieldName = actualKey }, Destination = new DataPlug { Node = Node, FieldName = inputPort.key } });
       }
 
       foreach (var entry in _fieldNameToLiteralNodes.ToArray()) {
@@ -233,6 +233,85 @@ namespace NanoGraph.VisualScripting {
     private void RemoveLiteralNode(KeyValuePair<string, LiteralNode> entry) {
       _fieldNameToLiteralNodes.Remove(entry.Key);
       entry.Value?.Graph?.RemoveNode(entry.Value);
+    }
+
+    public static IEnumerable<BaseNode> GetDestBaseNodes(IUnit dest, string key) {
+      if (dest is SubgraphUnit subgraphUnit) {
+        GraphInput graphInput = subgraphUnit.nest.graph.units.FirstOrDefault(unit => unit is GraphInput) as GraphInput;
+        if (graphInput == null) {
+          yield break;
+        }
+        foreach (var connection in graphInput.connections) {
+          if (connection.source.key == key) {
+            if (connection.destination.unit is BaseNode baseNode) {
+              yield return baseNode;
+            }
+          }
+        }
+        yield break;
+      } else if (dest is BaseNode baseNode) {
+        yield return baseNode;
+      }
+    }
+
+    public static BaseNode GetSourceBaseNodesOrNull(IUnit src, string key, out string actualKey) {
+      actualKey = key;
+      if (src is SubgraphUnit subgraphUnit) {
+        GraphOutput graphOutput = subgraphUnit.nest.graph.units.FirstOrDefault(unit => unit is GraphOutput) as GraphOutput;
+        if (graphOutput == null) {
+          return null;
+        }
+        foreach (var connection in graphOutput.connections) {
+          if (connection.destination.key == key) {
+            if (connection.source.unit is BaseNode baseNode) {
+              return baseNode;
+            }
+          }
+        }
+        return null;
+      } else if (src is GraphInput graphInput) {
+        SubgraphUnit ownerSubgraphUnit = GetSubgraphUnit(graphInput.graph);
+        if (ownerSubgraphUnit == null) {
+          return null;
+        }
+        foreach (var connection in ownerSubgraphUnit.connections) {
+          if (connection.destination.key == key) {
+            return GetSourceBaseNodesOrNull(connection.source.unit, connection.source.key, out actualKey);
+          }
+        }
+      } else if (src is BaseNode baseNode) {
+        return baseNode;
+      }
+      return null;
+    }
+
+    private static readonly List<(WeakReference, SubgraphUnit)> _weakNestedGraphs = new List<(WeakReference, SubgraphUnit)>();
+
+    public static SubgraphUnit GetSubgraphUnit(FlowGraph nestedGraph) {
+      foreach ((WeakReference graphRef, SubgraphUnit unitEntry) in _weakNestedGraphs) {
+        if (graphRef.Target is FlowGraph graphEntry && graphEntry == nestedGraph) {
+          return unitEntry;
+        }
+      }
+      return null;
+    }
+
+    public static void MapSubgraphUnit(SubgraphUnit subgraphUnit) {
+      FlowGraph graph = subgraphUnit.nest.graph;
+      bool sweepNulls = false;
+      foreach ((WeakReference graphRef, SubgraphUnit unitEntry) in _weakNestedGraphs) {
+        if (graphRef.Target is FlowGraph graphEntry) {
+          if (graphEntry == graph) {
+            break;
+          }
+        } else {
+          sweepNulls = true;
+        }
+      }
+      _weakNestedGraphs.Add((new WeakReference(graph), subgraphUnit));
+      if (sweepNulls) {
+        _weakNestedGraphs.RemoveAll(entry => !entry.Item1.IsAlive);
+      }
     }
   }
 

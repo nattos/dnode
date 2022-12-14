@@ -110,8 +110,8 @@ namespace DNode {
 
       ValueState state = new ValueState {
           PortState = portState,
-          Min = customInspectorData?.MinValue ?? rangeAttrib?.Min ?? D3DConstants.DefaultGenericMathMin,
-          Max = customInspectorData?.MaxValue ?? rangeAttrib?.Max ?? D3DConstants.DefaultGenericMathMax,
+          Min = customInspectorData?.MinValue ?? rangeAttrib?.Min ?? -1.0f, // D3DConstants.DefaultGenericMathMin,
+          Max = customInspectorData?.MaxValue ?? rangeAttrib?.Max ?? 1.0f, // D3DConstants.DefaultGenericMathMax,
           IsLog = customInspectorData?.IsLogScale ?? isLog,
           LogScalingFactor = customInspectorData?.LogScalingFactor ?? logScaleAttrib?.ScalingFactor ?? 1.0,
           ClampMode = customInspectorData?.ClampMode ?? clampAttrib?.ClampMode ?? ClampMode.Clamp,

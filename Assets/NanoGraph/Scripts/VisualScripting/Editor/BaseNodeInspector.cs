@@ -124,12 +124,21 @@ namespace NanoGraph.VisualScripting {
       if (!_connectionListenersAdded) {
         _connectionListenersAdded = true;
         DNode.DValueConnectionWidget.ConnectionChanged += connection => {
-          try {
-            (connection.source.unit as BaseNode)?.NotifyOutputConnectionsChanged();
-          } catch {}
-          try {
-            (connection.destination.unit as BaseNode)?.NotifyInputConnectionsChanged();
-          } catch {}
+          if (connection.destination.unit is SubgraphUnit destSubgraphUnit) {
+            BaseNode.MapSubgraphUnit(destSubgraphUnit);
+          }
+          if (connection.source.unit is SubgraphUnit srcSubgraphUnit) {
+            BaseNode.MapSubgraphUnit(srcSubgraphUnit);
+          }
+          // try {
+          //   (connection.source.unit as BaseNode)?.NotifyOutputConnectionsChanged();
+          // } catch {}
+            foreach (BaseNode node in BaseNode.GetDestBaseNodes(connection.destination.unit, connection.destination.key)) {
+              try {
+                node.NotifyInputConnectionsChanged();
+              } catch {}
+            }
+            // (connection.destination.unit as BaseNode)?.NotifyInputConnectionsChanged();
         };
       }
     }

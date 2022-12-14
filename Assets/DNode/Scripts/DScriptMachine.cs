@@ -224,7 +224,7 @@ namespace DNode {
       foreach (IFrameComponent component in _frameComponents) {
         component.OnStartFrame();
       }
-      DStepEvent.Trigger(this);
+      // DStepEvent.Trigger(this);
       foreach (IFrameComponent component in _frameComponents) {
         component.OnEndFrame();
       }

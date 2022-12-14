@@ -5,6 +5,7 @@ using Unity.VisualScripting;
 using UnityEngine;
 
 namespace DNode {
+  [IncludeInSettings(true)]
   [TypeIcon(typeof(OnDrawGizmos))]
   public struct DValue : IDisplayDataProvider {
     public double[] ValueArray;
@@ -201,9 +202,9 @@ namespace DNode {
       typesWithDefaultValues.Add(typeof(DValue));
       typesWithDefaultValues.Add(typeof(DCustomInspectorValue));
       typesWithDefaultValues.Add(typeof(DEvent));
-      typesWithDefaultValues.Add(typeof(DFontSpec));
-      typesWithDefaultValues.Add(typeof(DIOFrameInputAddressSpec));
-      typesWithDefaultValues.Add(typeof(DLaunchableTriggerValue));
+      // typesWithDefaultValues.Add(typeof(DFontSpec));
+      // typesWithDefaultValues.Add(typeof(DIOFrameInputAddressSpec));
+      // typesWithDefaultValues.Add(typeof(DLaunchableTriggerValue));
     }
 
     static DValue() {

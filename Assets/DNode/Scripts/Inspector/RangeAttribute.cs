@@ -24,8 +24,8 @@ namespace DNode {
     }
   }
 
-  public class ExposureRangeAttribute : RangeAttribute {
-    public ExposureRangeAttribute(double minEv = D3DConstants.DefaultMinEv, double maxEv = D3DConstants.DefaultMaxEv, double defaultValue = 0.0)
-      : base(minEv, maxEv, defaultValue) {}
-  }
+  // public class ExposureRangeAttribute : RangeAttribute {
+  //   public ExposureRangeAttribute(double minEv = D3DConstants.DefaultMinEv, double maxEv = D3DConstants.DefaultMaxEv, double defaultValue = 0.0)
+  //     : base(minEv, maxEv, defaultValue) {}
+  // }
 }
