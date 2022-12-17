@@ -40,7 +40,12 @@ namespace NanoGraph.Plugin {
 
     private readonly List<Parameter> _parameters = new List<Parameter>();
 
+    private bool _isServerStarting = false;
+
     public Action TextureOutputsUpdated;
+
+    public bool IsCompiling => _pluginWatcher.IsCompiling || _pluginBuilder.IsCompiling;
+    public bool IsReloading => _pluginWatcher.IsReloading || _isServerStarting;
 
     public PluginService() {
       _pluginBuilder = new PluginBuilder();
@@ -53,6 +58,7 @@ namespace NanoGraph.Plugin {
         }
       };
       _pluginWatcher.PluginCodeChanged += () => _pluginBuilder.MarkDirty();
+      StartRendering();
     }
 
     public Texture2D GetTextureInput() {
@@ -71,6 +77,7 @@ namespace NanoGraph.Plugin {
       if (_isRendering) {
         return;
       }
+      _isServerStarting = true;
       _isRendering = true;
       var thisCancelationFlag = new CancelationFlag();
       _renderLoopCancelationFlag = thisCancelationFlag;
@@ -78,11 +85,12 @@ namespace NanoGraph.Plugin {
         double frameStartTime = Time.realtimeSinceStartupAsDouble;
         while (true) {
           if (thisCancelationFlag.Canceled) {
+            _isServerStarting = false;
             return;
           }
 
           await StartServer();
-
+          _isServerStarting = false;
 
           var _serverTexture = _textureInputs[_textureInputs.Count - 1].Texture;
           var temp = RenderTexture.GetTemporary(

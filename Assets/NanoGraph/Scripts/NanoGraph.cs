@@ -6,6 +6,8 @@ using UnityEngine;
 
 namespace NanoGraph {
   public class NanoGraph {
+    public const bool DebugVerbose = false;
+
     public static string GeneratedCodeOutputPath => System.IO.Path.Combine(System.IO.Path.GetDirectoryName(UnityEngine.Application.dataPath), "NanoFFGL/NanoFFGL/Generated");
 
     public string EffectName = "Program";
@@ -20,8 +22,12 @@ namespace NanoGraph {
 
     private readonly Dictionary<IDataNode, List<Action>> _nodeInvalidatedHanders = new Dictionary<IDataNode, List<Action>>();
 
+    private readonly List<IComputeNode> _outputNodes = new List<IComputeNode>();
+
     public void AddNode(IDataNode node) {
-      Debug.Log($"Add Node: {node}");
+      if (DebugVerbose) {
+        Debug.Log($"Add Node: {node}");
+      }
       node.Graph?.RemoveNode(node);
       node.Graph = this;
       node.CacheData = new DataNodeCacheData();
@@ -34,7 +40,9 @@ namespace NanoGraph {
       if (node.Graph != this) {
         return;
       }
-      Debug.Log($"Remove Node: {node}");
+      if (DebugVerbose) {
+        Debug.Log($"Remove Node: {node}");
+      }
       node.Graph = null;
       DataEdge[] inputEdges = GetInputEdges(node);
       DataEdge[] outputEdges = GetInputEdges(node);
@@ -44,8 +52,21 @@ namespace NanoGraph {
       _inputEdgesForNode.Remove(node);
       _outputEdgesForNode.Remove(node);
       _nodes.Remove(node);
+      if (node is IComputeNode computeNode) {
+        _outputNodes.Remove(computeNode);
+      }
       _dirtyNodes.Remove(node);
 
+      ValidateLater();
+    }
+
+    public void RegisterOutputNode(IComputeNode node) {
+      _outputNodes.Add(node);
+      ValidateLater();
+    }
+
+    public void UnregisterOutputNode(IComputeNode node) {
+      _outputNodes.Remove(node);
       ValidateLater();
     }
 
@@ -73,7 +94,9 @@ namespace NanoGraph {
       MarkNodeDirty(sourceNode);
       MarkNodeDirty(destNode);
 
-      Debug.Log($"Connected {sourcePlug} => {destPlug}");
+      if (DebugVerbose) {
+        Debug.Log($"Connected {sourcePlug} => {destPlug}");
+      }
       ValidateLater();
     }
 
@@ -89,7 +112,9 @@ namespace NanoGraph {
       MarkNodeDirty(edge.Source.Node);
       MarkNodeDirty(edge.Destination.Node);
 
-      Debug.Log($"Disconnected {edge.Source} => {edge.Destination}");
+      if (DebugVerbose) {
+        Debug.Log($"Disconnected {edge.Source} => {edge.Destination}");
+      }
       ValidateLater();
     }
 
@@ -171,6 +196,9 @@ namespace NanoGraph {
       }
     }
 
+    public bool IsValidating => _isValidateLaterInFlight;
+    public bool IsCompiling => _isCompileLaterInFlight;
+
     private bool _isValidateLaterInFlight = false;
     public void ValidateLater() {
       if (_isValidateLaterInFlight) {
@@ -180,7 +208,26 @@ namespace NanoGraph {
       EditorUtils.InvokeLater(() => {
         _isValidateLaterInFlight = false;
         Validate();
+        CompileLater();
       });
+    }
+
+    private bool _isCompileLaterInFlight = false;
+    public void CompileLater() {
+      if (_isCompileLaterInFlight) {
+        return;
+      }
+      _isCompileLaterInFlight = true;
+      EditorUtils.InvokeLater(() => {
+        _isCompileLaterInFlight = false;
+        Compile();
+      });
+    }
+
+    private void Compile() {
+      if (_outputNodes.Count > 0) {
+        GenerateProgram(_outputNodes);
+      }
     }
 
     public void MarkNodeDirty(IDataNode node) {
@@ -738,18 +785,38 @@ namespace NanoGraph {
       }
 
       string outerCpuCode = program.OuterCpuCode;
-      Debug.Log(outerCpuCode);
+      if (DebugVerbose) {
+        Debug.Log(outerCpuCode);
+      }
       string outerGpuCode = program.OuterGpuCode;
-      Debug.Log(outerGpuCode);
+      if (DebugVerbose) {
+        Debug.Log(outerGpuCode);
+      }
 
       System.IO.Directory.CreateDirectory(GeneratedCodeOutputPath);
-      System.IO.File.WriteAllText(System.IO.Path.Combine(GeneratedCodeOutputPath, "Program.incl.h"), outerCpuCode);
-      System.IO.File.WriteAllText(System.IO.Path.Combine(GeneratedCodeOutputPath, "Program.metal.incl.h"), outerGpuCode);
-      Debug.Log("CODE WRITTEN");
+      bool modifiedCpuProgram = SyncToFile(System.IO.Path.Combine(GeneratedCodeOutputPath, "Program.incl.h"), outerCpuCode);
+      bool modifiedGpuProgram = SyncToFile(System.IO.Path.Combine(GeneratedCodeOutputPath, "Program.metal.incl.h"), outerGpuCode);
+      if (modifiedCpuProgram || modifiedGpuProgram) {
+        if (DebugVerbose) {
+          Debug.Log("Code applied.");
+        }
+      }
 
       if (errors.Count > 0) {
         Debug.Log(string.Join("\n", errors));
       }
+    }
+
+    private static bool SyncToFile(string path, string text) {
+      string originalText = null;
+      if (System.IO.File.Exists(path)) {
+        originalText = System.IO.File.ReadAllText(path);
+      }
+      if (originalText == text) {
+        return false;
+      }
+      System.IO.File.WriteAllText(path, text);
+      return true;
     }
 
     private static DataField[] CompileTimeOnlyFields(IEnumerable<DataField> fields) {

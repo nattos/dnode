@@ -25,19 +25,48 @@ namespace NanoGraph.Plugin {
     }
 
     public void OnGUI() {
-      if (GUILayout.Button("Restart Plugin")) {
-        EditorApplication.delayCall += () => {
-          PluginService.Instance.StopRendering();
-          PluginService.Instance.StartRendering();
-        };
+      using (new EditorGUILayout.HorizontalScope()) {
+        bool isRendering = PluginService.Instance.IsRendering;
+        if (GUILayout.Button(isRendering ? "Stop" : "Start")) {
+          EditorApplication.delayCall += () => {
+            if (isRendering) {
+              PluginService.Instance.StopRendering();
+            } else {
+              PluginService.Instance.StartRendering();
+            }
+          };
+        }
+        Input = EditorGUILayout.ToggleLeft("Show Input", Input);
+        EditorGUILayout.Space();
       }
-      Input = EditorGUILayout.ToggleLeft("Show Input", Input);
-      Rect textureRect = EditorGUILayout.GetControlRect(GUILayout.Height(400));
       Texture2D texture = Input ? PluginService.Instance.GetTextureInput() : PluginService.Instance.GetTextureOutput();
       if (!texture) {
         texture = Texture2D.blackTexture;
       }
+      float aspectRatio = texture.height / (float) texture.width;
+      float desiredHeight = this.position.width * aspectRatio;
+      Rect textureRect = EditorGUILayout.GetControlRect(GUILayout.Height(desiredHeight));
       EditorGUI.DrawPreviewTexture(textureRect, texture, null, ScaleMode.ScaleToFit);
+
+      List<string> statusParts = new List<string>();
+      bool isCompiling = PluginService.Instance.IsCompiling || (NanoGraph.DebugInstance?.IsCompiling ?? false);
+      bool isReloading = PluginService.Instance.IsReloading;
+      bool isValidating = (NanoGraph.DebugInstance?.IsValidating ?? false);
+      if (isValidating) {
+        statusParts.Add("Validate");
+      }
+      if (isCompiling) {
+        statusParts.Add("Compile");
+      }
+      if (isReloading) {
+        statusParts.Add("Reload");
+      }
+      string statusStr = string.Join(" | ", statusParts);
+
+      Rect statusRect = textureRect;
+      statusRect.y = statusRect.yMax - EditorGUIUtility.singleLineHeight;
+      statusRect.height = EditorGUIUtility.singleLineHeight;
+      EditorGUI.LabelField(statusRect, statusStr);
 
       foreach (var parameter in PluginService.Instance.GetParameters()) {
         using (var check = new EditorGUI.ChangeCheckScope()) {

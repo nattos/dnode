@@ -14,6 +14,8 @@ namespace NanoGraph.Plugin {
     private bool _isDirty = false;
     private bool _isBuilding = false;
 
+    public bool IsCompiling => _isDirty || _isBuilding;
+
     public void MarkDirty() {
       _isDirty = true;
       StartBuilding();

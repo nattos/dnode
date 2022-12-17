@@ -8,7 +8,7 @@ using System.IO;
 
 namespace NanoGraph.Plugin {
   public class PluginWatcher {
-    private const int RecompileDelayMillis = 1000;
+    private const int RecompileDelayMillis = 50;
 
     private FileSystemWatcher _codeWatcher;
     private FileSystemWatcher _pluginWatcher;
@@ -66,6 +66,8 @@ namespace NanoGraph.Plugin {
       }
     }
 
+    public bool IsCompiling => _isRecompiling;
+
     private void MaybeRecompileLater() {
       // Delegate to main thread.
       EditorUtils.DelayCall += () => {
@@ -80,6 +82,8 @@ namespace NanoGraph.Plugin {
         };
       };
     }
+
+    public bool IsReloading => _isReloading;
 
     private void MaybeReloadLater() {
       // Delegate to main thread.

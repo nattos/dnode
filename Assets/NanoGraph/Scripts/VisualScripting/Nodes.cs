@@ -7,7 +7,7 @@ using UnityEngine;
 using Unity.VisualScripting;
 
 namespace NanoGraph.VisualScripting {
-  public abstract class BaseNode : Unit, IDCustomInspectorDataProvider {
+  public abstract class BaseNode : Unit, IDCustomInspectorDataProvider, IValueEditedHandler {
     [Serialize]
     public IDataNode Node;
 
@@ -17,6 +17,7 @@ namespace NanoGraph.VisualScripting {
     private readonly Dictionary<string, DCustomInspectorData> _fieldNameToCustomInspectorData = new Dictionary<string, DCustomInspectorData>();
 
     private readonly Action _nodeInvalidatedHandler;
+    private bool _isRegisteredAsOutputNode;
 
     public BaseNode() {
       _nodeInvalidatedHandler = () => { PortsChanged(); Define(); };
@@ -50,8 +51,13 @@ namespace NanoGraph.VisualScripting {
       (Node as IAutoTypeNode)?.UpdateTypesFromInputs();
     }
 
-    // public void NotifyOutputConnectionsChanged() {
-    // }
+    public void NotifyOutputConnectionsChanged() {
+      SyncOutputNodeRegistration();
+    }
+
+    void IValueEditedHandler.OnValueEdited() {
+      Node?.Graph?.CompileLater();
+    }
 
     protected override void Definition() {
       EnsureNode();
@@ -156,7 +162,7 @@ namespace NanoGraph.VisualScripting {
           edgesToRemove.Add(oldInputEdge);
           continue;
         }
-        IDataNode newSourceNode = GetSourceBaseNodesOrNull(inputConnection.source.unit, inputConnection.source.key, out string actualKey)?.Node;
+        IDataNode newSourceNode = GetSourceBaseNodeOrNull(inputConnection.source.unit, inputConnection.source.key, out string actualKey)?.Node;
         if (oldSourceNode != newSourceNode || actualKey != oldInputEdge.Source.FieldName) {
           edgesToRemove.Add(oldInputEdge);
           edgesToAdd.Add(new DataEdge { Source = new DataPlug { Node = newSourceNode, FieldName = actualKey }, Destination = oldInputEdge.Destination });
@@ -166,7 +172,7 @@ namespace NanoGraph.VisualScripting {
       // Look for new connections.
       foreach (IUnitInputPort inputPort in inputs) {
         var inputConnection = inputPort.connections.FirstOrDefault();
-        IDataNode inputNode = GetSourceBaseNodesOrNull(inputConnection?.source.unit, inputConnection?.source.key, out string actualKey)?.Node;
+        IDataNode inputNode = GetSourceBaseNodeOrNull(inputConnection?.source.unit, inputConnection?.source.key, out string actualKey)?.Node;
         if (inputNode == null) {
           // TODO: Update nodes if types differ.
           // Link a LiteralNode if appropriate.
@@ -235,6 +241,30 @@ namespace NanoGraph.VisualScripting {
       entry.Value?.Graph?.RemoveNode(entry.Value);
     }
 
+    private void SyncOutputNodeRegistration() {
+      bool isOutputNode = false;
+      foreach (var output in outputs) {
+        foreach (var connection in output.connections) {
+          if (connection.destination.unit is GraphOutput graphOutput) {
+            isOutputNode = true;
+            break;
+          }
+        }
+      }
+
+      if (_isRegisteredAsOutputNode != isOutputNode) {
+        _isRegisteredAsOutputNode = isOutputNode;
+        IComputeNode computeNode = Node as IComputeNode;
+        if (computeNode != null) {
+          if (isOutputNode) {
+            Node.Graph.RegisterOutputNode(computeNode);
+          } else {
+            Node.Graph.UnregisterOutputNode(computeNode);
+          }
+        }
+      }
+    }
+
     public static IEnumerable<BaseNode> GetDestBaseNodes(IUnit dest, string key) {
       if (dest is SubgraphUnit subgraphUnit) {
         GraphInput graphInput = subgraphUnit.nest.graph.units.FirstOrDefault(unit => unit is GraphInput) as GraphInput;
@@ -254,7 +284,7 @@ namespace NanoGraph.VisualScripting {
       }
     }
 
-    public static BaseNode GetSourceBaseNodesOrNull(IUnit src, string key, out string actualKey) {
+    public static BaseNode GetSourceBaseNodeOrNull(IUnit src, string key, out string actualKey) {
       actualKey = key;
       if (src is SubgraphUnit subgraphUnit) {
         GraphOutput graphOutput = subgraphUnit.nest.graph.units.FirstOrDefault(unit => unit is GraphOutput) as GraphOutput;
@@ -276,7 +306,7 @@ namespace NanoGraph.VisualScripting {
         }
         foreach (var connection in ownerSubgraphUnit.connections) {
           if (connection.destination.key == key) {
-            return GetSourceBaseNodesOrNull(connection.source.unit, connection.source.key, out actualKey);
+            return GetSourceBaseNodeOrNull(connection.source.unit, connection.source.key, out actualKey);
           }
         }
       } else if (src is BaseNode baseNode) {

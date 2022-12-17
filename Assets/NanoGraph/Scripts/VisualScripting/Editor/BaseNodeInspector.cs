@@ -130,9 +130,11 @@ namespace NanoGraph.VisualScripting {
           if (connection.source.unit is SubgraphUnit srcSubgraphUnit) {
             BaseNode.MapSubgraphUnit(srcSubgraphUnit);
           }
-          // try {
-          //   (connection.source.unit as BaseNode)?.NotifyOutputConnectionsChanged();
-          // } catch {}
+            if (BaseNode.GetSourceBaseNodeOrNull(connection.source.unit, connection.source.key, out _) is BaseNode sourceNode) {
+              try {
+                sourceNode.NotifyOutputConnectionsChanged();
+              } catch {}
+            }
             foreach (BaseNode node in BaseNode.GetDestBaseNodes(connection.destination.unit, connection.destination.key)) {
               try {
                 node.NotifyInputConnectionsChanged();

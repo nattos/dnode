@@ -19,6 +19,10 @@ namespace DNode {
     DCustomInspectorData? ProvideCustomInspectorData(string key);
   }
 
+  public interface IValueEditedHandler {
+    void OnValueEdited();
+  }
+
   [TypeIcon(typeof(OnDrawGizmos))]
   public struct DCustomInspectorValue : IDisplayDataProvider {
     public DValue Value;
