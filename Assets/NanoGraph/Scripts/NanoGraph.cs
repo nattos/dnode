@@ -484,6 +484,24 @@ namespace NanoGraph {
       }).Where(generator => generator != null).ToList();
     }
 
+    private struct ComputePlan {
+      public IComputeNode Node;
+      public List<ICodeGenerator> Generators;
+      public List<CodeGeneratorFromComputeNode> DependentComputeNodes;
+      public List<DataPlug> DependentComputeInputs;
+
+      public ComputePlan(
+          IComputeNode node,
+          List<ICodeGenerator> generators,
+          List<CodeGeneratorFromComputeNode> dependentComputeNodes,
+          List<DataPlug> dependentComputeInputs) {
+        Node = node;
+        Generators = generators;
+        DependentComputeNodes = dependentComputeNodes;
+        DependentComputeInputs = dependentComputeInputs;
+      }
+    }
+
     public void GenerateProgram(IReadOnlyList<IComputeNode> outputNodes) {
       // TODO: Generate plan and scopes.
       // TODO: Deal with conditional scopes.
@@ -506,7 +524,9 @@ namespace NanoGraph {
       var computeNodeResults = new Dictionary<IComputeNode, (CodeCachedResult? result, IComputeNodeEmitCodeOperation op)>();
       Queue<IComputeNode> queuedCalcNodes = new Queue<IComputeNode>();
       HashSet<IComputeNode> wasQueuedCalcNode = new HashSet<IComputeNode>();
+      List<IComputeNode> computeNodeSeenOrder = new List<IComputeNode>();
       void QueueComputeNode(IComputeNode node) {
+        computeNodeSeenOrder.Add(node);
         if (!wasQueuedCalcNode.Add(node)) {
           return;
         }
@@ -519,7 +539,7 @@ namespace NanoGraph {
       }
 
       // Traverse graph of compute nodes and generate a plan for each.
-      var computePlans = new List<(IComputeNode node, List<ICodeGenerator>, List<CodeGeneratorFromComputeNode>, List<DataPlug>)>();
+      Dictionary<IComputeNode, ComputePlan> computePlanMap = new Dictionary<IComputeNode, ComputePlan>();
       while (queuedCalcNodes.TryDequeue(out IComputeNode node)) {
         List<CodeGeneratorFromComputeNode> dependentComputeNodes = new List<CodeGeneratorFromComputeNode>();
         List<DataPlug> dependentComputeInputs = new List<DataPlug>();
@@ -535,15 +555,28 @@ namespace NanoGraph {
           dependentComputeNodes.Clear();
           dependentComputeInputs.Clear();
         }
-        computePlans.Add((node, computePlan, dependentComputeNodes, dependentComputeInputs));
+        computePlanMap[node] = new ComputePlan(node, computePlan, dependentComputeNodes, dependentComputeInputs);
         foreach (var dependency in dependentComputeNodes) {
           QueueComputeNode(dependency.Node);
         }
       }
-      computePlans.Reverse();
+
+      // List out plans in dependency order.
+      List<ComputePlan> computePlans = new List<ComputePlan>();
+      computeNodeSeenOrder.Reverse();
+      HashSet<IComputeNode> computePlanAdded = new HashSet<IComputeNode>();
+      foreach (IComputeNode computeNode in computeNodeSeenOrder) {
+        if (computePlanAdded.Add(computeNode)) {
+          computePlans.Add(computePlanMap[computeNode]);
+        }
+      }
 
       // Execute each compute plan in order.
-      foreach (var (computeNode, computePlan, dependentComputeNodes, dependentComputeInputs) in computePlans) {
+      foreach (var plan in computePlans) {
+        var computeNode = plan.Node;
+        var computePlan = plan.Generators;
+        var dependentComputeNodes = plan.DependentComputeNodes;
+        var dependentComputeInputs = plan.DependentComputeInputs;
         // Read inputs.
         var dependentComputeNodeResults = new List<ComputeNodeResultEntry>();
         foreach (var dependency in dependentComputeNodes) {
@@ -696,7 +729,7 @@ namespace NanoGraph {
           getParamsFunc.AddStatement($"    .DefaultValue = {getParamsFunc.EmitLiteral(valueInput.DefaultValue)},");
           getParamsFunc.AddStatement($"    .MinValue = {getParamsFunc.EmitLiteral(valueInput.MinValue)},");
           getParamsFunc.AddStatement($"    .MaxValue = {getParamsFunc.EmitLiteral(valueInput.MaxValue)},");
-          getParamsFunc.AddStatement($"  }}");
+          getParamsFunc.AddStatement($"  }},");
         }
         getParamsFunc.AddStatement("};");
         getParamsFunc.AddStatement($"return parameters;");

@@ -7,6 +7,14 @@ using System.Threading.Tasks;
 using UnityEngine;
 
 namespace NanoGraph.Plugin {
+  public struct Parameter {
+    public string Name;
+    public double Value;
+    public double DefaultValue;
+    public double MinValue;
+    public double MaxValue;
+  }
+
   public class PluginService : ScriptableObject {
     private class CancelationFlag {
       public bool Canceled = false;
@@ -27,6 +35,8 @@ namespace NanoGraph.Plugin {
     private readonly List<SharedTexture> _textureOutputs = new List<SharedTexture>();
     private Dictionary<string, double> _parameterValues = new Dictionary<string, double>();
     private readonly Dictionary<string, double> _queuedParameterValues = new Dictionary<string, double>();
+
+    private readonly List<Parameter> _parameters = new List<Parameter>();
 
     public Action TextureOutputsUpdated;
 
@@ -123,6 +133,14 @@ namespace NanoGraph.Plugin {
       StopServer();
     }
 
+    public Parameter[] GetParameters() {
+      Parameter[] parameters = _parameters.ToArray();
+      for (int i = 0; i < parameters.Length; ++i) {
+        parameters[i].Value = _parameterValues.GetOrDefault(parameters[i].Name);
+      }
+      return parameters;
+    }
+
     public void SetParameter(string name, double value) {
       _parameterValues[name] = value;
       _queuedParameterValues[name] = value;
@@ -164,6 +182,7 @@ namespace NanoGraph.Plugin {
       }
       _textureOutputs.Add(SharedTextureManager.Instance.CreateTexture(RenderSize.x, RenderSize.y));
 
+      _parameters.Clear();
       Dictionary<string, double> oldParameterValues = _parameterValues;
       Dictionary<string, double> newParameterValues = new Dictionary<string, double>();
       Dictionary<string, double> parameterValuesToSet = new Dictionary<string, double>();
@@ -175,6 +194,12 @@ namespace NanoGraph.Plugin {
           value = parameter.Value;
         }
         newParameterValues[parameter.Name] = value;
+        _parameters.Add(new Parameter {
+          Name = parameter.Name,
+          DefaultValue = parameter.DefaultValue,
+          MinValue = parameter.MinValue,
+          MaxValue = parameter.MaxValue,
+        });
       }
       if (parameterValuesToSet.Count > 0) {
         await _server.SetParametersRequest(parameterValuesToSet);

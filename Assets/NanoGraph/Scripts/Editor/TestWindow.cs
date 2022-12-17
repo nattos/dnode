@@ -25,7 +25,12 @@ namespace NanoGraph.Plugin {
     }
 
     public void OnGUI() {
-      EditorGUILayout.TextField("???", "ASDF");
+      if (GUILayout.Button("Restart Plugin")) {
+        EditorApplication.delayCall += () => {
+          PluginService.Instance.StopRendering();
+          PluginService.Instance.StartRendering();
+        };
+      }
       Input = EditorGUILayout.ToggleLeft("Show Input", Input);
       Rect textureRect = EditorGUILayout.GetControlRect(GUILayout.Height(400));
       Texture2D texture = Input ? PluginService.Instance.GetTextureInput() : PluginService.Instance.GetTextureOutput();
@@ -33,6 +38,15 @@ namespace NanoGraph.Plugin {
         texture = Texture2D.blackTexture;
       }
       EditorGUI.DrawPreviewTexture(textureRect, texture, null, ScaleMode.ScaleToFit);
+
+      foreach (var parameter in PluginService.Instance.GetParameters()) {
+        using (var check = new EditorGUI.ChangeCheckScope()) {
+          float newValue = EditorGUILayout.Slider(parameter.Name, (float)parameter.Value, (float)parameter.MinValue, (float)parameter.MaxValue);
+          if (check.changed) {
+            PluginService.Instance.SetParameter(parameter.Name, newValue);
+          }
+        }
+      }
     }
 
 

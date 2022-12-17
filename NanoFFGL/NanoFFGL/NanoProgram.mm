@@ -525,8 +525,8 @@ int main(int argc, const char* argv[]) {
               { "Name", parameterDecl.Name },
               { "Value", currentValue },
               { "DefaultValue", parameterDecl.DefaultValue },
-              { "MaxValue", parameterDecl.MinValue },
-              { "MinValue", parameterDecl.MaxValue },
+              { "MinValue", parameterDecl.MinValue },
+              { "MaxValue", parameterDecl.MaxValue },
             };
             parameters.push_back(parameter);
             ++parameterIndex;
