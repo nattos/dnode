@@ -51,7 +51,7 @@ namespace DNode {
   #endif // UNITY_EDITOR
       }
     }
-    public EnvironmentComponent EnvironmentComponent;
+    // public EnvironmentComponent EnvironmentComponent;
     public MeshGlyphFont DefaultFont;
     public string DefaultFontName;
 
@@ -112,7 +112,7 @@ namespace DNode {
 
       _frameComponents = new IFrameComponent[] {
           PrefabCache,
-          EnvironmentComponent,
+          // EnvironmentComponent,
           RenderTextureCache,
           OscManager,
       }.Concat(GlobalCamera.GetComponentsInChildren<IFrameComponent>()).ToArray();
@@ -140,8 +140,8 @@ namespace DNode {
         CompositingCamera.gameObject.SetActive(true);
         CompositingCamera.targetDisplay = 0;
 
-        CompositingCamera.GetComponent<UnityEngine.Rendering.Volume>().profile.TryGet<BlitTexturePostProcessComponent>(out var blitTexturePost);
-        blitTexturePost.InputTexture.value = backgroundTexture;
+        // CompositingCamera.GetComponent<UnityEngine.Rendering.Volume>().profile.TryGet<BlitTexturePostProcessComponent>(out var blitTexturePost);
+        // blitTexturePost.InputTexture.value = backgroundTexture;
       } else {
         GlobalCamera.targetDisplay = 0;
         GlobalCamera.targetTexture = null;
@@ -168,10 +168,10 @@ namespace DNode {
         }
       }
 
-      if (backgroundTexture != null) {
-        EnvironmentComponent.BackgroundTexture.Value = backgroundTexture.Texture;
-        EnvironmentComponent.BackgroundTextureAlpha.Value = 1.0f;
-      }
+      // if (backgroundTexture != null) {
+      //   EnvironmentComponent.BackgroundTexture.Value = backgroundTexture.Texture;
+      //   EnvironmentComponent.BackgroundTextureAlpha.Value = 1.0f;
+      // }
       if (!hadGlobalCamera && SceneCamera && GlobalCamera) {
         GlobalCamera.transform.position = SceneCamera.transform.position;
         GlobalCamera.transform.rotation = SceneCamera.transform.rotation;
