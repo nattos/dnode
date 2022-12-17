@@ -23,7 +23,9 @@ namespace NanoGraph.Plugin {
     private const int TargetFrameRate = 60;
     private const double TargetFrameDelay = 1.0 / TargetFrameRate;
 
+    private PluginBuilder _pluginBuilder;
     private PluginServer _server;
+    private PluginWatcher _pluginWatcher;
 
     [NonSerialized]
     private bool _isRendering = false;
@@ -40,6 +42,19 @@ namespace NanoGraph.Plugin {
 
     public Action TextureOutputsUpdated;
 
+    public PluginService() {
+      _pluginBuilder = new PluginBuilder();
+      _pluginWatcher = new PluginWatcher();
+      _pluginWatcher.PluginBinaryChanged += () => {
+        if (IsRendering) {
+          Debug.Log("Reloading plugin.");
+          StopRendering();
+          StartRendering();
+        }
+      };
+      _pluginWatcher.PluginCodeChanged += () => _pluginBuilder.MarkDirty();
+    }
+
     public Texture2D GetTextureInput() {
       return _textureInputs.FirstOrDefault()?.Texture;
     }
@@ -48,10 +63,11 @@ namespace NanoGraph.Plugin {
       return _textureOutputs.FirstOrDefault()?.Texture;
     }
 
+    public bool IsRendering => _isRendering;
+
     float phase = 0.0f;
 
     public void StartRendering() {
-      Debug.Log(UnityEngine.QualitySettings.activeColorSpace);
       if (_isRendering) {
         return;
       }

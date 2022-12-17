@@ -28,10 +28,9 @@
 		0C518A30294BCB0D00E31962 /* NanoFFGL.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = NanoFFGL.entitlements; sourceTree = "<group>"; };
 		0C518A36294BCB7B00E31962 /* NanoProgram.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = NanoProgram.mm; sourceTree = "<group>"; };
 		0C518A37294BCB7B00E31962 /* NanoProgram.metal */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.metal; path = NanoProgram.metal; sourceTree = "<group>"; };
-		0C518A3A294BCCF700E31962 /* Program.metal.incl.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Program.metal.incl.h; path = ../../../../Desktop/Program.metal.incl.h; sourceTree = "<group>"; };
-		0C518A3B294BCCF700E31962 /* Program.incl.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Program.incl.h; path = ../../../../Desktop/Program.incl.h; sourceTree = "<group>"; };
 		0C518A3C294BD18F00E31962 /* Base64.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Base64.h; sourceTree = "<group>"; };
 		0C518A3D294BD2CF00E31962 /* json.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = json.hpp; sourceTree = "<group>"; };
+		0CA86911294DF9B60040333B /* Generated */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Generated; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -64,6 +63,7 @@
 		0C518A22294BCB0C00E31962 /* NanoFFGL */ = {
 			isa = PBXGroup;
 			children = (
+				0CA86911294DF9B60040333B /* Generated */,
 				0C518A37294BCB7B00E31962 /* NanoProgram.metal */,
 				0C518A36294BCB7B00E31962 /* NanoProgram.mm */,
 				0C518A23294BCB0C00E31962 /* AppDelegate.h */,
@@ -74,8 +74,6 @@
 				0C518A2B294BCB0D00E31962 /* Main.storyboard */,
 				0C518A2E294BCB0D00E31962 /* main.m */,
 				0C518A30294BCB0D00E31962 /* NanoFFGL.entitlements */,
-				0C518A3B294BCCF700E31962 /* Program.incl.h */,
-				0C518A3A294BCCF700E31962 /* Program.metal.incl.h */,
 				0C518A3C294BD18F00E31962 /* Base64.h */,
 				0C518A3D294BD2CF00E31962 /* json.hpp */,
 			);

@@ -44,6 +44,9 @@ namespace NanoGraph.Plugin {
   public class ProcessTexturesResponse {}
 
   public class PluginServer : IDisposable {
+    public static string PluginPackagePath => System.IO.Path.Combine(System.IO.Path.GetDirectoryName(UnityEngine.Application.dataPath), "NanoFFGL/build/NanoFFGL/Build/Products/Debug/NanoFFGL.app");
+    public static string PluginBinaryPath => System.IO.Path.Combine(PluginPackagePath, "Contents/MacOS/NanoFFGL");
+
     private const bool DebugStandardError = false;
 
     private readonly AutoResetEvent _threadFlag = new AutoResetEvent(false);
@@ -119,7 +122,7 @@ namespace NanoGraph.Plugin {
       lock (_commandQueueLock)
       lock (_terminatedLock) {
         if (_terminated) {
-          responseHandler(null);
+          FlushCommandHandler(responseHandler);
           return;
         }
         _commandQueue.Add((command, responseHandler));
@@ -143,7 +146,7 @@ namespace NanoGraph.Plugin {
         startParams.RedirectStandardError = true;
       }
       startParams.UseShellExecute = false;
-      startParams.FileName = "/Users/nattos/Library/Developer/Xcode/DerivedData/NanoFFGL-cizgjrmcmjircrenuvpddgdehdgn/Build/Products/Debug/NanoFFGL.app/Contents/MacOS/NanoFFGL";
+      startParams.FileName = PluginBinaryPath;
       process.StartInfo = startParams;
 
       process.OutputDataReceived += (object sender, DataReceivedEventArgs e) => {
@@ -242,11 +245,7 @@ namespace NanoGraph.Plugin {
           _commandQueue.Clear();
         }
         while (commandHandlerQueue.Count > 0) {
-          try {
-            commandHandlerQueue.Dequeue()?.Invoke(null);
-          } catch (Exception e) {
-            UnityEngine.Debug.LogException(e);
-          }
+          FlushCommandHandler(commandHandlerQueue.Dequeue());
         }
 
         if (!process.HasExited) {
@@ -256,6 +255,14 @@ namespace NanoGraph.Plugin {
             UnityEngine.Debug.LogException(e);
           }
         }
+      }
+    }
+
+    private void FlushCommandHandler(Action<string> commandResponseHandler) {
+      try {
+        commandResponseHandler?.Invoke(null);
+      } catch (Exception e) {
+        UnityEngine.Debug.Log($"Server was shutdown: {e}");
       }
     }
 

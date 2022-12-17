@@ -6,6 +6,8 @@ using UnityEngine;
 
 namespace NanoGraph {
   public class NanoGraph {
+    public static string GeneratedCodeOutputPath => System.IO.Path.Combine(System.IO.Path.GetDirectoryName(UnityEngine.Application.dataPath), "NanoFFGL/NanoFFGL/Generated");
+
     public string EffectName = "Program";
     private readonly List<IDataNode> _nodes = new List<IDataNode>();
     private readonly HashSet<IDataNode> _dirtyNodes = new HashSet<IDataNode>();
@@ -740,8 +742,10 @@ namespace NanoGraph {
       string outerGpuCode = program.OuterGpuCode;
       Debug.Log(outerGpuCode);
 
-      System.IO.File.WriteAllText("/Users/nattos/Desktop/Program.incl.h", outerCpuCode);
-      System.IO.File.WriteAllText("/Users/nattos/Desktop/Program.metal.incl.h", outerGpuCode);
+      System.IO.Directory.CreateDirectory(GeneratedCodeOutputPath);
+      System.IO.File.WriteAllText(System.IO.Path.Combine(GeneratedCodeOutputPath, "Program.incl.h"), outerCpuCode);
+      System.IO.File.WriteAllText(System.IO.Path.Combine(GeneratedCodeOutputPath, "Program.metal.incl.h"), outerGpuCode);
+      Debug.Log("CODE WRITTEN");
 
       if (errors.Count > 0) {
         Debug.Log(string.Join("\n", errors));
