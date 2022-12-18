@@ -22,35 +22,41 @@ void WriteTexture(NanoWriteTexture texture, vector_uint2 gid_xy, float4 value) {
   texture.write(half4(value), gid_xy);
 }
 
-vector_float2 Convert_float_To_vector_float2(float value) {
+template<typename T> inline T copy_value(T value) { return value; }
+
+template<typename TFrom, typename TTo> inline TTo Convert(TFrom value) {
+  return value;
+}
+
+template<> vector_float2 inline Convert<float, vector_float2>(float value) {
   return vector_float2 { value, value };
 }
 
-vector_float3 Convert_float_To_vector_float3(float value) {
+template<> vector_float3 inline Convert<float, vector_float3>(float value) {
   return vector_float3 { value, value, value };
 }
 
-vector_float4 Convert_float_To_vector_float4(float value) {
+template<> vector_float4 inline Convert<float, vector_float4>(float value) {
   return vector_float4 { value, value, value, value };
 }
 
-vector_float3 Convert_vector_float2_To_vector_float3(vector_float2 value) {
+template<> vector_float3 inline Convert<vector_float2, vector_float3>(vector_float2 value) {
   return vector_float3 { value.x, value.y, 0.0f };
 }
 
-vector_float4 Convert_vector_float3_To_vector_float4(vector_float3 value) {
+template<> vector_float4 inline Convert<vector_float3, vector_float4>(vector_float3 value) {
   return vector_float4 { value.x, value.y, value.z, 0.0f };
 }
 
-vector_float2 Convert_vector_float3_To_vector_float2(vector_float3 value) {
+template<> vector_float2 inline Convert<vector_float3, vector_float2>(vector_float3 value) {
   return vector_float2 { value.x, value.y };
 }
 
-vector_float2 Convert_vector_float4_To_vector_float2(vector_float4 value) {
+template<> vector_float2 inline Convert<vector_float4, vector_float2>(vector_float4 value) {
   return vector_float2 { value.x, value.y };
 }
 
-float Convert_vector_float4_To_float(vector_float4 value) {
+template<> float inline Convert<vector_float4, float>(vector_float4 value) {
   return value.x;
 }
 

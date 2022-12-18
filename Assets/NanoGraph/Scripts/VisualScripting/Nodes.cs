@@ -360,11 +360,14 @@ namespace NanoGraph.VisualScripting {
   public class ReadTexture : NodeOfType<ReadTextureNode> {}
   public class Math : NodeOfType<MathNode> {}
   public class MakeArray : NodeOfType<MakeArrayNode>{}
+  public class FillArray : NodeOfType<FillArrayNode>{}
+  public class ReduceArray : NodeOfType<ReduceArrayNode>{}
   public class Concat : NodeOfType<ConcatNode>{}
   public class VectorIndex : NodeOfType<VectorIndexNode>{}
   public class Pack : NodeOfType<PackNode>{}
   public class Unpack : NodeOfType<UnpackNode>{}
   public class Literal : NodeOfType<LiteralNode>{}
+  public class GenerateValue : NodeOfType<GenerateValueNode>{}
   public class Latch : NodeOfType<LatchNode>{}
   public class ValueIn : NodeOfType<ValueInputNode>{}
   public class TextureIn : NodeOfType<TextureInputNode>{}

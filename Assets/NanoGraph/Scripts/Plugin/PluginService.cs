@@ -45,6 +45,7 @@ namespace NanoGraph.Plugin {
     public Action TextureOutputsUpdated;
 
     public bool IsCompiling => _pluginWatcher.IsCompiling || _pluginBuilder.IsCompiling;
+    public bool HasCompileError => _pluginBuilder.IsError;
     public bool IsReloading => _pluginWatcher.IsReloading || _isServerStarting;
 
     public PluginService() {

@@ -14,6 +14,8 @@ namespace NanoGraph.Plugin {
     private bool _isDirty = false;
     private bool _isBuilding = false;
 
+    public bool IsError { get; private set; } = false;
+
     public bool IsCompiling => _isDirty || _isBuilding;
 
     public void MarkDirty() {
@@ -27,10 +29,12 @@ namespace NanoGraph.Plugin {
       }
       _isDirty = false;
       _isBuilding = true;
+      IsError = false;
       EditorUtils.DelayCall += async () => {
-        await Task.Run(() => {
-          DoBuild();
+        bool success = await Task.Run(() => {
+          return DoBuild();
         });
+        IsError = !success;
         _isBuilding = false;
         if (_isDirty) {
           StartBuilding();
@@ -38,7 +42,7 @@ namespace NanoGraph.Plugin {
       };
     }
 
-    private void DoBuild() {
+    private bool DoBuild() {
       UnityEngine.Debug.Log("Beginning build.");
 
       ProcessStartInfo startParams = new ProcessStartInfo();
@@ -66,6 +70,7 @@ namespace NanoGraph.Plugin {
       int resultCode = process.ExitCode;
 
       UnityEngine.Debug.Log($"Done build: Code {resultCode}\n{outputStr}\n{errorStr}");
+      return resultCode == 0;
     }
   }
 }

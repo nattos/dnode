@@ -124,23 +124,27 @@ namespace NanoGraph.VisualScripting {
       if (!_connectionListenersAdded) {
         _connectionListenersAdded = true;
         DNode.DValueConnectionWidget.ConnectionChanged += connection => {
-          if (connection.destination.unit is SubgraphUnit destSubgraphUnit) {
-            BaseNode.MapSubgraphUnit(destSubgraphUnit);
-          }
-          if (connection.source.unit is SubgraphUnit srcSubgraphUnit) {
-            BaseNode.MapSubgraphUnit(srcSubgraphUnit);
-          }
-            if (BaseNode.GetSourceBaseNodeOrNull(connection.source.unit, connection.source.key, out _) is BaseNode sourceNode) {
-              try {
-                sourceNode.NotifyOutputConnectionsChanged();
-              } catch {}
+          try {
+            if (connection.destination.unit is SubgraphUnit destSubgraphUnit) {
+              BaseNode.MapSubgraphUnit(destSubgraphUnit);
             }
-            foreach (BaseNode node in BaseNode.GetDestBaseNodes(connection.destination.unit, connection.destination.key)) {
-              try {
-                node.NotifyInputConnectionsChanged();
-              } catch {}
+            if (connection.source.unit is SubgraphUnit srcSubgraphUnit) {
+              BaseNode.MapSubgraphUnit(srcSubgraphUnit);
             }
-            // (connection.destination.unit as BaseNode)?.NotifyInputConnectionsChanged();
+          } catch (KeyNotFoundException e) {
+            return;
+          }
+          if (BaseNode.GetSourceBaseNodeOrNull(connection.source.unit, connection.source.key, out _) is BaseNode sourceNode) {
+            try {
+              sourceNode.NotifyOutputConnectionsChanged();
+            } catch {}
+          }
+          foreach (BaseNode node in BaseNode.GetDestBaseNodes(connection.destination.unit, connection.destination.key)) {
+            try {
+              node.NotifyInputConnectionsChanged();
+            } catch {}
+          }
+          // (connection.destination.unit as BaseNode)?.NotifyInputConnectionsChanged();
         };
       }
     }

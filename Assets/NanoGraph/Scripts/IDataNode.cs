@@ -68,6 +68,10 @@ namespace NanoGraph {
     public static DataSpec ExtendWithFields(DataSpec proto, params DataField[] extraFields) {
       return new DataSpec { Fields = proto.Fields.Concat(extraFields).ToArray() };
     }
+
+    public static DataSpec ExtendWithFields(DataField[] extraFields, DataSpec proto) {
+      return new DataSpec { Fields = extraFields.Concat(proto.Fields).ToArray() };
+    }
   }
 
   public interface IDataNode {

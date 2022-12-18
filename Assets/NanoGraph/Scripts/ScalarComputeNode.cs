@@ -5,8 +5,45 @@ using System.Linq;
 using UnityEngine;
 
 namespace NanoGraph {
+  public enum BasicOutputType {
+    Custom,
+    Bool,
+    Int,
+    Uint,
+    Uint2,
+    Float,
+    Float2,
+    Float3,
+    Float4,
+    Texture,
+  }
+
+  public static class BasicOutputTypeExtensions {
+    public static PrimitiveType? ToPrimitiveTypeOrNull(this BasicOutputType type) {
+      switch (type) {
+        case BasicOutputType.Custom:
+        default:
+          return null;
+        case BasicOutputType.Bool: return PrimitiveType.Bool;
+        case BasicOutputType.Int: return PrimitiveType.Int;
+        case BasicOutputType.Uint: return PrimitiveType.Uint;
+        case BasicOutputType.Uint2: return PrimitiveType.Uint2;
+        case BasicOutputType.Float: return PrimitiveType.Float;
+        case BasicOutputType.Float2: return PrimitiveType.Float2;
+        case BasicOutputType.Float3: return PrimitiveType.Float3;
+        case BasicOutputType.Float4: return PrimitiveType.Float4;
+        case BasicOutputType.Texture: return PrimitiveType.Texture;
+      }
+    }
+  }
+
   public class ScalarComputeNode : ComputeNode {
     public override INanoCodeContext CodeContext => NanoProgram.CpuContext;
+
+    [EditableAttribute]
+    public BasicOutputType OutputType = BasicOutputType.Custom;
+
+    protected override PrimitiveType? SingleFieldModeType => OutputType.ToPrimitiveTypeOrNull();
 
     public override IComputeNodeEmitCodeOperation CreateEmitCodeOperation(ComputeNodeEmitCodeOperationContext context) => new EmitterCpu(this, context);
 

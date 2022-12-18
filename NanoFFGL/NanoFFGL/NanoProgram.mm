@@ -316,6 +316,8 @@ protected:
     return result;
   }
 
+  template<typename T> inline T copy_value(T value) { return value; }
+
   static inline float max(float a, float b) { return std::max(a, b); }
   static inline vector_float2 max(vector_float2 a, vector_float2 b) { return vector_float2 { std::max(a.x, b.x), std::max(a.y, b.y) }; }
   static inline vector_float3 max(vector_float3 a, vector_float3 b) { return vector_float3 { std::max(a.x, b.x), std::max(a.y, b.y), std::max(a.z, b.z) }; }
@@ -415,6 +417,30 @@ protected:
   static inline vector_float2 atan(vector_float2 a) { return vector_float2 { std::atan(a.x), std::atan(a.y) }; }
   static inline vector_float3 atan(vector_float3 a) { return vector_float3 { std::atan(a.x), std::atan(a.y), std::atan(a.z) }; }
   static inline vector_float4 atan(vector_float4 a) { return vector_float4 { std::atan(a.x), std::atan(a.y), std::atan(a.z), std::atan(a.w) }; }
+
+  template<typename T>
+  struct ValueAndBool {
+    T Value;
+    bool Flag;
+  };
+  
+  template<typename T> static inline bool to_bool(const T& value) { return Convert<T, bool>(value); }
+  template<typename T> static inline bool to_bool(const ValueAndBool<T>& value) { return value.Flag; }
+
+  template<typename T> static inline bool not_op(const T& value) { return !to_bool(value); }
+  template<typename T> static inline bool and_op(const T& lhs, const T& rhs) { return to_bool(lhs) && to_bool(rhs); }
+  template<typename T> static inline bool or_op(const T& lhs, const T& rhs) { return to_bool(lhs) || to_bool(rhs); }
+  template<typename T> static inline bool xor_op(const T& lhs, const T& rhs) { return to_bool(lhs) ^ to_bool(rhs); }
+  template<typename T> static inline ValueAndBool<T> greater_than_op(const T& lhs, const T& rhs) { return ValueAndBool<T> { rhs, (lhs > rhs) }; }
+  template<typename T> static inline ValueAndBool<T> less_than_op(const T& lhs, const T& rhs) { return ValueAndBool<T> { rhs, (lhs < rhs) }; }
+  template<typename T> static inline ValueAndBool<T> greater_or_equal_op(const T& lhs, const T& rhs) { return ValueAndBool<T> { rhs, (lhs >= rhs) }; }
+  template<typename T> static inline ValueAndBool<T> less_or_equal_op(const T& lhs, const T& rhs) { return ValueAndBool<T> { rhs, (lhs <= rhs) }; }
+
+  template<typename T> static T random_next();
+  template<> float random_next<float>() { return std::rand() / (float) RAND_MAX; } // TODO: Re-evaluate random function.
+  template<> vector_float2 random_next<vector_float2>() { return vector_float2 { random_next<float>(), random_next<float>() }; }
+  template<> vector_float3 random_next<vector_float3>() { return vector_float3 { random_next<float>(), random_next<float>(), random_next<float>() }; }
+  template<> vector_float4 random_next<vector_float4>() { return vector_float4 { random_next<float>(), random_next<float>(), random_next<float>(), random_next<float>() }; }
 };
 
 

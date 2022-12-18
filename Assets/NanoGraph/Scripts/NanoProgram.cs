@@ -237,6 +237,10 @@ namespace NanoGraph {
       throw new NotSupportedException();
     }
 
+    public string EmitCopy(string expr) {
+      return $"copy_value({expr})";
+    }
+
     // public bool CanConvert(TypeSpec fromType, TypeSpec toType) {
     // }
 
@@ -276,8 +280,7 @@ namespace NanoGraph {
         return EmitConvert(Program.Float4Type, toType, $"SampleTexture(({expr}), gid_xy_norm)");
       }
       if (fromType.IsBuiltIn && toType.IsBuiltIn) {
-        // TODO: Convert to templated function.
-        return $"Convert_{fromType.Identifier}_To_{toType.Identifier}({expr})";
+        return $"Convert<{GetTypeIdentifier(fromType)}, {GetTypeIdentifier(toType)}>({expr})";
       }
       throw new NotSupportedException();
     }

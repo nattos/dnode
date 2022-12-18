@@ -40,10 +40,13 @@ namespace NanoGraph {
     public TypeDeclMode TypeDeclMode = TypeDeclMode.External;
     public TypeDecl InternalType;
 
-    public virtual DataSpec ComputeInputSpec => DataSpec.ExtendWithFields(GetInputOutputDataSpec(FieldPortsMode.Combined, InputTypeFields), TypeDeclFields);
+    protected virtual PrimitiveType? SingleFieldModeType => null;
+    public bool IsSingleFieldMode => SingleFieldModeType != null;
+
+    public virtual DataSpec ComputeInputSpec => DataSpec.ExtendWithFields(TypeDeclFields, GetInputOutputDataSpec(FieldPortsMode.Combined, InputTypeFields));
     public virtual DataSpec ComputeOutputSpec => OutputSpec;
     public virtual DataSpec AuxSizesOutputSpec => DataSpec.Empty;
-    public override DataSpec InputSpec => DataSpec.ExtendWithFields(GetInputOutputDataSpec(InputPortsMode, InputTypeFields), TypeDeclFields);
+    public override DataSpec InputSpec => DataSpec.ExtendWithFields(TypeDeclFields, GetInputOutputDataSpec(InputPortsMode, InputTypeFields));
     public override DataSpec OutputSpec => GetInputOutputDataSpec(OutputPortsMode, OutputTypeFields);
 
     private DataSpec GetInputOutputDataSpec(FieldPortsMode fieldsMode, TypeField[] fields) {
@@ -56,7 +59,7 @@ namespace NanoGraph {
       }
     }
 
-    protected DataField[] TypeDeclFields => new[] { new DataField { Name = "TypeDecl", IsCompileTimeOnly = true, Type = TypeSpec.MakePrimitive(PrimitiveType.TypeDecl) } };
+    protected DataField[] TypeDeclFields => IsSingleFieldMode ? Array.Empty<DataField>() : new[] { new DataField { Name = "TypeDecl", IsCompileTimeOnly = true, Type = TypeSpec.MakePrimitive(PrimitiveType.TypeDecl) } };
 
     public virtual TypeField[] InputTypeFields => InputOutputTypeFields;
     public virtual TypeField[] OutputTypeFields => InputOutputTypeFields;
@@ -68,6 +71,10 @@ namespace NanoGraph {
           default:
             return InternalType.Fields.ToArray();
           case TypeDeclMode.External: {
+            if (IsSingleFieldMode) {
+              PrimitiveType fieldType = SingleFieldModeType.Value;
+              return new[] { TypeField.MakePrimitive("Out", fieldType) };
+            }
             TypeSpec? field = Graph.GetEdgeToDestinationOrNull(new DataPlug { Node = this, FieldName = "TypeDecl" })?.SourceFieldOrNull?.Type;
             TypeDecl inputType = field?.Type ?? TypeDecl.Empty;
             return inputType.Fields.ToArray();

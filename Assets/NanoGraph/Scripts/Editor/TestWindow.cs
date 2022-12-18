@@ -50,8 +50,12 @@ namespace NanoGraph.Plugin {
 
       List<string> statusParts = new List<string>();
       bool isCompiling = PluginService.Instance.IsCompiling || (NanoGraph.DebugInstance?.IsCompiling ?? false);
+      bool hasCompileError = PluginService.Instance.HasCompileError;
       bool isReloading = PluginService.Instance.IsReloading;
       bool isValidating = (NanoGraph.DebugInstance?.IsValidating ?? false);
+      if (hasCompileError) {
+        statusParts.Add("Compile Error");
+      }
       if (isValidating) {
         statusParts.Add("Validate");
       }

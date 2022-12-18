@@ -35,14 +35,14 @@ namespace NanoGraph {
     Log10,
     Atan,
 
-    // Not,
-    // And,
-    // Or,
-    // Xor,
-    // Greater,
-    // Less,
-    // GreaterOrEqual,
-    // LessOrEqual,
+    Not,
+    And,
+    Or,
+    Xor,
+    Greater,
+    Less,
+    GreaterOrEqual,
+    LessOrEqual,
 
     // Concat,
     // Union,
@@ -57,14 +57,15 @@ namespace NanoGraph {
   public struct StandardOperatorCodeEmitter {
     public string OperatorSymbol;
     public string FunctionIdentifier;
+    public string OuterFunctionIdentifier;
     public FunctionMultiInputStyle FunctionMultiInputStyle;
 
     public static StandardOperatorCodeEmitter MakeOperator(string symbol) {
       return new StandardOperatorCodeEmitter { OperatorSymbol = symbol };
     }
 
-    public static StandardOperatorCodeEmitter MakeChainedFunction(string identifier) {
-      return new StandardOperatorCodeEmitter { FunctionIdentifier = identifier, FunctionMultiInputStyle = FunctionMultiInputStyle.Chained };
+    public static StandardOperatorCodeEmitter MakeChainedFunction(string identifier, string outerFuncIdentifier = null) {
+      return new StandardOperatorCodeEmitter { FunctionIdentifier = identifier, OuterFunctionIdentifier = outerFuncIdentifier, FunctionMultiInputStyle = FunctionMultiInputStyle.Chained };
     }
 
     public static StandardOperatorCodeEmitter MakeVarargFunction(string identifier) {
@@ -96,16 +97,20 @@ namespace NanoGraph {
           return $"{CodeEmitter.FunctionIdentifier}({string.Join(", ", inputExpressions)})";
         case FunctionMultiInputStyle.Chained:
         default: {
-          if (inputExpressions.Count == 1) {
-            return $"{CodeEmitter.FunctionIdentifier}({inputExpressions[0]})";
-          }
           string result = null;
-          foreach (string exp in inputExpressions) {
-            if (result == null) {
-              result = exp;
-            } else {
-              result = $"{CodeEmitter.FunctionIdentifier}({result}, {exp})";
+          if (inputExpressions.Count == 1) {
+            result = $"{CodeEmitter.FunctionIdentifier}({inputExpressions[0]})";
+          } else {
+            foreach (string exp in inputExpressions) {
+              if (result == null) {
+                result = exp;
+              } else {
+                result = $"{CodeEmitter.FunctionIdentifier}({result}, {exp})";
+              }
             }
+          }
+          if (!string.IsNullOrEmpty(CodeEmitter.OuterFunctionIdentifier)) {
+            result = $"{CodeEmitter.OuterFunctionIdentifier}({result})";
           }
           return result;
         }
@@ -148,6 +153,15 @@ namespace NanoGraph {
           new StandardOperator(StandardOperatorType.Log2, inputCount: 1, codeEmitter: StandardOperatorCodeEmitter.MakeChainedFunction("log2")),
           new StandardOperator(StandardOperatorType.Log10, inputCount: 1, codeEmitter: StandardOperatorCodeEmitter.MakeChainedFunction("log10")),
           new StandardOperator(StandardOperatorType.Atan, inputCount: 1, codeEmitter: StandardOperatorCodeEmitter.MakeChainedFunction("atan")),
+
+          new StandardOperator(StandardOperatorType.Not, inputCount: 1, codeEmitter: StandardOperatorCodeEmitter.MakeChainedFunction("not_op"), fixedOutputType: PrimitiveType.Bool),
+          new StandardOperator(StandardOperatorType.And, codeEmitter: StandardOperatorCodeEmitter.MakeChainedFunction("and_op"), fixedOutputType: PrimitiveType.Bool),
+          new StandardOperator(StandardOperatorType.Or, codeEmitter: StandardOperatorCodeEmitter.MakeChainedFunction("or_op"), fixedOutputType: PrimitiveType.Bool),
+          new StandardOperator(StandardOperatorType.Xor, codeEmitter: StandardOperatorCodeEmitter.MakeChainedFunction("xor_op"), fixedOutputType: PrimitiveType.Bool),
+          new StandardOperator(StandardOperatorType.Greater, codeEmitter: StandardOperatorCodeEmitter.MakeChainedFunction("greater_than_op", "to_bool"), fixedOutputType: PrimitiveType.Bool),
+          new StandardOperator(StandardOperatorType.Less, codeEmitter: StandardOperatorCodeEmitter.MakeChainedFunction("less_than_op", "to_bool"), fixedOutputType: PrimitiveType.Bool),
+          new StandardOperator(StandardOperatorType.GreaterOrEqual, codeEmitter: StandardOperatorCodeEmitter.MakeChainedFunction("greater_or_equal_op", "to_bool"), fixedOutputType: PrimitiveType.Bool),
+          new StandardOperator(StandardOperatorType.LessOrEqual, codeEmitter: StandardOperatorCodeEmitter.MakeChainedFunction("less_or_equal_op", "to_bool"), fixedOutputType: PrimitiveType.Bool),
       };
       ByType = All.ToDictionary(op => op.Type, op => op);
     }
