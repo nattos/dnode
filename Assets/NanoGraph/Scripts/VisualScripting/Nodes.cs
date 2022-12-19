@@ -366,6 +366,7 @@ namespace NanoGraph.VisualScripting {
   public class VectorIndex : NodeOfType<VectorIndexNode>{}
   public class Pack : NodeOfType<PackNode>{}
   public class Unpack : NodeOfType<UnpackNode>{}
+  public class Switch : NodeOfType<SwitchNode>{}
   public class Literal : NodeOfType<LiteralNode>{}
   public class GenerateValue : NodeOfType<GenerateValueNode>{}
   public class Latch : NodeOfType<LatchNode>{}

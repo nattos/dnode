@@ -119,7 +119,7 @@ namespace NanoGraph {
     public TypeSpec InternalElementType = TypeSpec.MakePrimitive(PrimitiveType.Float);
 
     [EditableAttribute]
-    public int InputCount;
+    public int InputCount = 2;
 
     public override DataSpec InputSpec => DataSpec.FromFields(Enumerable.Range(0, InputCount).Select(i => DataField.MakeType(i.ToString(), ElementType)).ToArray());
     public override DataSpec OutputSpec => DataSpec.FromFields(DataField.MakeType("Out", TypeSpec.MakeArray(ElementType)));
@@ -159,6 +159,7 @@ namespace NanoGraph {
     Value,
     Index,
     Random,
+    // Time
   }
 
   public class ValueValueProvider : IValueProvider {
@@ -642,6 +643,68 @@ namespace NanoGraph {
           context.ArraySizeFunction.AddStatement($"{NanoProgram.IntIdentifier} {outputLocal.ArraySizeIdentifier} = {inputLocal.ArraySizeIdentifier};");
         }
       }
+    }
+  }
+
+  public class SwitchNode : DataNode, ICodeNode, IConditionalNode {
+    [EditableAttribute]
+    public AutoType AutoType = AutoType.Auto;
+    public TypeSpec InternalInputType = TypeSpec.MakePrimitive(PrimitiveType.Float);
+
+    [EditableAttribute]
+    public int InputCount = 2;
+
+    public override DataSpec InputSpec => DataSpec.FromFields(new [] { DataField.MakePrimitive("Case", PrimitiveType.Int) }.Concat(Enumerable.Range(0, InputCount).Select(i => DataField.MakeType(i.ToString(), InputType))).ToArray());
+    public override DataSpec OutputSpec => DataSpec.FromFields(DataField.MakeType("Out", InputType));
+
+    public TypeSpec InputType => AutoTypeUtils.GetAutoType(AutoType, InternalInputType);
+
+    public void UpdateTypesFromInputs() {
+      AutoTypeUtils.UpdateAutoType(Graph.GetInputEdges(this).Where(edge => edge.Destination.FieldName != "Case").ToArray(), ref InternalInputType, forceIsArray: false);
+    }
+
+    public void EmitCode(CodeContext context) {
+      string outputIdentifier = context.OutputLocals[0].Identifier;
+      string conditionExpr = context.InputLocals[0].Identifier;
+      context.Function.AddStatement($"{context.Function.GetTypeIdentifier(InputType)} {outputIdentifier};");
+      context.Function.AddStatement($"switch ({conditionExpr}) {{");
+      for (int i = 1; i < context.InputLocals.Count; ++i) {
+        int caseValue = i - 1;
+        if (i == (context.InputLocals.Count - 1)) {
+          context.Function.AddStatement($"  default:");
+        } else {
+          context.Function.AddStatement($"  case {context.Function.EmitLiteral(caseValue)}:");
+        }
+        context.Function.AddStatement($"    {outputIdentifier} = {context.InputLocals[i].Identifier};");
+        context.Function.AddStatement($"    break;");
+      }
+      context.Function.AddStatement($"}}");
+
+      // TODO: Fix this.
+      context.ArraySizeFunction.AddStatement($"{NanoProgram.IntIdentifier} {context.OutputLocals[0].ArraySizeIdentifier} = {1};");
+    }
+
+    public void GetInputsAreConditional(bool[] outInputsAreConditional) {
+      outInputsAreConditional[0] = false;
+      for (int i = 1; i < outInputsAreConditional.Length; ++i) {
+        outInputsAreConditional[i] = true;
+      }
+    }
+
+    public void EmitInputsUsedCode(CodeContext context) {
+      string conditionExpr = context.InputLocals[0].Identifier;
+      context.Function.AddStatement($"switch ({conditionExpr}) {{");
+      for (int i = 1; i < context.OutputLocals.Count; ++i) {
+        int caseValue = i - 1;
+        if (i == (context.InputLocals.Count - 1)) {
+          context.Function.AddStatement($"  default:");
+        } else {
+          context.Function.AddStatement($"  case {context.Function.EmitLiteral(caseValue)}:");
+        }
+        context.Function.AddStatement($"    {context.OutputLocals[i].Identifier} = true;");
+        context.Function.AddStatement($"    break;");
+      }
+      context.Function.AddStatement($"}}");
     }
   }
 

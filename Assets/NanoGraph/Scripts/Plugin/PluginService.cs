@@ -51,15 +51,15 @@ namespace NanoGraph.Plugin {
     public PluginService() {
       _pluginBuilder = new PluginBuilder();
       _pluginWatcher = new PluginWatcher();
-      _pluginWatcher.PluginBinaryChanged += () => {
-        if (IsRendering) {
-          Debug.Log("Reloading plugin.");
-          StopRendering();
-          StartRendering();
-        }
-      };
-      _pluginWatcher.PluginCodeChanged += () => _pluginBuilder.MarkDirty();
-      StartRendering();
+      // _pluginWatcher.PluginBinaryChanged += () => {
+      //   if (IsRendering) {
+      //     Debug.Log("Reloading plugin.");
+      //     StopRendering();
+      //     StartRendering();
+      //   }
+      // };
+      // _pluginWatcher.PluginCodeChanged += () => _pluginBuilder.MarkDirty();
+      // StartRendering();
     }
 
     public Texture2D GetTextureInput() {

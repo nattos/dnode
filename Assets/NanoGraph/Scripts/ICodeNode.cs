@@ -30,6 +30,11 @@ namespace NanoGraph {
     void EmitCode(CodeContext context);
   }
 
+  public interface IConditionalNode : ICodeNode {
+    void GetInputsAreConditional(bool[] outInputsAreConditional);
+    void EmitInputsUsedCode(CodeContext context);
+  }
+
   public struct ComputeNodeResultEntry {
     public IComputeNode Node;
     public IComputeNodeEmitCodeOperation Operation;
