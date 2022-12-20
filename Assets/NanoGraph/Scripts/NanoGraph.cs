@@ -214,13 +214,16 @@ namespace NanoGraph {
 
     private bool _isCompileLaterInFlight = false;
     public void CompileLater() {
+      if (!Plugin.PluginService.Instance.EnableAutoReload) {
+        return;
+      }
       if (_isCompileLaterInFlight) {
         return;
       }
       _isCompileLaterInFlight = true;
       EditorUtils.InvokeLater(() => {
         _isCompileLaterInFlight = false;
-        // Compile();
+        Compile();
       });
     }
 
@@ -462,7 +465,6 @@ namespace NanoGraph {
 
           conditionalNode.EmitInputsUsedCode(new CodeContext {
             Function = func,
-            ArraySizeFunction = null,
             InputLocals = inputsUsedInputLocals,
             OutputLocals = inputsUsedOutputLocals,
             Errors = context.Errors,
@@ -484,7 +486,7 @@ namespace NanoGraph {
             string innerOutput = context.Function.AllocLocal("Tmp");
             context.Function.AddStatement($"{context.Function.GetTypeIdentifier(output.Type)} {conditionalOutput};");
             conditionalOutputs.Add((conditionalOutput, innerOutput));
-            innerOutputLocals.Add(new CodeLocal { Identifier = innerOutput, Type = output.Type, ArraySizeIdentifier = output.ArraySizeIdentifier });
+            innerOutputLocals.Add(new CodeLocal { Identifier = innerOutput, Type = output.Type });
           }
 
           // Generate the conditional expression itself.
@@ -575,231 +577,230 @@ namespace NanoGraph {
       Dictionary<IDataNode, List<IConditionalNode>> conditionedOnMap = new Dictionary<IDataNode, List<IConditionalNode>>();
       Dictionary<IConditionalNode, List<IDataNode>> conditionGroups = new Dictionary<IConditionalNode, List<IDataNode>>();
       Dictionary<(IDataNode, bool), List<IDataNode>> inputMap = new Dictionary<(IDataNode, bool), List<IDataNode>>();
-      {
-        Queue<IConditionalNode> toConditionOnQueue = new Queue<IConditionalNode>();
-        HashSet<IConditionalNode> conditionedOnQueuedSet = new HashSet<IConditionalNode>();
-        IDataNode currentCondition = root;
-        List<IDataNode> currentConditionNodes = new List<IDataNode>();
-        Queue<IDataNode> toVisitQueue = new Queue<IDataNode>();
-        HashSet<IDataNode> visitedSet = new HashSet<IDataNode>();
-        conditionedOnMap[root] = new List<IConditionalNode>();
 
-        void QueueNode(DataPlug source) {
-          IDataNode node = source.Node;
-          if (visitedSet.Add(node)) {
-            toVisitQueue.Enqueue(node);
-          }
-        }
-        void QueueToConditionOnNode(IConditionalNode node) {
-          if (conditionedOnQueuedSet.Add(node)) {
-            toConditionOnQueue.Enqueue(node);
-          }
-        }
+      Queue<IConditionalNode> toConditionOnQueue = new Queue<IConditionalNode>();
+      HashSet<IConditionalNode> conditionedOnQueuedSet = new HashSet<IConditionalNode>();
+      IDataNode currentCondition = root;
+      List<IDataNode> currentConditionNodes = new List<IDataNode>();
+      Queue<IDataNode> toVisitQueue = new Queue<IDataNode>();
+      HashSet<IDataNode> visitedSet = new HashSet<IDataNode>();
+      conditionedOnMap[root] = new List<IConditionalNode>();
 
-        List<IDataNode> rootInputs = new List<IDataNode>();
-        foreach (var field in root.InputSpec.Fields) {
-          var edge = _edgesByDest.GetOrDefault(new DataPlug { Node = root, FieldName = field.Name });
-          if (edge?.Source.Node == null) {
+      void QueueNode(DataPlug source) {
+        IDataNode node = source.Node;
+        if (visitedSet.Add(node)) {
+          toVisitQueue.Enqueue(node);
+        }
+      }
+      void QueueToConditionOnNode(IConditionalNode node) {
+        if (conditionedOnQueuedSet.Add(node)) {
+          toConditionOnQueue.Enqueue(node);
+        }
+      }
+
+      List<IDataNode> rootInputs = new List<IDataNode>();
+      foreach (var field in root.InputSpec.Fields) {
+        var edge = _edgesByDest.GetOrDefault(new DataPlug { Node = root, FieldName = field.Name });
+        if (edge?.Source.Node == null) {
+          continue;
+        }
+        QueueNode(edge.Source);
+        rootInputs.Add(edge.Source.Node);
+      }
+      inputMap[(root, false)] = rootInputs;
+
+      while (currentCondition != null) {
+        while (toVisitQueue.TryDequeue(out IDataNode node)) {
+          bool isPreamble;
+          currentConditionNodes.Add(node);
+          if (!conditionedOnMap.TryGetValue(node, out List<IConditionalNode> conditionedOn)) {
+            conditionedOn = new List<IConditionalNode>();
+            conditionedOnMap[node] = conditionedOn;
+          }
+          if (currentCondition is IConditionalNode currentConditionalNode) {
+            if (!conditionedOn.Contains(currentConditionalNode)) {
+              conditionedOn.Add(currentConditionalNode);
+            }
+          }
+
+          if (node is IComputeNode && !(node is ISplitComputeNode)) {
             continue;
           }
-          QueueNode(edge.Source);
-          rootInputs.Add(edge.Source.Node);
-        }
-        inputMap[(root, false)] = rootInputs;
-
-        while (currentCondition != null) {
-          while (toVisitQueue.TryDequeue(out IDataNode node)) {
-            bool isPreamble;
-            currentConditionNodes.Add(node);
-            if (!conditionedOnMap.TryGetValue(node, out List<IConditionalNode> conditionedOn)) {
-              conditionedOn = new List<IConditionalNode>();
-              conditionedOnMap[node] = conditionedOn;
-            }
-            if (currentCondition is IConditionalNode currentConditionalNode) {
-              if (!conditionedOn.Contains(currentConditionalNode)) {
-                conditionedOn.Add(currentConditionalNode);
-              }
-            }
-
-            if (node is IComputeNode && !(node is ISplitComputeNode)) {
-              continue;
-            }
-            List<IDataNode> inputs = new List<IDataNode>();
-            if (node is IConditionalNode conditionalNode) {
-              isPreamble = true;
-              QueueToConditionOnNode(conditionalNode);
-              DataSpec nextConditionInputSpec = conditionalNode.InputSpec;
-              bool[] inputsAreConditional = new bool[nextConditionInputSpec.Fields.Count];
-              conditionalNode.GetInputsAreConditional(inputsAreConditional);
-              for (int i = 0; i < nextConditionInputSpec.Fields.Count; ++i) {
-                if (inputsAreConditional[i]) {
-                  continue;
-                }
-                var field = nextConditionInputSpec.Fields[i];
-                var edge = _edgesByDest.GetOrDefault(new DataPlug { Node = conditionalNode, FieldName = field.Name });
-                if (edge?.Source.Node == null) {
-                  continue;
-                }
-                QueueNode(edge.Source);
-                inputs.Add(edge.Source.Node);
-              }
-            } else {
-              isPreamble = false;
-              foreach (var field in node.InputSpec.Fields) {
-                var edge = _edgesByDest.GetOrDefault(new DataPlug { Node = node, FieldName = field.Name });
-                if (edge?.Source.Node == null) {
-                  continue;
-                }
-                QueueNode(edge.Source);
-                inputs.Add(edge.Source.Node);
-              }
-            }
-            inputMap[(node, isPreamble)] = inputs;
-          }
-
-          {
-            if (currentCondition is IConditionalNode currentConditionalNode) {
-              conditionGroups[currentConditionalNode] = currentConditionNodes;
-            }
-          }
-
-          if (toConditionOnQueue.Count == 0) {
-            break;
-          }
-          IConditionalNode nextConditionalNode = toConditionOnQueue.Dequeue();
-          currentCondition = nextConditionalNode;
-          toVisitQueue.Clear();
-          visitedSet.Clear();
-          currentConditionNodes = new List<IDataNode>();
-          {
-            // Fill queue.
-            List<IDataNode> inputs = new List<IDataNode>();
-            DataSpec nextConditionInputSpec = nextConditionalNode.InputSpec;
+          List<IDataNode> inputs = new List<IDataNode>();
+          if (node is IConditionalNode conditionalNode) {
+            isPreamble = true;
+            QueueToConditionOnNode(conditionalNode);
+            DataSpec nextConditionInputSpec = conditionalNode.InputSpec;
             bool[] inputsAreConditional = new bool[nextConditionInputSpec.Fields.Count];
-            nextConditionalNode.GetInputsAreConditional(inputsAreConditional);
+            conditionalNode.GetInputsAreConditional(inputsAreConditional);
             for (int i = 0; i < nextConditionInputSpec.Fields.Count; ++i) {
-              if (!inputsAreConditional[i]) {
+              var field = nextConditionInputSpec.Fields[i];
+              if (inputsAreConditional[i] || field.IsCompileTimeOnly) {
                 continue;
               }
-              var field = nextConditionInputSpec.Fields[i];
-              var edge = _edgesByDest.GetOrDefault(new DataPlug { Node = nextConditionalNode, FieldName = field.Name });
+              var edge = _edgesByDest.GetOrDefault(new DataPlug { Node = conditionalNode, FieldName = field.Name });
               if (edge?.Source.Node == null) {
                 continue;
               }
               QueueNode(edge.Source);
               inputs.Add(edge.Source.Node);
             }
-            inputMap[(nextConditionalNode, false)] = inputs;
-          }
-        }
-
-        string conditionGroupsStr = string.Join("\n", conditionGroups.Select(entry => $"{entry.Key} : {{\n{string.Join("\n", entry.Value)}\n}}"));
-        Debug.Log($"Condition Groups:\n{conditionGroupsStr}");
-
-        (IDataNode node, bool isPreamble)[] rawOrder = DepthFirstTraversal<(IDataNode node, bool branch)>((root, false), entry => {
-          IEnumerable<(IDataNode, bool)> result = Enumerable.Empty<(IDataNode, bool)>();
-          if (inputMap.TryGetValue(entry, out List<IDataNode> inputs)) {
-            result = result.Concat(inputs.Select(input => (input, false)));
-            result = result.Concat(inputs.Select(input => (input, true)));
-          }
-          List<IConditionalNode> conditionedOn = conditionedOnMap[entry.node];
-          result = result.Concat(conditionedOn.Select(node => ((IDataNode)node, true)));
-          return result;
-        }).ToArray();
-
-        string rawOrderStr = string.Join("\n", rawOrder.Select(node => {
-          string conditionStr = "";
-          var conditions = conditionedOnMap[node.Item1].Where(cond => cond != root).ToList();
-          if (conditions.Count > 0) {
-            conditionStr = $" ? [ {string.Join(", ", conditions)} ]";
-          }
-          return $"  {node}{conditionStr}";
-        }));
-        Debug.Log($"Raw Order: [\n{rawOrderStr}\n]");
-
-
-        Dictionary<IDataNode, ICodeGenerator> generators = new Dictionary<IDataNode, ICodeGenerator>();
-        foreach (IDataNode node in conditionedOnMap.Keys) {
-          if (node == root) {
-            continue;
-          }
-          ICodeGenerator generator;
-          if (node is ICodeNode codeNode) {
-            generator = new CodeGeneratorFromCodeNode(codeNode);
-          } else if (node is IComputeNode computeNode) {
-            var codeGenerator = new CodeGeneratorFromComputeNode(computeNode, root);
-            dependentComputeNodes.Add(codeGenerator);
-            generator = codeGenerator;
-          } else if (node is ICompileTimeOnlyNode) {
-            generator = null;
           } else {
-            errors.Add($"Node {node} is not an ICodeNode.");
-            generator = null;
-          }
-          if (generator != null) {
-            generators[node] = generator;
-          }
-        }
-
-        // Get precise input indexes for conditions.
-        Dictionary<IDataNode, List<(IConditionalNode condition, int inputIndex)>> conditionedOnInputsMap = new Dictionary<IDataNode, List<(IConditionalNode, int)>>();;
-        foreach (var entry in conditionGroups) {
-          HashSet<IDataNode> groupNodes = new HashSet<IDataNode>(entry.Value);
-          IConditionalNode conditionNode = entry.Key;
-
-          DataSpec inputSpec = conditionNode.InputSpec;
-          int inputCount = inputSpec.Fields.Count;
-          bool[] isInputConditionalArray = new bool[inputCount];
-          conditionNode.GetInputsAreConditional(isInputConditionalArray);
-
-          for (int inputIndex = 0; inputIndex < inputCount; ++inputIndex) {
-            if (!isInputConditionalArray[inputIndex]) {
-              continue;
-            }
-            var nodesForInput = DepthFirstTraversal<IDataNode>(conditionNode, node => {
-              if (node == conditionNode) {
-                DataEdge edge = node.Graph.GetEdgeToDestinationOrNull(node, inputSpec.Fields[inputIndex].Name);
-                if (edge == null) {
-                  return Array.Empty<IDataNode>();
-                }
-                return new[] { edge.Source.Node };
-              } else {
-                IEnumerable<IDataNode> inputsA = inputMap.GetOrDefault((node, false)) ?? Enumerable.Empty<IDataNode>();
-                IEnumerable<IDataNode> inputsB = inputMap.GetOrDefault((node, true)) ?? Enumerable.Empty<IDataNode>();
-                return inputsA.Concat(inputsB).Where(node => groupNodes.Contains(node));
-              }
-            }).ToArray();
-
-            // Write them out.
-            foreach (IDataNode nodeForInput in nodesForInput) {
-              if (nodeForInput == conditionNode) {
+            isPreamble = false;
+            foreach (var field in node.InputSpec.Fields) {
+              var edge = _edgesByDest.GetOrDefault(new DataPlug { Node = node, FieldName = field.Name });
+              if (edge?.Source.Node == null) {
                 continue;
               }
-              if (!conditionedOnInputsMap.TryGetValue(nodeForInput, out var list)) {
-                list = new List<(IConditionalNode, int)>();
-                conditionedOnInputsMap[nodeForInput] = list;
-              }
-              list.Add((conditionNode, inputIndex));
+              QueueNode(edge.Source);
+              inputs.Add(edge.Source.Node);
             }
+          }
+          inputMap[(node, isPreamble)] = inputs;
+        }
+
+        {
+          if (currentCondition is IConditionalNode currentConditionalNode) {
+            conditionGroups[currentConditionalNode] = currentConditionNodes;
           }
         }
 
-        // Attach conditions to generators.
-        foreach (var entry in generators) {
-          IDataNode node = entry.Key;
-          ICodeGenerator generator = entry.Value;
-          var conditions = conditionedOnInputsMap.GetOrDefault(node);
-          generator.Conditions = conditions?.Select(cond => (generators[cond.condition], cond.inputIndex))?.ToArray() ?? Array.Empty<(ICodeGenerator, int)>();
+        if (toConditionOnQueue.Count == 0) {
+          break;
         }
-
-        // Get compute input DataPlugs.
-        dependentComputeInputs.AddRange(dependentComputeNodes.SelectMany(node => {
-          return GetOutputEdges(node.SourceNode).Where(edge => generators.ContainsKey(edge.Destination.Node)).Select(edge => edge.Source);
-        }).Distinct());
-
-        List<(ICodeGenerator, bool)> plan = rawOrder.Where(entry => entry.node != root).Select(entry => (generators[entry.node], entry.isPreamble)).ToList();
-        return plan;
+        IConditionalNode nextConditionalNode = toConditionOnQueue.Dequeue();
+        currentCondition = nextConditionalNode;
+        toVisitQueue.Clear();
+        visitedSet.Clear();
+        currentConditionNodes = new List<IDataNode>();
+        {
+          // Fill queue.
+          List<IDataNode> inputs = new List<IDataNode>();
+          DataSpec nextConditionInputSpec = nextConditionalNode.InputSpec;
+          bool[] inputsAreConditional = new bool[nextConditionInputSpec.Fields.Count];
+          nextConditionalNode.GetInputsAreConditional(inputsAreConditional);
+          for (int i = 0; i < nextConditionInputSpec.Fields.Count; ++i) {
+            var field = nextConditionInputSpec.Fields[i];
+            if (!inputsAreConditional[i] || field.IsCompileTimeOnly) {
+              continue;
+            }
+            var edge = _edgesByDest.GetOrDefault(new DataPlug { Node = nextConditionalNode, FieldName = field.Name });
+            if (edge?.Source.Node == null) {
+              continue;
+            }
+            QueueNode(edge.Source);
+            inputs.Add(edge.Source.Node);
+          }
+          inputMap[(nextConditionalNode, false)] = inputs;
+        }
       }
+
+      string conditionGroupsStr = string.Join("\n", conditionGroups.Select(entry => $"{entry.Key} : {{\n{string.Join("\n", entry.Value)}\n}}"));
+      Debug.Log($"Condition Groups:\n{conditionGroupsStr}");
+
+      (IDataNode node, bool isPreamble)[] rawOrder = DepthFirstTraversal<(IDataNode node, bool branch)>((root, false), entry => {
+        IEnumerable<(IDataNode, bool)> result = Enumerable.Empty<(IDataNode, bool)>();
+        if (inputMap.TryGetValue(entry, out List<IDataNode> inputs)) {
+          result = result.Concat(inputs.Select(input => (input, false)));
+          result = result.Concat(inputs.Select(input => (input, true)));
+        }
+        List<IConditionalNode> conditionedOn = conditionedOnMap[entry.node];
+        result = result.Concat(conditionedOn.Select(node => ((IDataNode)node, true)));
+        return result;
+      }).ToArray();
+
+      string rawOrderStr = string.Join("\n", rawOrder.Select(node => {
+        string conditionStr = "";
+        var conditions = conditionedOnMap[node.Item1].Where(cond => cond != root).ToList();
+        if (conditions.Count > 0) {
+          conditionStr = $" ? [ {string.Join(", ", conditions)} ]";
+        }
+        return $"  {node}{conditionStr}";
+      }));
+      Debug.Log($"Raw Order: [\n{rawOrderStr}\n]");
+
+
+      Dictionary<IDataNode, ICodeGenerator> generators = new Dictionary<IDataNode, ICodeGenerator>();
+      foreach (IDataNode node in conditionedOnMap.Keys) {
+        if (node == root) {
+          continue;
+        }
+        ICodeGenerator generator;
+        if (node is ICodeNode codeNode) {
+          generator = new CodeGeneratorFromCodeNode(codeNode);
+        } else if (node is IComputeNode computeNode) {
+          var codeGenerator = new CodeGeneratorFromComputeNode(computeNode, root);
+          dependentComputeNodes.Add(codeGenerator);
+          generator = codeGenerator;
+        } else if (node is ICompileTimeOnlyNode) {
+          generator = null;
+        } else {
+          errors.Add($"Node {node} is not an ICodeNode.");
+          generator = null;
+        }
+        if (generator != null) {
+          generators[node] = generator;
+        }
+      }
+
+      // Get precise input indexes for conditions.
+      Dictionary<IDataNode, List<(IConditionalNode condition, int inputIndex)>> conditionedOnInputsMap = new Dictionary<IDataNode, List<(IConditionalNode, int)>>();;
+      foreach (var entry in conditionGroups) {
+        HashSet<IDataNode> groupNodes = new HashSet<IDataNode>(entry.Value);
+        IConditionalNode conditionNode = entry.Key;
+
+        DataSpec inputSpec = conditionNode.InputSpec;
+        int inputCount = inputSpec.Fields.Count;
+        bool[] isInputConditionalArray = new bool[inputCount];
+        conditionNode.GetInputsAreConditional(isInputConditionalArray);
+
+        for (int inputIndex = 0; inputIndex < inputCount; ++inputIndex) {
+          if (!isInputConditionalArray[inputIndex]) {
+            continue;
+          }
+          var nodesForInput = DepthFirstTraversal<IDataNode>(conditionNode, node => {
+            if (node == conditionNode) {
+              DataEdge edge = node.Graph.GetEdgeToDestinationOrNull(node, inputSpec.Fields[inputIndex].Name);
+              if (edge == null) {
+                return Array.Empty<IDataNode>();
+              }
+              return new[] { edge.Source.Node };
+            } else {
+              IEnumerable<IDataNode> inputsA = inputMap.GetOrDefault((node, false)) ?? Enumerable.Empty<IDataNode>();
+              IEnumerable<IDataNode> inputsB = inputMap.GetOrDefault((node, true)) ?? Enumerable.Empty<IDataNode>();
+              return inputsA.Concat(inputsB).Where(node => groupNodes.Contains(node));
+            }
+          }).ToArray();
+
+          // Write them out.
+          foreach (IDataNode nodeForInput in nodesForInput) {
+            if (nodeForInput == conditionNode) {
+              continue;
+            }
+            if (!conditionedOnInputsMap.TryGetValue(nodeForInput, out var list)) {
+              list = new List<(IConditionalNode, int)>();
+              conditionedOnInputsMap[nodeForInput] = list;
+            }
+            list.Add((conditionNode, inputIndex));
+          }
+        }
+      }
+
+      // Attach conditions to generators.
+      foreach (var entry in generators) {
+        IDataNode node = entry.Key;
+        ICodeGenerator generator = entry.Value;
+        var conditions = conditionedOnInputsMap.GetOrDefault(node);
+        generator.Conditions = conditions?.Select(cond => (generators[cond.condition], cond.inputIndex))?.ToArray() ?? Array.Empty<(ICodeGenerator, int)>();
+      }
+
+      // Get compute input DataPlugs.
+      dependentComputeInputs.AddRange(dependentComputeNodes.SelectMany(node => {
+        return GetOutputEdges(node.SourceNode).Where(edge => edge.Destination.Node == root || generators.ContainsKey(edge.Destination.Node)).Select(edge => edge.Source);
+      }).Distinct());
+
+      List<(ICodeGenerator, bool)> plan = rawOrder.Where(entry => entry.node != root && !(entry.node is ICompileTimeOnlyNode)).Select(entry => (generators[entry.node], entry.isPreamble)).ToList();
+      return plan;
     }
 
     private struct ComputePlan {
@@ -918,7 +919,7 @@ namespace NanoGraph {
         var emitOp = computeNode.CreateEmitCodeOperation(emitContext);
 
         emitOp.EmitFunctionSignature();
-        emitOp.EmitFunctionPreamble(out NanoFunction func, out NanoFunction arraySizesFunc);
+        emitOp.EmitFunctionPreamble(out NanoFunction func);
         emitOp.EmitLoadFunctionInputs();
 
         Dictionary<DataPlug, CodeLocal> resultLocalMap = new Dictionary<DataPlug, CodeLocal>();
@@ -961,7 +962,7 @@ namespace NanoGraph {
               actualType = desiredType;
             }
 
-            inputLocals[i] = new CodeLocal { Identifier = actualInputLocal, Type = actualType, ArraySizeIdentifier = inputLocal?.ArraySizeIdentifier };
+            inputLocals[i] = new CodeLocal { Identifier = actualInputLocal, Type = actualType };
           }
           return inputLocals;
         }
@@ -984,15 +985,13 @@ namespace NanoGraph {
                 continue;
               }
               string outputLocal = func.AllocLocal($"{codeGenerator.SourceNode.ShortName}_{field.Name}");
-              string outputSizeLocal = arraySizesFunc.AllocLocal($"{codeGenerator.SourceNode.ShortName}_{field.Name}");
-              resultLocalMap[new DataPlug { Node = codeGenerator.SourceNode, FieldName = field.Name }] = new CodeLocal { Identifier = outputLocal, Type = field.Type, ArraySizeIdentifier = outputSizeLocal };
-              outputLocals.Add(new CodeLocal { Identifier = outputLocal, Type = field.Type, ArraySizeIdentifier = outputSizeLocal });
+              resultLocalMap[new DataPlug { Node = codeGenerator.SourceNode, FieldName = field.Name }] = new CodeLocal { Identifier = outputLocal, Type = field.Type };
+              outputLocals.Add(new CodeLocal { Identifier = outputLocal, Type = field.Type });
             }
           }
 
           var context = new CodeContext {
             Function = func,
-            ArraySizeFunction = arraySizesFunc,
             InputLocals = inputLocals,
             OutputLocals = outputLocals,
             Errors = errors,
@@ -1019,7 +1018,6 @@ namespace NanoGraph {
           CodeLocal[] inputLocals = GetInputLocals(splitComputeNode, splitComputeNode.InputSpec);
           op.EmitLateUpdateCode(computeNode, new CodeContext {
             Function = func,
-            ArraySizeFunction = arraySizesFunc,
             InputLocals = inputLocals,
             OutputLocals = Array.Empty<CodeLocal>(),
             Errors = errors,
@@ -1028,7 +1026,6 @@ namespace NanoGraph {
 
         emitOp.ConsumeFunctionBodyResult(resultLocalMap);
         emitOp.EmitFunctionReturn(out CodeCachedResult? codeCachedResult);
-        emitOp.EmitValidateSizesCacheFunction();
         emitOp.EmitValidateCacheFunction();
         emitOp.EmitExecuteFunctionCode();
         computeNodeResults[computeNode] = (codeCachedResult, emitOp);

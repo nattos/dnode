@@ -101,14 +101,10 @@ namespace NanoGraph {
         context.Function.AddStatement($"  {writeBufferExpr};");
 
         context.Function.AddStatement($"}}");
-
-        string sizesLengthExpr = StandardOperators.Get(StandardOperatorType.Max).EmitExpressionCode(context, context.InputLocals.Select(input => $"{input.ArraySizeIdentifier}").ToArray());
-        context.ArraySizeFunction.AddStatement($"{NanoProgram.IntIdentifier} {context.OutputLocals[0].ArraySizeIdentifier} = {sizesLengthExpr};");
       } else {
         string[] inputs = context.InputLocals.Select(input => input.Identifier).ToArray();
         string resultExpr = op.EmitExpressionCode(context, inputs);
         context.Function.AddStatement($"{context.Function.GetTypeIdentifier(outputElementType)} {outputIdentifier} = {resultExpr};");
-        context.ArraySizeFunction.AddStatement($"{NanoProgram.IntIdentifier} {context.OutputLocals[0].ArraySizeIdentifier} = 1;");
       }
     }
   }
@@ -135,7 +131,6 @@ namespace NanoGraph {
       for (int i = 0; i < InputCount; ++i) {
         context.Function.AddStatement($"{context.Function.Context.EmitWriteBuffer(context.OutputLocals[0].Identifier, context.Function.EmitLiteral(i), context.InputLocals[i].Identifier)};");
       }
-      context.ArraySizeFunction.AddStatement($"{NanoProgram.IntIdentifier} {context.OutputLocals[0].ArraySizeIdentifier} = {InputCount};");
     }
   }
 
@@ -214,7 +209,6 @@ namespace NanoGraph {
       IValueProvider provider = ValueProvider;
       var elementType = ElementType;
       string lengthExpr = context.InputLocals[0].Identifier;
-      string sizesLengthExpr = context.InputLocals[0].ArraySizeIdentifier;
       string lengthLocal = context.Function.AllocLocal("Length");
       context.Function.AddStatement($"{NanoProgram.IntIdentifier} {lengthLocal} = {lengthExpr};");
       context.Function.AddStatement($"{context.Function.GetArrayTypeIdentifier(elementType)} {context.OutputLocals[0].Identifier}(NanoTypedBuffer<{context.Function.GetTypeIdentifier(elementType)}>::Allocate({lengthLocal}));");
@@ -222,7 +216,6 @@ namespace NanoGraph {
       context.Function.AddStatement($"for ({NanoProgram.IntIdentifier} {indexLocal} = 0; {indexLocal} < {lengthExpr}; ++{indexLocal}) {{");
       context.Function.AddStatement($"  {context.Function.Context.EmitWriteBuffer(context.OutputLocals[0].Identifier, indexLocal, provider.EmitCode(this, context, inputsIndexOffset: 1, indexLocal, elementType))};");
       context.Function.AddStatement($"}}");
-      context.ArraySizeFunction.AddStatement($"{NanoProgram.IntIdentifier} {context.OutputLocals[0].ArraySizeIdentifier} = {sizesLengthExpr};");
     }
   }
 
@@ -251,7 +244,6 @@ namespace NanoGraph {
 
     public void EmitCode(CodeContext context) {
       context.Function.AddStatement($"{context.Function.GetTypeIdentifier(ReducedType)} {context.OutputLocals[0].Identifier} = GetLength({context.InputLocals[0].Identifier});");
-      context.ArraySizeFunction.AddStatement($"{NanoProgram.IntIdentifier} {context.OutputLocals[0].ArraySizeIdentifier} = 1;");
     }
   }
 
@@ -268,16 +260,13 @@ namespace NanoGraph {
 
     public void EmitCode(CodeContext context) {
       string sizeLocal = context.Function.AllocLocal("ConcatSize");
-      string sizesSizeLocal = context.OutputLocals[0].ArraySizeIdentifier;
       context.Function.AddStatement($"{NanoProgram.IntIdentifier} {sizeLocal} = 0;");
-      context.ArraySizeFunction.AddStatement($"{NanoProgram.IntIdentifier} {sizesSizeLocal} = 0;");
       List<string> inputSizeLocals = new List<string>();
       for (int i = 0; i < InputCount; ++i) {
         string inputSizeLocal = context.Function.AllocLocal("InputSize");
         inputSizeLocals.Add(inputSizeLocal);
         context.Function.AddStatement($"{NanoProgram.IntIdentifier} {inputSizeLocal} = GetLength({context.InputLocals[i].Identifier});");
         context.Function.AddStatement($"{sizeLocal} += {inputSizeLocal};");
-        context.ArraySizeFunction.AddStatement($"{sizesSizeLocal} += {context.InputLocals[i].ArraySizeIdentifier};");
       }
       context.Function.AddStatement($"{context.Function.GetArrayTypeIdentifier(ElementType)} {context.OutputLocals[0].Identifier}(NanoTypedBuffer<{context.Function.GetTypeIdentifier(ElementType)}>::Allocate({sizeLocal}));");
       string indexIdentifier = context.Function.AllocLocal("ConcatIndex");
@@ -310,7 +299,6 @@ namespace NanoGraph {
 
     public void EmitCode(CodeContext context) {
       context.Function.AddStatement($"{context.Function.GetTypeIdentifier(ElementType)} {context.OutputLocals[0].Identifier} = {context.Function.Context.EmitSampleBuffer(context.InputLocals[0].Identifier, context.InputLocals[1].Identifier)};");
-      context.ArraySizeFunction.AddStatement($"{NanoProgram.IntIdentifier} {context.OutputLocals[0].ArraySizeIdentifier} = 1;");
     }
   }
 
@@ -320,7 +308,6 @@ namespace NanoGraph {
 
     public void EmitCode(CodeContext context) {
       context.Function.AddStatement($"{context.Function.GetTypeIdentifier(context.OutputLocals[0].Type)} {context.OutputLocals[0].Identifier} = {context.Function.Context.EmitSampleTexture(context.InputLocals[0].Identifier, context.InputLocals[1].Identifier)};");
-      context.ArraySizeFunction.AddStatement($"{NanoProgram.IntIdentifier} {context.OutputLocals[0].ArraySizeIdentifier} = 1;");
     }
   }
 
@@ -378,7 +365,6 @@ namespace NanoGraph {
       }
 
       context.Function.AddStatement($"{context.Function.GetTypeIdentifier(indexType)} {context.OutputLocals[0].Identifier} = {indexExpr};");
-      context.ArraySizeFunction.AddStatement($"{NanoProgram.IntIdentifier} {context.OutputLocals[0].ArraySizeIdentifier} = 1;");
     }
   }
 
@@ -530,7 +516,6 @@ namespace NanoGraph {
       }
       string initializerStr = string.Join("\n", initializerParts);
       context.Function.AddStatement($"{context.Function.GetTypeIdentifier(resultType)} {context.OutputLocals[0].Identifier} = {{ {initializerStr} }};");
-      context.ArraySizeFunction.AddStatement($"{NanoProgram.IntIdentifier} {context.OutputLocals[0].ArraySizeIdentifier} = 1;");
     }
   }
 
@@ -621,7 +606,6 @@ namespace NanoGraph {
           string outputArrayTypeIdentifier = context.Function.GetArrayTypeIdentifier(field.Type);
           string outputElementTypeIdentifier = context.Function.GetElementTypeIdentifier(field.Type);
           context.Function.AddStatement($"{outputArrayTypeIdentifier} {outputLocal.Identifier}(NanoTypedBuffer<{outputElementTypeIdentifier}>::Allocate({inputLengthLocal}));");
-          context.ArraySizeFunction.AddStatement($"{NanoProgram.IntIdentifier} {outputLocal.ArraySizeIdentifier} = {inputLocal.ArraySizeIdentifier};");
         }
         index = 0;
         string indexLocal = context.Function.AllocLocal("Index");
@@ -640,7 +624,6 @@ namespace NanoGraph {
           string outputTypeIdentifier = context.Function.GetTypeIdentifier(field.Type);
           string inputField = inputType.IsBuiltIn ? field.Name : inputType.GetField(field.Name);
           context.Function.AddStatement($"{outputTypeIdentifier} {outputLocal.Identifier} = {inputLocal.Identifier}.{inputField};");
-          context.ArraySizeFunction.AddStatement($"{NanoProgram.IntIdentifier} {outputLocal.ArraySizeIdentifier} = {inputLocal.ArraySizeIdentifier};");
         }
       }
     }
@@ -679,9 +662,6 @@ namespace NanoGraph {
         context.Function.AddStatement($"    break;");
       }
       context.Function.AddStatement($"}}");
-
-      // TODO: Fix this.
-      context.ArraySizeFunction.AddStatement($"{NanoProgram.IntIdentifier} {context.OutputLocals[0].ArraySizeIdentifier} = {1};");
     }
 
     public void GetInputsAreConditional(bool[] outInputsAreConditional) {
@@ -737,11 +717,8 @@ namespace NanoGraph {
       if (ValueSource == InputSource.Internal) {
         var internalValue = EffectiveInternalValue;
         context.Function.AddStatement($"{context.Function.GetTypeIdentifier(type)} {context.OutputLocals[0].Identifier} = {context.Function.EmitLiteral(type, internalValue)};");
-        int length = IsArray ? internalValue.Rows : 1;
-        context.ArraySizeFunction.AddStatement($"{NanoProgram.IntIdentifier} {context.OutputLocals[0].ArraySizeIdentifier} = {context.ArraySizeFunction.EmitLiteral(length)};");
       } else {
         context.Function.AddStatement($"{context.Function.GetTypeIdentifier(type)} {context.OutputLocals[0].Identifier} = {context.InputLocals[0].Identifier};");
-        context.ArraySizeFunction.AddStatement($"{NanoProgram.IntIdentifier} {context.OutputLocals[0].ArraySizeIdentifier} = {context.ArraySizeFunction.EmitLiteral(1)};");
       }
     }
   }
@@ -769,7 +746,6 @@ namespace NanoGraph {
       IValueProvider provider = ValueProvider;
       var elementType = ElementType;
       context.Function.AddStatement($"{context.Function.GetTypeIdentifier(elementType)} {context.OutputLocals[0].Identifier} = {provider.EmitCode(this, context, inputsIndexOffset: 0, context.Function.EmitLiteral(0), elementType)};");
-      context.ArraySizeFunction.AddStatement($"{NanoProgram.IntIdentifier} {context.OutputLocals[0].ArraySizeIdentifier} = {context.ArraySizeFunction.EmitLiteral(1)};");
     }
   }
 

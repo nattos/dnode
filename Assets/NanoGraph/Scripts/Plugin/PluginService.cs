@@ -44,6 +44,8 @@ namespace NanoGraph.Plugin {
 
     public Action TextureOutputsUpdated;
 
+    public bool EnableAutoReload { get; set; } = true;
+
     public bool IsCompiling => _pluginWatcher.IsCompiling || _pluginBuilder.IsCompiling;
     public bool HasCompileError => _pluginBuilder.IsError;
     public bool IsReloading => _pluginWatcher.IsReloading || _isServerStarting;
@@ -51,15 +53,21 @@ namespace NanoGraph.Plugin {
     public PluginService() {
       _pluginBuilder = new PluginBuilder();
       _pluginWatcher = new PluginWatcher();
-      // _pluginWatcher.PluginBinaryChanged += () => {
-      //   if (IsRendering) {
-      //     Debug.Log("Reloading plugin.");
-      //     StopRendering();
-      //     StartRendering();
-      //   }
-      // };
-      // _pluginWatcher.PluginCodeChanged += () => _pluginBuilder.MarkDirty();
-      // StartRendering();
+      _pluginWatcher.PluginBinaryChanged += () => {
+        if (EnableAutoReload && IsRendering) {
+          Debug.Log("Reloading plugin.");
+          StopRendering();
+          StartRendering();
+        }
+      };
+      _pluginWatcher.PluginCodeChanged += () => {
+        if (EnableAutoReload) {
+          _pluginBuilder.MarkDirty();
+        }
+      };
+      if (EnableAutoReload) {
+        StartRendering();
+      }
     }
 
     public Texture2D GetTextureInput() {
@@ -93,38 +101,40 @@ namespace NanoGraph.Plugin {
           await StartServer();
           _isServerStarting = false;
 
-          var _serverTexture = _textureInputs[_textureInputs.Count - 1].Texture;
-          var temp = RenderTexture.GetTemporary(
-              _serverTexture.width, _serverTexture.height, 0,
-              RenderTextureFormat.Default, RenderTextureReadWrite.Default
-          );
-          RenderTexture oldRT = RenderTexture.active;
-          RenderTexture.active = temp;
-          phase += 0.05f;
-          GL.Clear(clearDepth: false, clearColor: true, new Color(Mathf.Abs(Mathf.Sin(phase)), 0.0f, 0.0f, 1.0f));
-          // GL.PushMatrix();
-          // GL.LoadOrtho();
-          // GL.LoadPixelMatrix();
-          // GL.Begin(GL.LINES);
-          // GL.Vertex3(0.0f, 0.0f, 0.0f);
-          // GL.Vertex3(10.0f, 10.0f, 10.0f);
-          // GL.Color(Color.red);
-          // GL.End();
-          // GL.PopMatrix();
-          RenderTexture.active = oldRT;
-          Graphics.CopyTexture(temp, _serverTexture);
-          // RenderTexture.ReleaseTemporary(temp);
-          // SharedTexture tex = _textureInputs[_textureInputs.Count - 1];
-          // Graphics.CopyTexture(Texture2D.redTexture, 0, 0, 0, 0, Texture2D.redTexture.width, Texture2D.redTexture.height, tex.Texture, 0, 0, 100, 100);
-          // SharedTexture tex = _textureInputs[_textureInputs.Count - 1];
-          // RenderTexture rt = RenderTexture.GetTemporary(1920, 1080, 0, RenderTextureFormat.BGRA32, 0, );
-          // RenderTexture.active = rt;
-          // phase += 0.1f;
-          // GL.Clear(clearDepth: false, clearColor: true, new Color(Mathf.Abs(Mathf.Sin(phase)), 0.0f, 0.0f, 1.0f));
-          // RenderTexture.active = null;
-          // // // var rt = RenderTexture.GetTemporary(tex.Texture.width, tex.Texture.height, 0, RenderTextureFormat.Default, RenderTextureReadWrite.Default);
-          // Graphics.CopyTexture(rt, tex.Texture);
-          // RenderTexture.ReleaseTemporary(rt);
+          if (_textureInputs.Count > 0) {
+            var _serverTexture = _textureInputs[_textureInputs.Count - 1].Texture;
+            var temp = RenderTexture.GetTemporary(
+                _serverTexture.width, _serverTexture.height, 0,
+                RenderTextureFormat.Default, RenderTextureReadWrite.Default
+            );
+            RenderTexture oldRT = RenderTexture.active;
+            RenderTexture.active = temp;
+            phase += 0.05f;
+            GL.Clear(clearDepth: false, clearColor: true, new Color(Mathf.Abs(Mathf.Sin(phase)), 0.0f, 0.0f, 1.0f));
+            // GL.PushMatrix();
+            // GL.LoadOrtho();
+            // GL.LoadPixelMatrix();
+            // GL.Begin(GL.LINES);
+            // GL.Vertex3(0.0f, 0.0f, 0.0f);
+            // GL.Vertex3(10.0f, 10.0f, 10.0f);
+            // GL.Color(Color.red);
+            // GL.End();
+            // GL.PopMatrix();
+            RenderTexture.active = oldRT;
+            Graphics.CopyTexture(temp, _serverTexture);
+            // RenderTexture.ReleaseTemporary(temp);
+            // SharedTexture tex = _textureInputs[_textureInputs.Count - 1];
+            // Graphics.CopyTexture(Texture2D.redTexture, 0, 0, 0, 0, Texture2D.redTexture.width, Texture2D.redTexture.height, tex.Texture, 0, 0, 100, 100);
+            // SharedTexture tex = _textureInputs[_textureInputs.Count - 1];
+            // RenderTexture rt = RenderTexture.GetTemporary(1920, 1080, 0, RenderTextureFormat.BGRA32, 0, );
+            // RenderTexture.active = rt;
+            // phase += 0.1f;
+            // GL.Clear(clearDepth: false, clearColor: true, new Color(Mathf.Abs(Mathf.Sin(phase)), 0.0f, 0.0f, 1.0f));
+            // RenderTexture.active = null;
+            // // // var rt = RenderTexture.GetTemporary(tex.Texture.width, tex.Texture.height, 0, RenderTextureFormat.Default, RenderTextureReadWrite.Default);
+            // Graphics.CopyTexture(rt, tex.Texture);
+            // RenderTexture.ReleaseTemporary(rt);
+          }
 
 
           if (_queuedParameterValues.Count > 0) {

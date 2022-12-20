@@ -77,8 +77,8 @@ namespace NanoGraph {
         }
       }
 
-      public override void EmitFunctionPreamble(out NanoFunction func, out NanoFunction arraySizesFunc) {
-        base.EmitFunctionPreamble(out func, out arraySizesFunc);
+      public override void EmitFunctionPreamble(out NanoFunction func) {
+        base.EmitFunctionPreamble(out func);
         this.instanceFieldIdentifier = program.AddInstanceField(program.GetProgramType(Node.StorageType, "Latch"), Node.ShortName);
       }
 

@@ -20,8 +20,8 @@ namespace NanoGraph {
         Node = node;
       }
 
-      public override void EmitFunctionPreamble(out NanoFunction func, out NanoFunction arraySizesFunc) {
-        base.EmitFunctionPreamble(out func, out arraySizesFunc);
+      public override void EmitFunctionPreamble(out NanoFunction func) {
+        base.EmitFunctionPreamble(out func);
         this.textureInputIndex = program.AllocateTextureInput();
       }
 

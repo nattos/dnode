@@ -54,17 +54,14 @@ namespace NanoGraph {
         Node = node;
       }
 
-      public override void EmitFunctionPreamble(out NanoFunction func, out NanoFunction arraySizesFunc) {
+      public override void EmitFunctionPreamble(out NanoFunction func) {
         // Begin generating the main results function.
         this.func = func = program.AddFunction(computeNode.ShortName, computeNode.CodeContext, resultType);
-        this.arraySizesFunc = arraySizesFunc = program.AddFunction($"{computeNode.ShortName}_Sizes", NanoProgram.CpuContext, arraySizeResultType);
       }
 
       public override void EmitFunctionReturn(out CodeCachedResult? result) {
         string returnLocal = func.AllocLocal("Return");
-        string returnSizesLocal = arraySizesFunc.AllocLocal("Return");
         func.AddStatement($"{func.GetTypeIdentifier(resultType)} {returnLocal};");
-        arraySizesFunc.AddStatement($"{arraySizesFunc.GetTypeIdentifier(arraySizeResultType)} {returnSizesLocal};");
         foreach (var field in computeOutputSpec.Fields) {
           if (field.IsCompileTimeOnly) {
             continue;
@@ -79,16 +76,13 @@ namespace NanoGraph {
             continue;
           }
           func.AddStatement($"{returnLocal}.{resultType.GetField(field.Name)} = {inputLocal?.Identifier};");
-          arraySizesFunc.AddStatement($"{returnSizesLocal}.{arraySizeResultType.GetField(field.Name)} = {inputLocal?.ArraySizeIdentifier};");
         }
         func.AddStatement($"return {returnLocal};");
-        arraySizesFunc.AddStatement($"return {returnSizesLocal};");
-        result = new CodeCachedResult { ResultType = resultType, ArraySizesResultType = arraySizeResultType, Result = new CodeLocal { Identifier = cachedResult.Identifier, Type = resultTypeSpec, ArraySizeIdentifier = cachedResult.ArraySizeIdentifier } };
+        result = new CodeCachedResult { ResultType = resultType, Result = new CodeLocal { Identifier = cachedResult.Identifier, Type = resultTypeSpec } };
       }
 
       public override void EmitValidateCacheFunction() {
         validateCacheFunction = program.AddFunction($"Update_{computeNode.ShortName}", NanoProgram.CpuContext, program.VoidType);
-        validateCacheFunction.AddStatement($"{validateSizesCacheFunction.Identifier}();");
         // Treat buffers correctly.
         foreach (var dependency in dependentComputeNodes) {
           if (dependency.Result == null) {
@@ -104,7 +98,7 @@ namespace NanoGraph {
             }
           }
         }
-        string funcResultLocal = arraySizesFunc.AllocLocal("Result");
+        string funcResultLocal = func.AllocLocal("Result");
         validateCacheFunction.AddStatement($"{validateCacheFunction.GetTypeIdentifier(resultType)} {funcResultLocal} = {func.Identifier}();");
         foreach (var field in computeNode.OutputSpec.Fields) {
           if (field.IsCompileTimeOnly) {
@@ -112,7 +106,7 @@ namespace NanoGraph {
           }
           var fieldName = resultType.GetField(field.Name);
           if (field.Type.IsArray) {
-            validateCacheFunction.AddStatement($"{cachedResult.Identifier}.{fieldName}->CopyCpuFrom({funcResultLocal}.{fieldName}.get());");
+            validateCacheFunction.AddStatement($"CopyCpuFrom({cachedResult.Identifier}.{fieldName}, ({funcResultLocal}.{fieldName}));");
           } else {
             validateCacheFunction.AddStatement($"{cachedResult.Identifier}.{fieldName} = {funcResultLocal}.{fieldName};");
           }

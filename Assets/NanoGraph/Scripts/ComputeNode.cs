@@ -45,7 +45,6 @@ namespace NanoGraph {
 
     public virtual DataSpec ComputeInputSpec => DataSpec.ExtendWithFields(TypeDeclFields, GetInputOutputDataSpec(FieldPortsMode.Combined, InputTypeFields));
     public virtual DataSpec ComputeOutputSpec => OutputSpec;
-    public virtual DataSpec AuxSizesOutputSpec => DataSpec.Empty;
     public override DataSpec InputSpec => DataSpec.ExtendWithFields(TypeDeclFields, GetInputOutputDataSpec(InputPortsMode, InputTypeFields));
     public override DataSpec OutputSpec => GetInputOutputDataSpec(OutputPortsMode, OutputTypeFields);
 
@@ -110,12 +109,9 @@ namespace NanoGraph {
       public readonly NanoProgram program;
 
       public NanoFunction func;
-      public NanoFunction arraySizesFunc;
-      public NanoFunction validateSizesCacheFunction;
       public NanoFunction validateCacheFunction;
       public TypeSpec resultTypeSpec { get; private set; }
       public NanoProgramType resultType { get; private set; }
-      public NanoProgramType arraySizeResultType { get; private set; }
       public DataSpec computeOutputSpec { get; private set; }
 
       public readonly NanoFunction executeFunction;
@@ -129,28 +125,23 @@ namespace NanoGraph {
       public Dictionary<IComputeNode, List<(DataField field, int inputIndex)>> descendantInputs = new Dictionary<IComputeNode, List<(DataField field, int inputIndex)>>();
 
       public CodeLocal cachedResult { get; private set; }
-      // public string cachedResultIdentifier;
-      // public string cachedResultSizesIdentifier;
 
       protected virtual IEnumerable<DataPlug> DependentComputeInputsToLoad => dependentComputeInputs;
 
       public void EmitFunctionSignature() {
         // Define a type to hold the result value.
         DataSpec computeInputSpec = computeNode.ComputeInputSpec;
-        DataSpec computeArrayInputSpec = computeNode.AuxSizesOutputSpec;
         this.computeOutputSpec = computeNode.ComputeOutputSpec;
         TypeDecl resultTypeDecl = TypeDeclFromDataFields(computeOutputSpec.Fields);
         // DataField[] compileTimeOnlyInputs = CompileTimeOnlyFields(computeInputSpec.Fields);
         this.resultTypeSpec = TypeSpec.MakeType(resultTypeDecl);
         this.resultType = program.AddType(resultTypeDecl, $"Result_{computeNode.ShortName}");
-        this.arraySizeResultType = program.AddType(TypeDeclFromDataFields(computeOutputSpec.Fields.Concat(computeArrayInputSpec.Fields).Select(field => new DataField { Name = field.Name, Type = TypeSpec.MakePrimitive(PrimitiveType.Int), IsCompileTimeOnly = field.IsCompileTimeOnly }).ToArray()), $"ResultSizes_{computeNode.ShortName}");
         // Define a field to hold the cached result.
         string cachedResultIdentifier = program.AddInstanceField(resultType, $"Result_{computeNode.ShortName}");
-        string cachedResultSizesIdentifier = program.AddInstanceField(arraySizeResultType, $"ResultSizes_{computeNode.ShortName}");
-        this.cachedResult = new CodeLocal { Type = resultTypeSpec, Identifier = cachedResultIdentifier, ArraySizeIdentifier = cachedResultSizesIdentifier };
+        this.cachedResult = new CodeLocal { Type = resultTypeSpec, Identifier = cachedResultIdentifier };
       }
 
-      public abstract void EmitFunctionPreamble(out NanoFunction func, out NanoFunction arraySizesFunc);
+      public abstract void EmitFunctionPreamble(out NanoFunction func);
 
       public void EmitLoadFunctionInputs() {
         int inputIndex = 0;
@@ -163,24 +154,6 @@ namespace NanoGraph {
         this.resultLocalMap = resultLocalMap;
       }
       public abstract void EmitFunctionReturn(out CodeCachedResult? result);
-
-      public void EmitValidateSizesCacheFunction() {
-        validateSizesCacheFunction = program.AddFunction($"UpdateSizes_{computeNode.ShortName}", NanoProgram.CpuContext, program.VoidType);
-        validateSizesCacheFunction.AddStatement($"{cachedResult.ArraySizeIdentifier} = {arraySizesFunc.Identifier}();");
-        foreach (var field in computeNode.OutputSpec.Fields) {
-          if (field.IsCompileTimeOnly) {
-            continue;
-          }
-          if (!field.Type.IsArray) {
-            continue;
-          }
-          validateSizesCacheFunction.AddStatement($"if (!{cachedResult.Identifier}.{resultType.GetField(field.Name)}) {{");
-          validateSizesCacheFunction.AddStatement($"  {cachedResult.Identifier}.{resultType.GetField(field.Name)}.reset(NanoTypedBuffer<{validateSizesCacheFunction.GetElementTypeIdentifier(field.Type)}>::Allocate({cachedResult.ArraySizeIdentifier}.{arraySizeResultType.GetField(field.Name)}));");
-          validateSizesCacheFunction.AddStatement($"}} else {{");
-          validateSizesCacheFunction.AddStatement($"  {cachedResult.Identifier}.{resultType.GetField(field.Name)}->Resize({cachedResult.ArraySizeIdentifier}.{arraySizeResultType.GetField(field.Name)});");
-          validateSizesCacheFunction.AddStatement($"}}");
-        }
-      }
 
       public abstract void EmitValidateCacheFunction();
 
@@ -219,10 +192,8 @@ namespace NanoGraph {
 
       protected virtual void EmitLoadOutput(CodeContext context, string fieldName, int inputIndex, CodeLocal intoLocal) {
         string outputLocal = intoLocal.Identifier;
-        string outputSizeLocal = intoLocal.ArraySizeIdentifier;
         // TODO: Unwind this. Caller can provide expression.
         context.Function.AddStatement($"{context.Function.GetTypeIdentifier(intoLocal.Type)} {outputLocal} = {context.Function.Context.EmitFunctionInput(program, cachedResult, fieldName, inputIndex)};");
-        context.ArraySizeFunction.AddStatement($"{NanoProgram.IntIdentifier} {outputSizeLocal} = {cachedResult.ArraySizeIdentifier}.{arraySizeResultType.GetField(fieldName)};");
       }
 
       private static TypeDecl TypeDeclFromDataFields(IEnumerable<DataField> fields) {

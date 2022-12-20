@@ -30,16 +30,13 @@ namespace NanoGraph {
       public TypeDecl vertexType;
       public NanoProgramType vertexProgramType;
       public List<NanoGpuBufferRef> gpuInputBuffers = new List<NanoGpuBufferRef>();
-      // public CodeCachedResult codeCachedResult;
 
       protected override IEnumerable<DataPlug> DependentComputeInputsToLoad => dependentComputeInputs.Where(plug => !(plug.Node == vertexNode && plug.FieldName == "Verts"));
 
-      public override void EmitFunctionPreamble(out NanoFunction func, out NanoFunction arraySizesFunc) {
+      public override void EmitFunctionPreamble(out NanoFunction func) {
         // Begin generating the main results function.
         string[] functionModifiers = { "fragment" };
         this.func = func = program.AddFunction(computeNode.ShortName, computeNode.CodeContext, program.Float4Type, functionModifiers);
-        this.arraySizesFunc = arraySizesFunc = program.AddFunction($"{computeNode.ShortName}_Sizes", NanoProgram.CpuContext, arraySizeResultType);
-
 
         // Identify which vertex shader is the input.
         this.vertexNode = graph.GetEdgeToDestinationOrNull(computeNode, "Verts")?.Source.Node as VertexShaderComputeNode;
@@ -71,21 +68,6 @@ namespace NanoGraph {
             continue;
           }
           AddGpuFuncInput(func, computeInput, $"input{inputIndex++}", gpuInputBuffers, ref bufferIndex);
-          // gpuInputBuffers.Add(new NanoGpuBufferRef {
-          //   FieldName = computeInput.Field.Name,
-          //   Expression = computeInput.Expression,
-          //   Index = bufferIndex,
-          //   Type = computeInput.Field.Type,
-          // });
-          // var fieldType = computeInput.FieldType;
-          // string[] modifiers = { "constant", "const" };
-          // string suffix = $"[[buffer({bufferIndex++})]]";
-          // bool isReference = true;
-          // if (fieldType.IsArray) {
-          //   modifiers = Array.Empty<string>();
-          //   isReference = false;
-          // }
-          // func.AddParam(modifiers, fieldType, $"input{inputIndex++}", suffix, new NanoParameterOptions { IsConst = true, IsReference = isReference });
         }
       }
 
@@ -103,13 +85,7 @@ namespace NanoGraph {
           return;
         }
         func.AddStatement($"return {inputLocal?.Identifier};");
-
-        string returnSizesLocal = arraySizesFunc.AllocLocal("Return");
-        arraySizesFunc.AddStatement($"{arraySizesFunc.GetTypeIdentifier(arraySizeResultType)} {returnSizesLocal};");
-        arraySizesFunc.AddStatement($"{returnSizesLocal}.{arraySizeResultType.GetField("Out")} = {arraySizesFunc.EmitLiteral(1)};");
-        arraySizesFunc.AddStatement($"return {returnSizesLocal};");
-
-        result = new CodeCachedResult { ResultType = resultType, ArraySizesResultType = arraySizeResultType, Result = new CodeLocal { Identifier = cachedResult.Identifier, Type = resultTypeSpec, ArraySizeIdentifier = cachedResult.ArraySizeIdentifier } };
+        result = new CodeCachedResult { ResultType = resultType, Result = new CodeLocal { Identifier = cachedResult.Identifier, Type = resultTypeSpec } };
       }
 
       public override void EmitValidateCacheFunction() {
@@ -118,7 +94,6 @@ namespace NanoGraph {
         string renderTargetIdentifier = program.AddInstanceField(program.Texture, $"{computeNode.ShortName}_RenderTarget");
 
         validateCacheFunction = program.AddFunction($"Update_{computeNode.ShortName}", NanoProgram.CpuContext, program.VoidType);
-        validateCacheFunction.AddStatement($"{validateSizesCacheFunction.Identifier}();");
 
 
         // Identify which vertex shader is the input.

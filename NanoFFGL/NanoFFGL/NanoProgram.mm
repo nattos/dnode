@@ -315,6 +315,13 @@ protected:
     (*result)[0] = Convert<TFrom, TTo>(value);
     return result;
   }
+  
+  template<typename T> static inline void CopyCpuFrom(std::shared_ptr<NanoTypedBuffer<T>>& to, const std::shared_ptr<NanoTypedBuffer<T>>& from) {
+    if (!to) {
+      to.reset(new NanoTypedBuffer<T>());
+    }
+    to->CopyCpuFrom(from.get());
+  }
 
   template<typename T> inline T copy_value(T value) { return value; }
 

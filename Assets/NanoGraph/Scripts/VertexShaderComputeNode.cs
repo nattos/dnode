@@ -28,11 +28,10 @@ namespace NanoGraph {
       public List<NanoGpuBufferRef> gpuInputBuffers = new List<NanoGpuBufferRef>();
       // public CodeCachedResult codeCachedResult;
 
-      public override void EmitFunctionPreamble(out NanoFunction func, out NanoFunction arraySizesFunc) {
+      public override void EmitFunctionPreamble(out NanoFunction func) {
         // Begin generating the main results function.
         string[] functionModifiers = { "vertex" };
         this.func = func = program.AddFunction(computeNode.ShortName, computeNode.CodeContext, resultType, functionModifiers);
-        this.arraySizesFunc = arraySizesFunc = program.AddFunction($"{computeNode.ShortName}_Sizes", NanoProgram.CpuContext, arraySizeResultType);
 
         func.AddParam(Array.Empty<string>(), program.GetPrimitiveType(PrimitiveType.Uint), $"gid_uint", "[[vertex_id]]");
         func.AddStatement($"{func.GetTypeIdentifier(PrimitiveType.Int)} gid = gid_uint;");
@@ -41,31 +40,11 @@ namespace NanoGraph {
         // Note: Only load inputs that we really read.
         int bufferIndex = 0;
         AddGpuFuncInputs(func, CollectComputeInputs(DependentComputeInputsToLoad), gpuInputBuffers, ref bufferIndex);
-        // int inputIndex = 0;
-        // foreach (var computeInput in CollectComputeInputs(DependentComputeInputsToLoad)) {
-        //   gpuInputBuffers.Add(new NanoGpuBufferRef {
-        //     FieldName = computeInput.Field.Name,
-        //     Expression = computeInput.Expression,
-        //     Index = bufferIndex,
-        //     Type = computeInput.Field.Type,
-        //   });
-        //   var fieldType = computeInput.FieldType;
-        //   string[] modifiers = { "constant", "const" };
-        //   string suffix = $"[[buffer({bufferIndex++})]]";
-        //   bool isReference = true;
-        //   if (fieldType.IsArray) {
-        //     modifiers = Array.Empty<string>();
-        //     isReference = false;
-        //   }
-        //   func.AddParam(modifiers, fieldType, $"input{inputIndex++}", suffix, new NanoParameterOptions { IsConst = true, IsReference = isReference });
-        // }
       }
 
       public override void EmitFunctionReturn(out CodeCachedResult? result) {
         string returnLocal = func.AllocLocal("Return");
-        string returnSizesLocal = arraySizesFunc.AllocLocal("Return");
         func.AddStatement($"{func.GetTypeIdentifier(resultType)} {returnLocal};");
-        arraySizesFunc.AddStatement($"{arraySizesFunc.GetTypeIdentifier(arraySizeResultType)} {returnSizesLocal};");
         foreach (var field in computeOutputSpec.Fields) {
           if (field.IsCompileTimeOnly) {
             continue;
@@ -87,29 +66,23 @@ namespace NanoGraph {
               func.RequiresConvert(inputLocal.Value.Type, field.Type)) {
             func.AddStatement($"{returnLocal}.{resultType.GetField(field.Name)}.w = {func.EmitLiteral(1.0f)};");
           }
-
-          arraySizesFunc.AddStatement($"{returnSizesLocal}.{arraySizeResultType.GetField(field.Name)} = {inputLocal?.ArraySizeIdentifier};");
         }
         func.AddStatement($"return {returnLocal};");
-        arraySizesFunc.AddStatement($"return {returnSizesLocal};");
         // Depending directly on the output of a vertex shader is invalid.
         // Only fragment shaders can depend on vertex shader outputs.
-        result = new CodeCachedResult { ResultType = resultType, ArraySizesResultType = arraySizeResultType };
+        result = new CodeCachedResult { ResultType = resultType };
       }
 
       public override void EmitValidateCacheFunction() {
         validateCacheFunction = program.AddFunction($"Update_{computeNode.ShortName}", NanoProgram.CpuContext, program.VoidType);
-        validateCacheFunction.AddStatement($"{validateSizesCacheFunction.Identifier}();");
         // All pipeline code goes in the fragment shader node.
       }
 
 
       protected override void EmitLoadOutput(CodeContext context, string fieldName, int inputIndex, CodeLocal intoLocal) {
         string outputLocal = intoLocal.Identifier;
-        string outputSizeLocal = intoLocal.ArraySizeIdentifier;
         // TODO: Unwind this. Caller can provide expression.
         context.Function.AddStatement($"{context.Function.GetTypeIdentifier(intoLocal.Type)} {outputLocal} = vertexData.{program.GetProgramType(cachedResult.Type).GetField(fieldName)};");
-        context.ArraySizeFunction.AddStatement($"{NanoProgram.IntIdentifier} {outputSizeLocal} = {cachedResult.ArraySizeIdentifier}.{arraySizeResultType.GetField(fieldName)};");
       }
     }
   }

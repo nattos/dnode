@@ -271,28 +271,5 @@ namespace NanoGraph.Plugin {
       _threadFlag.Set();
       _thread.Join();
     }
-
-    // [UnityEditor.MenuItem("Do/Plugin Stuff")]
-    // public async static void DoPluginStuff() {
-    //   // SharedTexture texture = Instance.CreateTexture(1920, 1080);
-
-    //   using (var server = new Server()) {
-    //     // server.SendRequest(new Request {
-    //     //   GetDefinition = new GetDefinitionRequest {}
-    //     // }, MakeRequestHandler<GetDefinitionResponse>(response => UnityEngine.Debug.Log(response)));
-    //     // server.SendRequest(new Request {
-    //     //   GetDefinition = new GetDefinitionRequest {}
-    //     // });
-    //     // System.Threading.Thread.Sleep(1000);
-
-    //     UnityEngine.Debug.Log(Newtonsoft.Json.JsonConvert.SerializeObject(await server.GetDefinition()));
-    //     UnityEngine.Debug.Log(Newtonsoft.Json.JsonConvert.SerializeObject(await server.GetParameters()));
-    //     UnityEngine.Debug.Log(Newtonsoft.Json.JsonConvert.SerializeObject(await server.SetParametersRequest(new[] {
-    //       new KeyValuePair<string, double>("My Param", 5.0),
-    //     })));
-    //     UnityEngine.Debug.Log(Newtonsoft.Json.JsonConvert.SerializeObject(await server.GetParameters()));
-
-    //   }
-    // }
   }
 }

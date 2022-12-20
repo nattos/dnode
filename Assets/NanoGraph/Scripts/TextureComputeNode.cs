@@ -37,8 +37,6 @@ namespace NanoGraph {
     public override DataSpec InputSpec => DataSpec.FromFields(DataField.MakePrimitive("Color", PrimitiveType.Float4));
     public override DataSpec OutputSpec => DataSpec.FromFields(new DataField { Name = "Out", Type = TypeSpec.MakePrimitive(PrimitiveType.Texture) });
 
-    public override DataSpec AuxSizesOutputSpec => DataSpec.FromFields(DataField.MakePrimitive("GridSizeX", PrimitiveType.Uint), DataField.MakePrimitive("GridSizeY", PrimitiveType.Uint));
-
     public override IComputeNodeEmitCodeOperation CreateEmitCodeOperation(ComputeNodeEmitCodeOperationContext context) => new EmitterGpu(this, context);
   
     private class EmitterGpu : EmitterBase {
@@ -53,12 +51,10 @@ namespace NanoGraph {
       public CodeCachedResult codeCachedResult;
       private ComputeInput? autoSizeModeInput = null;
 
-      public override void EmitFunctionPreamble(out NanoFunction func, out NanoFunction arraySizesFunc) {
+      public override void EmitFunctionPreamble(out NanoFunction func) {
         // Begin generating the main results function.
         string[] functionModifiers = { "kernel" };
         this.func = func = program.AddFunction(computeNode.ShortName, computeNode.CodeContext, program.VoidType, functionModifiers);
-        this.arraySizesFunc = arraySizesFunc = program.AddFunction($"{computeNode.ShortName}_Sizes", NanoProgram.CpuContext, arraySizeResultType);
-
 
         // Determine which input texture to base grid size.
         ComputeInput[] computeInputs = CollectComputeInputs(DependentComputeInputsToLoad).ToArray();
@@ -96,9 +92,7 @@ namespace NanoGraph {
 
       public override void EmitFunctionReturn(out CodeCachedResult? result) {
         // Store results.
-        string returnSizesLocal = arraySizesFunc.AllocLocal("Return");
-        this.codeCachedResult = new CodeCachedResult { ResultType = resultType, ArraySizesResultType = arraySizeResultType, Result = new CodeLocal { Identifier = cachedResult.Identifier, Type = resultTypeSpec, ArraySizeIdentifier = cachedResult.ArraySizeIdentifier } };
-        arraySizesFunc.AddStatement($"{arraySizesFunc.GetTypeIdentifier(arraySizeResultType)} {returnSizesLocal};");
+        this.codeCachedResult = new CodeCachedResult { ResultType = resultType, Result = new CodeLocal { Identifier = cachedResult.Identifier, Type = resultTypeSpec } };
 
         var outputColorSourceEdge = graph.GetEdgeToDestinationOrNull(new DataPlug { Node = Node, FieldName = "Color" });
         if (outputColorSourceEdge == null ||
@@ -109,6 +103,12 @@ namespace NanoGraph {
         }
         var outputColorBuffer = gpuOutputBuffers.First(buffer => buffer.FieldName == "Out");
         func.AddStatement($"WriteTexture({outputColorBuffer.Expression}, gid_xy_uint, {outputColorLocal.Identifier});");
+        result = codeCachedResult;
+      }
+
+      public override void EmitValidateCacheFunction() {
+        validateCacheFunction = program.AddFunction($"Update_{computeNode.ShortName}", NanoProgram.CpuContext, program.VoidType);
+        string pipelineStateIdentifier = program.AddInstanceField(program.MTLComputePipelineStateType, $"{computeNode.ShortName}_GpuPipeline");
 
         string gridSizeExpr = null;
         switch (Node.SizeMode) {
@@ -123,22 +123,10 @@ namespace NanoGraph {
             // TODO.
             throw new NotImplementedException();
         }
-        string gridSizeLocal = arraySizesFunc.AllocLocal("GridSize");
-        arraySizesFunc.AddStatement($"{program.Uint2Type.Identifier} {gridSizeLocal} = ({program.Uint2Type.Identifier}){gridSizeExpr};");
-        arraySizesFunc.AddStatement($"{returnSizesLocal}.{arraySizeResultType.GetField("GridSizeX")} = {gridSizeLocal}.x;");
-        arraySizesFunc.AddStatement($"{returnSizesLocal}.{arraySizeResultType.GetField("GridSizeY")} = {gridSizeLocal}.y;");
-        arraySizesFunc.AddStatement($"return {returnSizesLocal};");
-        result = codeCachedResult;
-      }
-
-      public override void EmitValidateCacheFunction() {
-        validateCacheFunction = program.AddFunction($"Update_{computeNode.ShortName}", NanoProgram.CpuContext, program.VoidType);
-        validateCacheFunction.AddStatement($"{validateSizesCacheFunction.Identifier}();");
-        string pipelineStateIdentifier = program.AddInstanceField(program.MTLComputePipelineStateType, $"{computeNode.ShortName}_GpuPipeline");
-
-        string gridSizeXExpr = $"{codeCachedResult.Result.ArraySizeIdentifier}.{codeCachedResult.ArraySizesResultType.GetField("GridSizeX")}";
-        string gridSizeYExpr = $"{codeCachedResult.Result.ArraySizeIdentifier}.{codeCachedResult.ArraySizesResultType.GetField("GridSizeY")}";
+        string gridSizeXExpr = $"({gridSizeExpr}).x";
+        string gridSizeYExpr = $"({gridSizeExpr}).y";
         string totalThreadCountExpr = $"(({gridSizeXExpr}) * ({gridSizeYExpr}))";
+
         foreach (var dependency in dependentComputeNodes.Where(dependency => dependency.Operation is ISplitComputeNodeEmitCodeOperation)) {
           var op = dependency.Operation as ISplitComputeNodeEmitCodeOperation;
           op?.EmitPreValidateCache(validateCacheFunction, Node, totalThreadCountExpr);

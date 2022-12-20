@@ -8,21 +8,17 @@ namespace NanoGraph {
   public struct CodeLocal {
     public string Identifier;
     public TypeSpec Type;
-    public string ArraySizeIdentifier;
   }
 
   public struct CodeContext {
     public NanoFunction Function;
-    public NanoFunction ArraySizeFunction;
     public IReadOnlyList<CodeLocal> InputLocals;
-    // public IReadOnlyList<DataField> CompileTimeOnlyInputs;
     public IReadOnlyList<CodeLocal> OutputLocals;
     public List<string> Errors;
   }
 
   public struct CodeCachedResult {
     public NanoProgramType ResultType;
-    public NanoProgramType ArraySizesResultType;
     public CodeLocal Result;
   }
 
@@ -55,11 +51,10 @@ namespace NanoGraph {
 
   public interface IComputeNodeEmitCodeOperation {
     void EmitFunctionSignature();
-    void EmitFunctionPreamble(out NanoFunction func, out NanoFunction arraySizesFunc);
+    void EmitFunctionPreamble(out NanoFunction func);
     void EmitLoadFunctionInputs();
     void ConsumeFunctionBodyResult(IReadOnlyDictionary<DataPlug, CodeLocal> resultLocalMap);
     void EmitFunctionReturn(out CodeCachedResult? result);
-    void EmitValidateSizesCacheFunction();
     void EmitValidateCacheFunction();
     void EmitExecuteFunctionCode();
 
@@ -71,7 +66,6 @@ namespace NanoGraph {
   public interface IComputeNode : IDataNode {
     DataSpec ComputeInputSpec { get; }
     DataSpec ComputeOutputSpec { get; }
-    DataSpec AuxSizesOutputSpec { get; }
     INanoCodeContext CodeContext { get; }
     IComputeNodeEmitCodeOperation CreateEmitCodeOperation(ComputeNodeEmitCodeOperationContext context);
   }
