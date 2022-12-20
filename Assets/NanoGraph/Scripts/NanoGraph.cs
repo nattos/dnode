@@ -427,6 +427,47 @@ namespace NanoGraph {
       void EmitPreambleCode(CodeContext context);
       void EmitCode(CodeContext context);
       void EmitValidateCacheCode(NanoFunction validateCacheFunction, NanoFunction originalFunction);
+
+      public static void WrapCodeInConditional(ICodeGenerator generator, CodeContext context, Action<CodeContext> emitInnerCodeHandler) {
+        // Wrap code in a condition if it is conditional.
+        CodeContext innerContext = context;
+        var conditions = generator.Conditions;
+        bool hasConditions = conditions.Count > 0;
+        List<(string outer, string inner)> conditionalOutputs = null;
+        if (hasConditions) {
+          // Generate temporary variables outside of the scope of the if.
+          conditionalOutputs = new List<(string, string)>();
+          var innerOutputLocals = new List<CodeLocal>();
+          innerContext.OutputLocals = innerOutputLocals;
+          foreach (var output in context.OutputLocals) {
+            string conditionalOutput = output.Identifier;
+            string innerOutput = context.Function.AllocLocal("Tmp");
+            context.Function.AddStatement($"{context.Function.GetTypeIdentifier(output.Type)} {conditionalOutput};");
+            conditionalOutputs.Add((conditionalOutput, innerOutput));
+            innerOutputLocals.Add(new CodeLocal { Identifier = innerOutput, Type = output.Type });
+          }
+
+          // Generate the conditional expression itself.
+          string conditionExpr = string.Join(" || ", conditions.Select(entry => {
+            if (entry.generator is CodeGeneratorFromCodeNode generator) {
+              return $"({generator.InputsUsedOutputLocals[entry.inputIndex].Identifier})";
+            }
+            return context.Function.EmitLiteral(false);
+          }));
+
+          context.Function.AddStatement($"if ({conditionExpr}) {{");
+        }
+
+        emitInnerCodeHandler(innerContext);
+
+        if (hasConditions) {
+          // Copy results into temps vars.
+          foreach ((string outer, string inner) in conditionalOutputs) {
+            context.Function.AddStatement($"  {outer} = std::move({inner});");
+          }
+          context.Function.AddStatement($"}}");
+        }
+      }
     }
 
     private class CodeGeneratorFromCodeNode : ICodeGenerator {
@@ -473,43 +514,7 @@ namespace NanoGraph {
         }
       }
       public void EmitCode(CodeContext context) {
-        // Wrap code in a condition if it is conditional.
-        CodeContext innerContext = context;
-        bool hasConditions = Conditions.Count > 0;
-        List<(string outer, string inner)> conditionalOutputs = null;
-        if (hasConditions) {
-          // Generate temporary variables outside of the scope of the if.
-          conditionalOutputs = new List<(string, string)>();
-          var innerOutputLocals = new List<CodeLocal>();
-          innerContext.OutputLocals = innerOutputLocals;
-          foreach (var output in context.OutputLocals) {
-            string conditionalOutput = output.Identifier;
-            string innerOutput = context.Function.AllocLocal("Tmp");
-            context.Function.AddStatement($"{context.Function.GetTypeIdentifier(output.Type)} {conditionalOutput};");
-            conditionalOutputs.Add((conditionalOutput, innerOutput));
-            innerOutputLocals.Add(new CodeLocal { Identifier = innerOutput, Type = output.Type });
-          }
-
-          // Generate the conditional expression itself.
-          string conditionExpr = string.Join(" || ", Conditions.Select(entry => {
-            if (entry.generator is CodeGeneratorFromCodeNode generator) {
-              return $"({generator.InputsUsedOutputLocals[entry.inputIndex].Identifier})";
-            }
-            return context.Function.EmitLiteral(false);
-          }));
-
-          context.Function.AddStatement($"if ({conditionExpr}) {{");
-        }
-
-        Node.EmitCode(innerContext);
-
-        if (hasConditions) {
-          // Copy results into temps vars.
-          foreach ((string outer, string inner) in conditionalOutputs) {
-            context.Function.AddStatement($"  {outer} = std::move({inner});");
-          }
-          context.Function.AddStatement($"}}");
-        }
+        ICodeGenerator.WrapCodeInConditional(this, context, innerContext => Node.EmitCode(innerContext));
       }
 
       public void EmitValidateCacheCode(NanoFunction validateCacheFunction, NanoFunction originalFunction) {}
@@ -542,7 +547,8 @@ namespace NanoGraph {
           context.Errors.Add($"Dependent node {Node} has not been defined yet.");
           return;
         }
-        Operation.EmitLoadInputsForDescendantNode(Root, context);
+
+        ICodeGenerator.WrapCodeInConditional(this, context, innerContext => Operation.EmitLoadInputsForDescendantNode(Root, innerContext));
       }
 
       public void EmitValidateCacheCode(NanoFunction validateCacheFunction, NanoFunction originalFunction) {
