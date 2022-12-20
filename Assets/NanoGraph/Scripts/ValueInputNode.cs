@@ -52,8 +52,8 @@ namespace NanoGraph {
         this.valueInputKey = program.AllocateValueInput(Node.Name, Node.DefaultValue, Node.MinValue, Node.MaxValue);
       }
 
-      public override void EmitValidateCacheFunction() {
-        base.EmitValidateCacheFunction();
+      public override void EmitValidateCacheFunctionInner() {
+        base.EmitValidateCacheFunctionInner();
         string inputExpr = $"GetValueInput({validateCacheFunction.EmitLiteral(valueInputKey)})";
         var fieldName = resultType.GetField("Out");
         validateCacheFunction.AddStatement($"{cachedResult.Identifier}.{fieldName} = ({validateCacheFunction.GetTypeIdentifier(Node.ValueType)}){inputExpr};");

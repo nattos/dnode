@@ -25,8 +25,8 @@ namespace NanoGraph {
         this.textureInputIndex = program.AllocateTextureInput();
       }
 
-      public override void EmitValidateCacheFunction() {
-        base.EmitValidateCacheFunction();
+      public override void EmitValidateCacheFunctionInner() {
+        base.EmitValidateCacheFunctionInner();
         string inputExpr = $"GetTextureInput({validateCacheFunction.EmitLiteral(textureInputIndex)})";
         var fieldName = resultType.GetField("Out");
         validateCacheFunction.AddStatement($"{cachedResult.Identifier}.{fieldName} = {inputExpr};");

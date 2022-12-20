@@ -6,8 +6,10 @@ using UnityEngine;
 
 namespace NanoGraph {
   public enum ExecutionMode {
-    // Cache and update at most once a frame.
+    // Cache and update at most once a frame, only if the output is used.
     OncePerFrame,
+    // Cache and update at once a frame, even if the result is not used.
+    OncePerFrameAlways,
     // Execute and cache first time requested.
     Once,
     // Execute and cache at program start.
@@ -15,6 +17,11 @@ namespace NanoGraph {
     // Only update when trigger signal sent, or first time requested.
     OnTrigger,
     // Do not cache. Executes everytime value is polled.
+    OnDemand,
+  }
+
+  public enum ExecuteFunctionContextType {
+    GlobalFrameStep,
     OnDemand,
   }
 
@@ -83,11 +90,7 @@ namespace NanoGraph {
     }
 
     public abstract INanoCodeContext CodeContext { get; }
-
     public abstract IComputeNodeEmitCodeOperation CreateEmitCodeOperation(ComputeNodeEmitCodeOperationContext context);
-
-
-
 
 
     public abstract class EmitterBase : IComputeNodeEmitCodeOperation {
@@ -96,7 +99,6 @@ namespace NanoGraph {
         errors = context.errors;
         graph = context.graph;
         program = context.program;
-        executeFunction = context.executeFunction;
         createPipelinesFunction = context.createPipelinesFunction;
         dependentComputeNodes = context.dependentComputeNodes;
         dependentComputeInputs = context.dependentComputeInputs;
@@ -109,12 +111,11 @@ namespace NanoGraph {
       public readonly NanoProgram program;
 
       public NanoFunction func;
-      public NanoFunction validateCacheFunction;
+      public NanoFunction validateCacheFunction { get; private set; }
       public TypeSpec resultTypeSpec { get; private set; }
       public NanoProgramType resultType { get; private set; }
       public DataSpec computeOutputSpec { get; private set; }
 
-      public readonly NanoFunction executeFunction;
       public readonly NanoFunction createPipelinesFunction;
 
       public readonly IReadOnlyList<ComputeNodeResultEntry> dependentComputeNodes;
@@ -125,6 +126,9 @@ namespace NanoGraph {
       public Dictionary<IComputeNode, List<(DataField field, int inputIndex)>> descendantInputs = new Dictionary<IComputeNode, List<(DataField field, int inputIndex)>>();
 
       public CodeLocal cachedResult { get; private set; }
+
+      private string _lastUpdateFrameNumberIdentifier;
+      private string _didInitializeFlagIdentifier;
 
       protected virtual IEnumerable<DataPlug> DependentComputeInputsToLoad => dependentComputeInputs;
 
@@ -139,6 +143,15 @@ namespace NanoGraph {
         // Define a field to hold the cached result.
         string cachedResultIdentifier = program.AddInstanceField(resultType, $"Result_{computeNode.ShortName}");
         this.cachedResult = new CodeLocal { Type = resultTypeSpec, Identifier = cachedResultIdentifier };
+
+        if (NeedsLastUpdateFrameNumber) {
+          this._lastUpdateFrameNumberIdentifier = program.AddInstanceField(program.IntType, "LastFrameNumber");
+          createPipelinesFunction.AddStatement($"{_lastUpdateFrameNumberIdentifier} = {createPipelinesFunction.EmitLiteral(-1)};");
+        }
+        if (NeedsDidInitializeFlag) {
+          this._didInitializeFlagIdentifier = program.AddInstanceField(program.BoolType, "DidInitialize");
+          createPipelinesFunction.AddStatement($"{_didInitializeFlagIdentifier} = {createPipelinesFunction.EmitLiteral(false)};");
+        }
       }
 
       public abstract void EmitFunctionPreamble(out NanoFunction func);
@@ -155,10 +168,60 @@ namespace NanoGraph {
       }
       public abstract void EmitFunctionReturn(out CodeCachedResult? result);
 
-      public abstract void EmitValidateCacheFunction();
+      public virtual void EmitValidateCacheFunction(NanoFunction validateCacheFunction) {
+        this.validateCacheFunction = validateCacheFunction;
+        switch (computeNode.ExecutionMode) {
+          case ExecutionMode.OncePerFrame:
+          case ExecutionMode.OncePerFrameAlways: {
+            string frameNumberLocal = validateCacheFunction.AllocLocal("FrameNumber");
+            validateCacheFunction.AddStatement($"{NanoProgram.IntIdentifier} {frameNumberLocal} = GetFrameNumber();");
+            validateCacheFunction.AddStatement($"if ({_didInitializeFlagIdentifier} && {_lastUpdateFrameNumberIdentifier} == {frameNumberLocal}) {{");
+            validateCacheFunction.AddStatement($"  return;");
+            validateCacheFunction.AddStatement($"}}");
+            validateCacheFunction.AddStatement($"{_didInitializeFlagIdentifier} = {validateCacheFunction.EmitLiteral(true)};");
+            validateCacheFunction.AddStatement($"{_lastUpdateFrameNumberIdentifier} = {frameNumberLocal};");
+            break;
+          }
+          case ExecutionMode.Once:
+          case ExecutionMode.OnceOnStart:
+            validateCacheFunction.AddStatement($"if ({_didInitializeFlagIdentifier}) {{");
+            validateCacheFunction.AddStatement($"  return;");
+            validateCacheFunction.AddStatement($"}}");
+            validateCacheFunction.AddStatement($"{_didInitializeFlagIdentifier} = {validateCacheFunction.EmitLiteral(true)};");
+            break;
+          case ExecutionMode.OnTrigger:
+          case ExecutionMode.OnDemand:
+            break;
+        }
+        EmitValidateCacheFunctionInner();
+      }
 
-      public void EmitExecuteFunctionCode() {
-        executeFunction.AddStatement($"{validateCacheFunction.Identifier}();");
+      public abstract void EmitValidateCacheFunctionInner();
+
+      public bool NeedsLastUpdateFrameNumber =>
+          computeNode.ExecutionMode == ExecutionMode.OncePerFrame ||
+          computeNode.ExecutionMode == ExecutionMode.OncePerFrameAlways;
+      public bool NeedsDidInitializeFlag =>
+          computeNode.ExecutionMode == ExecutionMode.OncePerFrame ||
+          computeNode.ExecutionMode == ExecutionMode.OncePerFrameAlways ||
+          computeNode.ExecutionMode == ExecutionMode.Once ||
+          computeNode.ExecutionMode == ExecutionMode.OnceOnStart;
+
+      public void EmitExecuteFunctionCode(NanoFunction inFunction, ExecuteFunctionContextType contextType) {
+        switch (contextType) {
+          case ExecuteFunctionContextType.GlobalFrameStep:
+            if (computeNode.ExecutionMode == ExecutionMode.OncePerFrameAlways ||
+                computeNode.ExecutionMode == ExecutionMode.OnceOnStart) {
+              inFunction.AddStatement($"{validateCacheFunction.Identifier}();");
+            }
+            break;
+          case ExecuteFunctionContextType.OnDemand:
+          default:
+            if (inFunction.Context is NanoCpuContext) {
+              inFunction.AddStatement($"{validateCacheFunction.Identifier}();");
+            }
+            break;
+        }
       }
 
       public void RecordLoadInputForDescendantNode(IComputeNode descendant, DataField field, int inputIndex) {
@@ -180,6 +243,7 @@ namespace NanoGraph {
         if (!descendantInputs.TryGetValue(descendant, out var inputs)) {
           return;
         }
+        EmitExecuteFunctionCode(context.Function, ExecuteFunctionContextType.OnDemand);
 
         int index = 0;
         foreach (var input in inputs) {
@@ -187,6 +251,15 @@ namespace NanoGraph {
           var inputIndex = input.inputIndex;
           var intoLocal = context.OutputLocals[index++];
           EmitLoadOutput(context, fieldName, inputIndex, intoLocal);
+        }
+      }
+ 
+      public void EmitValidateInputsForDescendantNode(IComputeNode descendant, NanoFunction validateCacheFunction, NanoFunction originalFunction) {
+        if (!descendantInputs.TryGetValue(descendant, out var inputs)) {
+          return;
+        }
+        if (originalFunction.Context is NanoGpuContext) {
+          EmitExecuteFunctionCode(validateCacheFunction, ExecuteFunctionContextType.OnDemand);
         }
       }
 

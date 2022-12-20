@@ -82,8 +82,8 @@ namespace NanoGraph {
         this.instanceFieldIdentifier = program.AddInstanceField(program.GetProgramType(Node.StorageType, "Latch"), Node.ShortName);
       }
 
-      public override void EmitValidateCacheFunction() {
-        base.EmitValidateCacheFunction();
+      public override void EmitValidateCacheFunctionInner() {
+        base.EmitValidateCacheFunctionInner();
         var fieldName = resultType.GetField("Out");
         validateCacheFunction.AddStatement($"{cachedResult.Identifier}.{fieldName} = {instanceFieldIdentifier};");
 

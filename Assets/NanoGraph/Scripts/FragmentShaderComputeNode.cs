@@ -88,13 +88,10 @@ namespace NanoGraph {
         result = new CodeCachedResult { ResultType = resultType, Result = new CodeLocal { Identifier = cachedResult.Identifier, Type = resultTypeSpec } };
       }
 
-      public override void EmitValidateCacheFunction() {
+      public override void EmitValidateCacheFunctionInner() {
         string pipelineStateIdentifier = program.AddInstanceField(program.MTLRenderPipelineState, $"{computeNode.ShortName}_RenderPipeline");
         string renderPassDescriptorIdentifier = program.AddInstanceField(program.MTLRenderPassDescriptor, $"{computeNode.ShortName}_RenderPassDescriptor");
         string renderTargetIdentifier = program.AddInstanceField(program.Texture, $"{computeNode.ShortName}_RenderTarget");
-
-        validateCacheFunction = program.AddFunction($"Update_{computeNode.ShortName}", NanoProgram.CpuContext, program.VoidType);
-
 
         // Identify which vertex shader is the input.
         VertexShaderComputeNode vertexNode = this.vertexNode;

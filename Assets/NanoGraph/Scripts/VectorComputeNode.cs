@@ -127,8 +127,7 @@ namespace NanoGraph {
         }
       }
 
-      public override void EmitValidateCacheFunction() {
-        validateCacheFunction = program.AddFunction($"Update_{computeNode.ShortName}", NanoProgram.CpuContext, program.VoidType);
+      public override void EmitValidateCacheFunctionInner() {
         string pipelineStateIdentifier = program.AddInstanceField(program.MTLComputePipelineStateType, $"{computeNode.ShortName}_GpuPipeline");
 
         // Sync buffers to GPU.

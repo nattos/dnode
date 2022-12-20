@@ -188,6 +188,7 @@ public:
     [_currentCommandBuffer commit];
     _currentCommandBuffer = nullptr;
     SetCurrentInstance(nullptr);
+    ++_frameNumber;
   }
 
   void EnsureResources() {
@@ -257,6 +258,8 @@ public:
   void SetCommandQueue(id<MTLCommandQueue> value) { _commandQueue = value; }
   id<MTLCommandBuffer> GetCurrentCommandBuffer() const { return _currentCommandBuffer; }
 
+  int GetFrameNumber() const { return _frameNumber; }
+
   static void SetCurrentInstance(NanoProgram* ptr) {
     NSThread* thread = [NSThread currentThread];
     [_threadMapLock lock];
@@ -292,6 +295,8 @@ private:
   bool _createdPipelines = false;
   std::vector<double> _valueInputs;
   std::vector<id<MTLTexture>> _inputTextures;
+
+  int _frameNumber = 0;
 
   static NSLock* _threadMapLock;
   static std::unique_ptr<std::map<NSThread*, NanoProgram*>> _threadMap;

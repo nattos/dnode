@@ -73,8 +73,7 @@ namespace NanoGraph {
         result = new CodeCachedResult { ResultType = resultType };
       }
 
-      public override void EmitValidateCacheFunction() {
-        validateCacheFunction = program.AddFunction($"Update_{computeNode.ShortName}", NanoProgram.CpuContext, program.VoidType);
+      public override void EmitValidateCacheFunctionInner() {
         // All pipeline code goes in the fragment shader node.
       }
 

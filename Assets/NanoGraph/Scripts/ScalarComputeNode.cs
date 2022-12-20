@@ -81,8 +81,7 @@ namespace NanoGraph {
         result = new CodeCachedResult { ResultType = resultType, Result = new CodeLocal { Identifier = cachedResult.Identifier, Type = resultTypeSpec } };
       }
 
-      public override void EmitValidateCacheFunction() {
-        validateCacheFunction = program.AddFunction($"Update_{computeNode.ShortName}", NanoProgram.CpuContext, program.VoidType);
+      public override void EmitValidateCacheFunctionInner() {
         // Treat buffers correctly.
         foreach (var dependency in dependentComputeNodes) {
           if (dependency.Result == null) {

@@ -426,6 +426,7 @@ namespace NanoGraph {
       IReadOnlyList<(ICodeGenerator generator, int inputIndex)> Conditions { get; set; }
       void EmitPreambleCode(CodeContext context);
       void EmitCode(CodeContext context);
+      void EmitValidateCacheCode(NanoFunction validateCacheFunction, NanoFunction originalFunction);
     }
 
     private class CodeGeneratorFromCodeNode : ICodeGenerator {
@@ -510,6 +511,8 @@ namespace NanoGraph {
           context.Function.AddStatement($"}}");
         }
       }
+
+      public void EmitValidateCacheCode(NanoFunction validateCacheFunction, NanoFunction originalFunction) {}
     }
 
     private class CodeGeneratorFromComputeNode : ICodeGenerator {
@@ -540,6 +543,10 @@ namespace NanoGraph {
           return;
         }
         Operation.EmitLoadInputsForDescendantNode(Root, context);
+      }
+
+      public void EmitValidateCacheCode(NanoFunction validateCacheFunction, NanoFunction originalFunction) {
+        Operation.EmitValidateInputsForDescendantNode(Root, validateCacheFunction, originalFunction);
       }
     }
 
@@ -911,7 +918,6 @@ namespace NanoGraph {
             errors = errors,
             graph = this,
             program = program,
-            executeFunction = executeFunction,
             createPipelinesFunction = createPipelinesFunction,
             dependentComputeNodes = dependentComputeNodeResults,
             dependentComputeInputs = dependentComputeInputs,
@@ -1026,8 +1032,17 @@ namespace NanoGraph {
 
         emitOp.ConsumeFunctionBodyResult(resultLocalMap);
         emitOp.EmitFunctionReturn(out CodeCachedResult? codeCachedResult);
-        emitOp.EmitValidateCacheFunction();
-        emitOp.EmitExecuteFunctionCode();
+
+        NanoFunction validateCacheFunction = program.AddFunction($"Update_{computeNode.ShortName}", NanoProgram.CpuContext, program.VoidType);
+        foreach ((ICodeGenerator codeGenerator, bool isPreamble) in computePlan) {
+          if (isPreamble) {
+            continue;
+          }
+          codeGenerator.EmitValidateCacheCode(validateCacheFunction, func);
+        }
+        emitOp.EmitValidateCacheFunction(validateCacheFunction);
+        emitOp.EmitExecuteFunctionCode(executeFunction, ExecuteFunctionContextType.GlobalFrameStep);
+
         computeNodeResults[computeNode] = (codeCachedResult, emitOp);
       }
 
@@ -1039,6 +1054,7 @@ namespace NanoGraph {
           errors.Add($"Missing result for output node {outputNode}");
           continue;
         }
+        cachedResult.op.EmitExecuteFunctionCode(executeFunction, ExecuteFunctionContextType.OnDemand);
         foreach (var field in outputSpec.Fields) {
           if (field.IsCompileTimeOnly) {
             continue;

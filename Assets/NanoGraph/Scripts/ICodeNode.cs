@@ -42,7 +42,6 @@ namespace NanoGraph {
     public NanoGraph graph;
     public NanoProgram program;
 
-    public NanoFunction executeFunction;
     public NanoFunction createPipelinesFunction;
 
     public IReadOnlyList<ComputeNodeResultEntry> dependentComputeNodes;
@@ -55,12 +54,13 @@ namespace NanoGraph {
     void EmitLoadFunctionInputs();
     void ConsumeFunctionBodyResult(IReadOnlyDictionary<DataPlug, CodeLocal> resultLocalMap);
     void EmitFunctionReturn(out CodeCachedResult? result);
-    void EmitValidateCacheFunction();
-    void EmitExecuteFunctionCode();
+    void EmitValidateCacheFunction(NanoFunction validateCacheFunction);
+    void EmitExecuteFunctionCode(NanoFunction inFunction, ExecuteFunctionContextType contextType);
 
     void RecordLoadInputForDescendantNode(IComputeNode descendant, DataField field, int inputIndex);
     DataField[] GetInputsForDescendantNode(IComputeNode descendant);
     void EmitLoadInputsForDescendantNode(IComputeNode descendant, CodeContext context);
+    void EmitValidateInputsForDescendantNode(IComputeNode descendant, NanoFunction validateCacheFunction, NanoFunction originalFunction);
   }
 
   public interface IComputeNode : IDataNode {
