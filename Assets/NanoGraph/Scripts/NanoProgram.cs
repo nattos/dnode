@@ -395,6 +395,7 @@ namespace NanoGraph {
     public readonly NanoProgramType VoidType;
     public readonly NanoProgramType BoolType;
     public readonly NanoProgramType IntType;
+    public readonly NanoProgramType Int2Type;
     public readonly NanoProgramType UintType;
     public readonly NanoProgramType Uint2Type;
     public readonly NanoProgramType FloatType;
@@ -412,6 +413,7 @@ namespace NanoGraph {
       _types.Add(VoidType = NanoProgramType.MakeBuiltIn(this, "void"));
       _types.Add(BoolType = NanoProgramType.MakeBuiltIn(this, "bool"));
       _types.Add(IntType = NanoProgramType.MakeBuiltIn(this, IntIdentifier));
+      _types.Add(Int2Type = NanoProgramType.MakeBuiltIn(this, "vector_int2"));
       _types.Add(UintType = NanoProgramType.MakeBuiltIn(this, UintIdentifier));
       _types.Add(Uint2Type = NanoProgramType.MakeBuiltIn(this, "vector_uint2"));
       _types.Add(FloatType = NanoProgramType.MakeBuiltIn(this, "float"));

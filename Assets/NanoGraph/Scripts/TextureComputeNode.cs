@@ -7,7 +7,16 @@ using UnityEngine;
 namespace NanoGraph {
   public enum TextureComputeSizeMode {
     Auto,
+    PatchSize,
     Custom,
+  }
+
+  public enum TextureComputeSizeMultiplier {
+    Full,
+    Half,
+    Quarter,
+    OneEighth,
+    Double,
   }
 
   public enum TextureComputeOutputMode {
@@ -27,6 +36,8 @@ namespace NanoGraph {
     public TextureComputeSizeMode SizeMode = TextureComputeSizeMode.Auto;
     // TODO: Support multiple output modes.
     [EditableAttribute]
+    public TextureComputeSizeMultiplier SizeMultiplier = TextureComputeSizeMultiplier.Full;
+    [EditableAttribute]
     public TextureComputeOutputMode OutputMode = TextureComputeOutputMode.TextureOnly;
     [EditableAttribute]
     // TODO: Support multiple output formats.
@@ -34,11 +45,26 @@ namespace NanoGraph {
 
     public override INanoCodeContext CodeContext => NanoProgram.GpuContext;
 
-    public override DataSpec InputSpec => DataSpec.FromFields(DataField.MakePrimitive("Color", PrimitiveType.Float4));
+    public override DataSpec InputSpec => DataSpec.FromFields(TextureSizeFields.Concat(InputFields).ToArray());
+    public override DataSpec ComputeInputSpec => DataSpec.FromFields(InputFields);
     public override DataSpec OutputSpec => DataSpec.FromFields(new DataField { Name = "Out", Type = TypeSpec.MakePrimitive(PrimitiveType.Texture) });
 
     public override IComputeNodeEmitCodeOperation CreateEmitCodeOperation(ComputeNodeEmitCodeOperationContext context) => new EmitterGpu(this, context);
   
+    public DataField[] InputFields => new[] { DataField.MakePrimitive("Color", PrimitiveType.Float4) };
+    public DataField[] TextureSizeFields {
+      get {
+        switch (SizeMode) {
+          case TextureComputeSizeMode.Auto:
+          case TextureComputeSizeMode.PatchSize:
+          default:
+            return Array.Empty<DataField>();
+          case TextureComputeSizeMode.Custom:
+            return new[] { DataField.MakePrimitive("Size", PrimitiveType.Float2) };
+        }
+      }
+    }
+
     private class EmitterGpu : EmitterBase {
       public readonly TextureComputeNode Node;
 
@@ -72,9 +98,6 @@ namespace NanoGraph {
             }
             break;
           }
-          case TextureComputeSizeMode.Custom:
-            // TODO.
-            throw new NotImplementedException();
         }
 
         // Load inputs.
@@ -102,28 +125,75 @@ namespace NanoGraph {
           return;
         }
         var outputColorBuffer = gpuOutputBuffers.First(buffer => buffer.FieldName == "Out");
-        func.AddStatement($"WriteTexture({outputColorBuffer.Expression}, gid_xy_uint, {outputColorLocal.Identifier});");
+        func.AddStatement($"WriteTexture({outputColorBuffer.Expression}, gid_xy_uint, {func.EmitConvert(outputColorLocal.Type, TypeSpec.MakePrimitive(PrimitiveType.Float4), outputColorLocal.Identifier)});");
         result = codeCachedResult;
+      }
+
+      private string GetInputExpr(string fieldName) {
+        var edge = graph.GetEdgeToDestinationOrNull(computeNode, fieldName);
+        if (edge == null) {
+          return null;
+        }
+        if (!(edge.Source.Node is IComputeNode sourceComputeNode)) {
+          errors.Add($"Node {computeNode} depends on an output that is not a compute node ({edge.Source.Node}).");
+          return null;
+        }
+        CodeCachedResult? sourceCachedResult = dependentComputeNodes.FirstOrNull(dependency => dependency.Node == sourceComputeNode)?.Result;
+        if (sourceCachedResult == null) {
+          errors.Add($"Node {computeNode} depends on a compute node that is not yet ready ({edge.Source.Node}).");
+          return null;
+        }
+
+        string inputExpr = $"{sourceCachedResult?.Result.Identifier}.{sourceCachedResult?.ResultType.GetField(edge.Source.FieldName)}";
+        return inputExpr;
+      }
+
+      private string EmitTextureSizeExpr(NanoFunction func) {
+        switch (Node.SizeMode) {
+          case TextureComputeSizeMode.Auto:
+            return $"GetTextureSize({autoSizeModeInput?.Expression})";
+          case TextureComputeSizeMode.PatchSize:
+          default:
+            return "OutputTextureSize";
+          case TextureComputeSizeMode.Custom:
+            return func.EmitConvert(func.Program.Float2Type, func.Program.Int2Type, GetInputExpr("Size"));
+        }
       }
 
       public override void EmitValidateCacheFunctionInner() {
         string pipelineStateIdentifier = program.AddInstanceField(program.MTLComputePipelineStateType, $"{computeNode.ShortName}_GpuPipeline");
 
-        string gridSizeExpr = null;
-        switch (Node.SizeMode) {
+        int sizeNumerator;
+        int sizeDenominator;
+        switch (Node.SizeMultiplier) {
+          case TextureComputeSizeMultiplier.Full:
           default:
-          case TextureComputeSizeMode.Auto: {
-            if (autoSizeModeInput != null) {
-              gridSizeExpr = $"GetTextureSize({autoSizeModeInput?.Expression})";
-            }
+            sizeNumerator = 1;
+            sizeDenominator = 1;
             break;
-          }
-          case TextureComputeSizeMode.Custom:
-            // TODO.
-            throw new NotImplementedException();
+          case TextureComputeSizeMultiplier.Half:
+            sizeNumerator = 1;
+            sizeDenominator = 2;
+            break;
+          case TextureComputeSizeMultiplier.Quarter:
+            sizeNumerator = 1;
+            sizeDenominator = 4;
+            break;
+          case TextureComputeSizeMultiplier.OneEighth:
+            sizeNumerator = 1;
+            sizeDenominator = 8;
+            break;
+          case TextureComputeSizeMultiplier.Double:
+            sizeNumerator = 2;
+            sizeDenominator = 1;
+            break;
         }
-        string gridSizeXExpr = $"({gridSizeExpr}).x";
-        string gridSizeYExpr = $"({gridSizeExpr}).y";
+
+        string gridSizeLocal = validateCacheFunction.AllocLocal("Size");
+        validateCacheFunction.AddStatement($"{validateCacheFunction.Program.Int2Type.Identifier} {gridSizeLocal} = {EmitTextureSizeExpr(validateCacheFunction)};");
+        string gridSizeExpr = gridSizeLocal;
+        string gridSizeXExpr = $"(({gridSizeExpr}).x * {sizeNumerator} / {sizeDenominator})";
+        string gridSizeYExpr = $"(({gridSizeExpr}).y * {sizeNumerator} / {sizeDenominator})";
         string totalThreadCountExpr = $"(({gridSizeXExpr}) * ({gridSizeYExpr}))";
 
         foreach (var dependency in dependentComputeNodes.Where(dependency => dependency.Operation is ISplitComputeNodeEmitCodeOperation)) {

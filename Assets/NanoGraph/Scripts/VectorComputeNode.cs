@@ -15,7 +15,7 @@ namespace NanoGraph {
     public override INanoCodeContext CodeContext => NanoProgram.GpuContext;
 
     public override DataSpec ComputeInputSpec => base.ComputeInputSpec;
-    public override DataSpec InputSpec => DataSpec.ExtendWithFields(base.InputSpec, ThreadCountFields);
+    public override DataSpec InputSpec => DataSpec.ExtendWithFields(ThreadCountFields, base.InputSpec);
 
     public override DataSpec OutputSpec {
       get {

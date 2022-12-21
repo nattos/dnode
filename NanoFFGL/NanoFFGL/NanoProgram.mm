@@ -179,6 +179,7 @@ public:
   virtual ~NanoProgram() {}
   
   MTLPixelFormat DefaultTextureFormat = MTLPixelFormatBGRA8Unorm_sRGB;
+  vector_int2 OutputTextureSize = vector_int2 { 1920, 1080 };
 
   void Run() {
     EnsureResources();
@@ -304,6 +305,8 @@ private:
 protected:
 
   id<MTLTexture> ResizeTexture(id<MTLTexture> originalTexture, int width, int height) {
+    width = std::max(1, width);
+    height = std::max(1, height);
     if (originalTexture && originalTexture.width == width && originalTexture.height == height) {
       return originalTexture;
     }
@@ -315,6 +318,16 @@ protected:
   template<typename TFrom, typename TTo> static inline TTo Convert(const TFrom& value) {
     return value;
   }
+  template<> inline vector_int2 Convert<vector_float2, vector_int2>(const vector_float2& value) {
+    return vector_int2 { Convert<float, int>(value.x), Convert<float, int>(value.y) };
+  }
+  template<> inline vector_int3 Convert<vector_float3, vector_int3>(const vector_float3& value) {
+    return vector_int3 { Convert<float, int>(value.x), Convert<float, int>(value.y), Convert<float, int>(value.z) };
+  }
+  template<> inline vector_int4 Convert<vector_float4, vector_int4>(const vector_float4& value) {
+    return vector_int4 { Convert<float, int>(value.x), Convert<float, int>(value.y), Convert<float, int>(value.z), Convert<float, int>(value.w) };
+  }
+
   template<typename TFrom, typename TTo> static inline std::shared_ptr<NanoTypedBuffer<TTo>> ConvertArray(const TFrom& value) {
     std::shared_ptr<NanoTypedBuffer<TTo>> result(NanoTypedBuffer<TTo>::Allocate(1));
     (*result)[0] = Convert<TFrom, TTo>(value);
@@ -330,6 +343,12 @@ protected:
 
   template<typename T> inline T copy_value(T value) { return value; }
 
+  static inline float modulo_op(int a, int b) { return (a % b); }
+  static inline float modulo_op(float a, float b) { return std::fmodf(a, b); }
+  static inline vector_float2 modulo_op(vector_float2 a, vector_float2 b) { return vector_float2 { modulo_op(a.x, b.x), modulo_op(a.y, b.y) }; }
+  static inline vector_float3 modulo_op(vector_float3 a, vector_float3 b) { return vector_float3 { modulo_op(a.x, b.x), modulo_op(a.y, b.y), modulo_op(a.z, b.z) }; }
+  static inline vector_float4 modulo_op(vector_float4 a, vector_float4 b) { return vector_float4 { modulo_op(a.x, b.x), modulo_op(a.y, b.y), modulo_op(a.z, b.z), modulo_op(a.w, b.w) }; }
+
   static inline float max(float a, float b) { return std::max(a, b); }
   static inline vector_float2 max(vector_float2 a, vector_float2 b) { return vector_float2 { std::max(a.x, b.x), std::max(a.y, b.y) }; }
   static inline vector_float3 max(vector_float3 a, vector_float3 b) { return vector_float3 { std::max(a.x, b.x), std::max(a.y, b.y), std::max(a.z, b.z) }; }
@@ -339,6 +358,11 @@ protected:
   static inline vector_float2 min(vector_float2 a, vector_float2 b) { return vector_float2 { std::min(a.x, b.x), std::min(a.y, b.y) }; }
   static inline vector_float3 min(vector_float3 a, vector_float3 b) { return vector_float3 { std::min(a.x, b.x), std::min(a.y, b.y), std::min(a.z, b.z) }; }
   static inline vector_float4 min(vector_float4 a, vector_float4 b) { return vector_float4 { std::min(a.x, b.x), std::min(a.y, b.y), std::min(a.z, b.z), std::min(a.w, b.w) }; }
+
+  static inline float lerp(float a, float b, float t) { return a * (1.0f - t) + b * t; }
+  static inline vector_float2 lerp(vector_float2 a, vector_float2 b, float t) { return vector_float2 { lerp(a.x, b.x, t), lerp(a.y, b.y, t) }; }
+  static inline vector_float3 lerp(vector_float3 a, vector_float3 b, float t) { return vector_float3 { lerp(a.x, b.x, t), lerp(a.y, b.y, t), lerp(a.z, b.z, t) }; }
+  static inline vector_float4 lerp(vector_float4 a, vector_float4 b, float t) { return vector_float4 { lerp(a.x, b.x, t), lerp(a.y, b.y, t), lerp(a.z, b.z, t), lerp(a.w, b.w, t) }; }
 
   static inline float pow(float a, float b) { return std::pow(a, b); }
   static inline vector_float2 pow(vector_float2 a, vector_float2 b) { return vector_float2 { std::pow(a.x, b.x), std::pow(a.y, b.y) }; }
@@ -360,10 +384,10 @@ protected:
   static inline vector_float3 abs(vector_float3 a) { return vector_float3 { std::abs(a.x), std::abs(a.y), std::abs(a.z) }; }
   static inline vector_float4 abs(vector_float4 a) { return vector_float4 { std::abs(a.x), std::abs(a.y), std::abs(a.z), std::abs(a.w) }; }
 
-  static inline float clamp(float a) { return std::max(0.0f, std::min(1.0f, a)); }
-  static inline vector_float2 clamp(vector_float2 a) { return vector_float2 { clamp(a.x), clamp(a.y) }; }
-  static inline vector_float3 clamp(vector_float3 a) { return vector_float3 { clamp(a.x), clamp(a.y), clamp(a.z) }; }
-  static inline vector_float4 clamp(vector_float4 a) { return vector_float4 { clamp(a.x), clamp(a.y), clamp(a.z), clamp(a.w) }; }
+  static inline float saturate(float a) { return std::max(0.0f, std::min(1.0f, a)); }
+  static inline vector_float2 saturate(vector_float2 a) { return vector_float2 { saturate(a.x), saturate(a.y) }; }
+  static inline vector_float3 saturate(vector_float3 a) { return vector_float3 { saturate(a.x), saturate(a.y), saturate(a.z) }; }
+  static inline vector_float4 saturate(vector_float4 a) { return vector_float4 { saturate(a.x), saturate(a.y), saturate(a.z), saturate(a.w) }; }
 
   static inline float negate(float a) { return -a; }
   static inline vector_float2 negate(vector_float2 a) { return vector_float2 { negate(a.x), negate(a.y) }; }
@@ -384,6 +408,21 @@ protected:
   static inline vector_float2 sign(vector_float2 a) { return vector_float2 { sign(a.x), sign(a.y) }; }
   static inline vector_float3 sign(vector_float3 a) { return vector_float3 { sign(a.x), sign(a.y), sign(a.z) }; }
   static inline vector_float4 sign(vector_float4 a) { return vector_float4 { sign(a.x), sign(a.y), sign(a.z), sign(a.w) }; }
+
+  static inline float floor_op(float a) { return std::floor(a); }
+  static inline vector_float2 floor_op(vector_float2 a) { return vector_float2 { floor_op(a.x), floor_op(a.y) }; }
+  static inline vector_float3 floor_op(vector_float3 a) { return vector_float3 { floor_op(a.x), floor_op(a.y), floor_op(a.z) }; }
+  static inline vector_float4 floor_op(vector_float4 a) { return vector_float4 { floor_op(a.x), floor_op(a.y), floor_op(a.z), floor_op(a.w) }; }
+
+  static inline float ceil_op(float a) { return std::ceil(a); }
+  static inline vector_float2 ceil_op(vector_float2 a) { return vector_float2 { ceil_op(a.x), ceil_op(a.y) }; }
+  static inline vector_float3 ceil_op(vector_float3 a) { return vector_float3 { ceil_op(a.x), ceil_op(a.y), ceil_op(a.z) }; }
+  static inline vector_float4 ceil_op(vector_float4 a) { return vector_float4 { ceil_op(a.x), ceil_op(a.y), ceil_op(a.z), ceil_op(a.w) }; }
+
+  static inline float round_op(float a) { return std::round(a); }
+  static inline vector_float2 round_op(vector_float2 a) { return vector_float2 { round_op(a.x), round_op(a.y) }; }
+  static inline vector_float3 round_op(vector_float3 a) { return vector_float3 { round_op(a.x), round_op(a.y), round_op(a.z) }; }
+  static inline vector_float4 round_op(vector_float4 a) { return vector_float4 { round_op(a.x), round_op(a.y), round_op(a.z), round_op(a.w) }; }
 
   static inline float cos(float a) { return std::cos(a); }
   static inline vector_float2 cos(vector_float2 a) { return vector_float2 { std::cos(a.x), std::cos(a.y) }; }
