@@ -225,6 +225,8 @@ namespace NanoGraph {
             return EmitUnsignedLiteral((int)Math.Round(value.FloatFromRow(0)));
           case PrimitiveType.Uint2:
             return EmitUnsignedLiteral(UnityEngine.Vector2Int.RoundToInt(value.Vector2FromRow(0)));
+          case PrimitiveType.Double:
+            return EmitLiteral(value[0, 0]);
           case PrimitiveType.Float:
             return EmitLiteral(value.FloatFromRow(0));
           case PrimitiveType.Float2:
@@ -404,6 +406,7 @@ namespace NanoGraph {
     public readonly NanoProgramType Int2Type;
     public readonly NanoProgramType UintType;
     public readonly NanoProgramType Uint2Type;
+    public readonly NanoProgramType DoubleType;
     public readonly NanoProgramType FloatType;
     public readonly NanoProgramType Float2Type;
     public readonly NanoProgramType Float3Type;
@@ -423,6 +426,7 @@ namespace NanoGraph {
       _types.Add(Int2Type = NanoProgramType.MakeBuiltIn(this, "vector_int2"));
       _types.Add(UintType = NanoProgramType.MakeBuiltIn(this, UintIdentifier));
       _types.Add(Uint2Type = NanoProgramType.MakeBuiltIn(this, "vector_uint2"));
+      _types.Add(DoubleType = NanoProgramType.MakeBuiltIn(this, "double"));
       _types.Add(FloatType = NanoProgramType.MakeBuiltIn(this, "float"));
       _types.Add(Float2Type = NanoProgramType.MakeBuiltIn(this, "vector_float2"));
       _types.Add(Float3Type = NanoProgramType.MakeBuiltIn(this, "vector_float3"));
@@ -563,6 +567,8 @@ namespace NanoGraph {
           return UintType;
         case PrimitiveType.Uint2:
           return Uint2Type;
+        case PrimitiveType.Double:
+          return DoubleType;
         case PrimitiveType.Float:
           return FloatType;
         case PrimitiveType.Float2:

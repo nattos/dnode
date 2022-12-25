@@ -1072,6 +1072,8 @@ namespace NanoGraph {
                       return new[] { $"((double)({inputExpr}))" };
                     case PrimitiveType.Uint2:
                       return new[] { $"((double)(({inputExpr}).x))", $"((double)(({inputExpr}).y))" };
+                    case PrimitiveType.Double:
+                      return new[] { $"((double)({inputExpr}))" };
                     case PrimitiveType.Float:
                       return new[] { $"((double)({inputExpr}))" };
                     case PrimitiveType.Float2:

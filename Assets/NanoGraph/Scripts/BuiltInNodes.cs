@@ -3,7 +3,6 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using DNode;
-using UnityEngine;
 
 namespace NanoGraph {
   public class MathNode : BaseMathNode {
@@ -14,10 +13,10 @@ namespace NanoGraph {
 
   public abstract class BaseMathNode : DataNode, ICodeNode, IAutoTypeNode {
     [EditableAttribute]
-    public AutoType AutoType = AutoType.Auto;
+    public AutoType OutType = AutoType.Auto;
     public TypeSpec InternalElementType = TypeSpec.MakePrimitive(PrimitiveType.Float);
 
-    public TypeSpec ElementType => AutoTypeUtils.GetAutoType(AutoType, InternalElementType);
+    public TypeSpec ElementType => AutoTypeUtils.GetAutoType(OutType, InternalElementType);
     public bool IsArrayInput => ElementType.IsArray;
 
     public void UpdateTypesFromInputs() {
@@ -111,7 +110,7 @@ namespace NanoGraph {
 
   public class MakeArrayNode : DataNode, ICodeNode, IAutoTypeNode {
     [EditableAttribute]
-    public AutoType AutoType = AutoType.Auto;
+    public AutoType OutType = AutoType.Auto;
     public TypeSpec InternalElementType = TypeSpec.MakePrimitive(PrimitiveType.Float);
 
     [EditableAttribute]
@@ -120,7 +119,7 @@ namespace NanoGraph {
     public override DataSpec InputSpec => DataSpec.FromFields(Enumerable.Range(0, InputCount).Select(i => DataField.MakeType(i.ToString(), ElementType)).ToArray());
     public override DataSpec OutputSpec => DataSpec.FromFields(DataField.MakeType("Out", TypeSpec.MakeArray(ElementType)));
 
-    public TypeSpec ElementType => AutoTypeUtils.GetAutoType(AutoType, InternalElementType);
+    public TypeSpec ElementType => AutoTypeUtils.GetAutoType(OutType, InternalElementType);
 
     public void UpdateTypesFromInputs() {
       AutoTypeUtils.UpdateAutoType(Graph.GetInputEdges(this), ref InternalElementType, forceIsArray: false);
@@ -137,6 +136,7 @@ namespace NanoGraph {
   public interface IValueProvider {
     DataField[] GetExtraInputFields(TypeSpec elementType);
     IEnumerable<DataEdge> FilteredAutoTypeEdges(IReadOnlyList<DataEdge> inputEdges);
+    PrimitiveType? PreferredType { get; }
     string EmitCode(ICodeNode node, CodeContext context, int inputsIndexOffset, string indexExpr, string lengthExpr, TypeSpec elementType);
 
     private static readonly IReadOnlyDictionary<ValueProviderType, IValueProvider> _valueProviders = new Dictionary<ValueProviderType, IValueProvider>() {
@@ -146,6 +146,7 @@ namespace NanoGraph {
       { ValueProviderType.Range, new RangeValueProvider() },
       { ValueProviderType.Step, new StepValueProvider() },
       { ValueProviderType.FrameNumber, new FrameNumberValueProvider() },
+      { ValueProviderType.Time, new TimeValueProvider() },
     };
 
     public static IValueProvider GetValueProvider(ValueProviderType type) {
@@ -160,12 +161,13 @@ namespace NanoGraph {
     Range,
     Step,
     FrameNumber,
-    // Time
+    Time,
   }
 
   public class ValueValueProvider : IValueProvider {
     public DataField[] GetExtraInputFields(TypeSpec elementType) => new[] { DataField.MakeType("Value", elementType) };
     public IEnumerable<DataEdge> FilteredAutoTypeEdges(IReadOnlyList<DataEdge> inputEdges) => inputEdges.Where(edge => edge.Destination.FieldName == "Value");
+    public PrimitiveType? PreferredType => null;
     public string EmitCode(ICodeNode node, CodeContext context, int inputsIndexOffset, string indexExpr, string lengthExpr, TypeSpec elementType) {
       return context.Function.EmitCopy(context.InputLocals[inputsIndexOffset].Identifier);
     }
@@ -174,6 +176,7 @@ namespace NanoGraph {
   public class IndexValueProvider : IValueProvider {
     public DataField[] GetExtraInputFields(TypeSpec elementType) => Array.Empty<DataField>();
     public IEnumerable<DataEdge> FilteredAutoTypeEdges(IReadOnlyList<DataEdge> inputEdges) => Array.Empty<DataEdge>();
+    public PrimitiveType? PreferredType => PrimitiveType.Int;
     public string EmitCode(ICodeNode node, CodeContext context, int inputsIndexOffset, string indexExpr, string lengthExpr, TypeSpec elementType) {
       return context.Function.EmitConvert(TypeSpec.MakePrimitive(PrimitiveType.Int), elementType, indexExpr);
     }
@@ -182,6 +185,7 @@ namespace NanoGraph {
   public class RangeValueProvider : IValueProvider {
     public DataField[] GetExtraInputFields(TypeSpec elementType) => new[] { DataField.MakeType("Min", elementType), DataField.MakeType("Max", elementType) };
     public IEnumerable<DataEdge> FilteredAutoTypeEdges(IReadOnlyList<DataEdge> inputEdges) => Array.Empty<DataEdge>();
+    public PrimitiveType? PreferredType => PrimitiveType.Float;
     public string EmitCode(ICodeNode node, CodeContext context, int inputsIndexOffset, string indexExpr, string lengthExpr, TypeSpec elementType) {
       string minIdentifier = context.InputLocals[inputsIndexOffset + 0].Identifier;
       string maxIdentifier = context.InputLocals[inputsIndexOffset + 1].Identifier;
@@ -192,6 +196,7 @@ namespace NanoGraph {
   public class StepValueProvider : IValueProvider {
     public DataField[] GetExtraInputFields(TypeSpec elementType) => new[] { DataField.MakeType("Start", elementType), DataField.MakeType("Step", elementType) };
     public IEnumerable<DataEdge> FilteredAutoTypeEdges(IReadOnlyList<DataEdge> inputEdges) => Array.Empty<DataEdge>();
+    public PrimitiveType? PreferredType => PrimitiveType.Float;
     public string EmitCode(ICodeNode node, CodeContext context, int inputsIndexOffset, string indexExpr, string lengthExpr, TypeSpec elementType) {
       string startIdentifier = context.InputLocals[inputsIndexOffset + 0].Identifier;
       string stepIdentifier = context.InputLocals[inputsIndexOffset + 1].Identifier;
@@ -202,6 +207,7 @@ namespace NanoGraph {
   public class RandomValueProvider : IValueProvider {
     public DataField[] GetExtraInputFields(TypeSpec elementType) => Array.Empty<DataField>();
     public IEnumerable<DataEdge> FilteredAutoTypeEdges(IReadOnlyList<DataEdge> inputEdges) => Array.Empty<DataEdge>();
+    public PrimitiveType? PreferredType => PrimitiveType.Float;
     public string EmitCode(ICodeNode node, CodeContext context, int inputsIndexOffset, string indexExpr, string lengthExpr, TypeSpec elementType) {
       // Note: Only works in CPU context.
       if (!(context.Function.Context is NanoCpuContext)) {
@@ -215,12 +221,26 @@ namespace NanoGraph {
   public class FrameNumberValueProvider : IValueProvider {
     public DataField[] GetExtraInputFields(TypeSpec elementType) => Array.Empty<DataField>();
     public IEnumerable<DataEdge> FilteredAutoTypeEdges(IReadOnlyList<DataEdge> inputEdges) => Array.Empty<DataEdge>();
+    public PrimitiveType? PreferredType => PrimitiveType.Int;
     public string EmitCode(ICodeNode node, CodeContext context, int inputsIndexOffset, string indexExpr, string lengthExpr, TypeSpec elementType) {
       // Note: Only works in CPU context.
       if (!(context.Function.Context is NanoCpuContext)) {
-        context.Errors.Add($"Random source only works in CPU contexts (for node {node}).");
+        context.Errors.Add($"Frame number source only works in CPU contexts (for node {node}).");
       }
       return context.Function.EmitConvert(TypeSpec.MakePrimitive(PrimitiveType.Int), elementType, "GetFrameNumber()");
+    }
+  }
+
+  public class TimeValueProvider : IValueProvider {
+    public DataField[] GetExtraInputFields(TypeSpec elementType) => Array.Empty<DataField>();
+    public IEnumerable<DataEdge> FilteredAutoTypeEdges(IReadOnlyList<DataEdge> inputEdges) => Array.Empty<DataEdge>();
+    public PrimitiveType? PreferredType => PrimitiveType.Double;
+    public string EmitCode(ICodeNode node, CodeContext context, int inputsIndexOffset, string indexExpr, string lengthExpr, TypeSpec elementType) {
+      // Note: Only works in CPU context.
+      if (!(context.Function.Context is NanoCpuContext)) {
+        context.Errors.Add($"Time source only works in CPU contexts (for node {node}).");
+      }
+      return context.Function.EmitConvert(TypeSpec.MakePrimitive(PrimitiveType.Double), elementType, "GetFrameTime()");
     }
   }
 
@@ -229,7 +249,7 @@ namespace NanoGraph {
     public ValueProviderType Source = ValueProviderType.Random;
 
     [EditableAttribute]
-    public AutoType AutoType = AutoType.Auto;
+    public AutoType OutType = AutoType.Auto;
     public TypeSpec InternalElementType = TypeSpec.MakePrimitive(PrimitiveType.Float);
 
     public IValueProvider ValueProvider => IValueProvider.GetValueProvider(Source);
@@ -237,9 +257,12 @@ namespace NanoGraph {
     public override DataSpec InputSpec => DataSpec.FromFields(new[] { DataField.MakePrimitive("Length", PrimitiveType.Int) }.Concat(ValueProvider.GetExtraInputFields(ElementType)).ToArray());
     public override DataSpec OutputSpec => DataSpec.FromFields(DataField.MakeType("Out", TypeSpec.MakeArray(ElementType)));
 
-    public TypeSpec ElementType => AutoTypeUtils.GetAutoType(AutoType, InternalElementType);
+    public TypeSpec ElementType => AutoTypeUtils.GetAutoType(OutType, InternalElementType);
 
     public void UpdateTypesFromInputs() {
+      if (ValueProvider.PreferredType is PrimitiveType preferredType) {
+        InternalElementType.Primitive = preferredType;
+      }
       AutoTypeUtils.UpdateAutoType(Graph.GetInputEdges(this), ref InternalElementType, forceIsArray: false);
     }
 
@@ -266,10 +289,10 @@ namespace NanoGraph {
     public ReduceOperatorType Operation = ReduceOperatorType.Length;
 
     [EditableAttribute]
-    public AutoType AutoType = AutoType.Auto;
+    public AutoType OutType = AutoType.Auto;
     public TypeSpec InternalElementType = TypeSpec.MakePrimitive(PrimitiveType.Float);
 
-    public TypeSpec ElementType => AutoTypeUtils.GetAutoType(AutoType, InternalElementType);
+    public TypeSpec ElementType => AutoTypeUtils.GetAutoType(OutType, InternalElementType);
     public TypeSpec ReducedType => TypeSpec.MakePrimitive(PrimitiveType.Int);
 
     public void UpdateTypesFromInputs() {
@@ -322,10 +345,10 @@ namespace NanoGraph {
 
   public class ReadNode : DataNode, ICodeNode, IAutoTypeNode {
     [EditableAttribute]
-    public AutoType AutoType = AutoType.Auto;
+    public AutoType OutType = AutoType.Auto;
     public TypeSpec InternalElementType = TypeSpec.MakePrimitive(PrimitiveType.Float);
 
-    public TypeSpec ElementType => AutoTypeUtils.GetAutoType(AutoType, InternalElementType);
+    public TypeSpec ElementType => AutoTypeUtils.GetAutoType(OutType, InternalElementType);
 
     public void UpdateTypesFromInputs() {
       AutoTypeUtils.UpdateAutoType(Graph.GetEdgeToDestinationOrNull(this, "In"), ref InternalElementType, forceIsArray: false);
@@ -669,7 +692,7 @@ namespace NanoGraph {
 
   public class SwitchNode : DataNode, ICodeNode, IConditionalNode {
     [EditableAttribute]
-    public AutoType AutoType = AutoType.Auto;
+    public AutoType OutType = AutoType.Auto;
     public TypeSpec InternalInputType = TypeSpec.MakePrimitive(PrimitiveType.Float);
 
     [EditableAttribute]
@@ -678,7 +701,7 @@ namespace NanoGraph {
     public override DataSpec InputSpec => DataSpec.FromFields(new [] { DataField.MakePrimitive("Case", PrimitiveType.Int) }.Concat(Enumerable.Range(0, InputCount).Select(i => DataField.MakeType(i.ToString(), InputType))).ToArray());
     public override DataSpec OutputSpec => DataSpec.FromFields(DataField.MakeType("Out", InputType));
 
-    public TypeSpec InputType => AutoTypeUtils.GetAutoType(AutoType, InternalInputType);
+    public TypeSpec InputType => AutoTypeUtils.GetAutoType(OutType, InternalInputType);
 
     public void UpdateTypesFromInputs() {
       AutoTypeUtils.UpdateAutoType(Graph.GetInputEdges(this).Where(edge => edge.Destination.FieldName != "Case").ToArray(), ref InternalInputType, forceIsArray: false);
@@ -775,6 +798,9 @@ namespace NanoGraph {
             case PrimitiveType.Uint:
               decodeValuesExpr = $"(values.size() >= 1 ? ((uint)std::round(values[0])) : 0)";
               break;
+            case PrimitiveType.Double:
+              decodeValuesExpr = $"(values.size() >= 1 ? ((double)(values[0])) : 0.0)";
+              break;
             case PrimitiveType.Float:
               decodeValuesExpr = $"(values.size() >= 1 ? ((float)(values[0])) : 0.0f)";
               break;
@@ -810,7 +836,7 @@ namespace NanoGraph {
     public ValueProviderType Source = ValueProviderType.Random;
 
     [EditableAttribute]
-    public AutoType Type = AutoType.Float;
+    public AutoType OutType = AutoType.Auto;
     public TypeSpec InternalElementType = TypeSpec.MakePrimitive(PrimitiveType.Float);
 
     public IValueProvider ValueProvider => IValueProvider.GetValueProvider(Source);
@@ -818,9 +844,14 @@ namespace NanoGraph {
     public override DataSpec InputSpec => DataSpec.FromFields(ValueProvider.GetExtraInputFields(ElementType));
     public override DataSpec OutputSpec => DataSpec.FromFields(DataField.MakeType("Out", ElementType));
 
-    public TypeSpec ElementType => AutoTypeUtils.GetAutoType(Type, InternalElementType);
+    public TypeSpec ElementType => PreferredElementType ?? AutoTypeUtils.GetAutoType(OutType, InternalElementType);
+    public TypeSpec? PreferredElementType => PreferredType == null ? null : TypeSpec.MakePrimitive(PreferredType.Value);
+    public PrimitiveType? PreferredType => OutType == AutoType.Auto ? ValueProvider.PreferredType : null;
 
     public void UpdateTypesFromInputs() {
+      if (ValueProvider.PreferredType is PrimitiveType preferredType) {
+        InternalElementType.Primitive = preferredType;
+      }
       AutoTypeUtils.UpdateAutoType(Graph.GetInputEdges(this), ref InternalElementType, forceIsArray: false);
     }
 

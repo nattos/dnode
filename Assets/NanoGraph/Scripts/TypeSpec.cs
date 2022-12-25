@@ -48,6 +48,7 @@ namespace NanoGraph {
     Int,
     Uint,
     Uint2,
+    Double,
     Float,
     Float2,
     Float3,

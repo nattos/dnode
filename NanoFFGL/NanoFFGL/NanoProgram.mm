@@ -226,6 +226,8 @@ public:
 
   void Run() {
     EnsureResources();
+    _frameTime = [NSDate now].timeIntervalSince1970 - _startTime;
+
     SetCurrentInstance(this);
     _currentCommandBuffer = [_commandQueue commandBuffer];
     Execute();
@@ -238,6 +240,7 @@ public:
   void EnsureResources() {
     if (!_device) {
       _device = MTLCreateSystemDefaultDevice();
+      _startTime = [NSDate now].timeIntervalSince1970;
     }
     if (!_commandQueue) {
       _commandQueue = [_device newCommandQueue];
@@ -309,6 +312,7 @@ public:
   id<MTLCommandBuffer> GetCurrentCommandBuffer() const { return _currentCommandBuffer; }
 
   int GetFrameNumber() const { return _frameNumber; }
+  double GetFrameTime() const { return _frameTime; }
 
   static void SetCurrentInstance(NanoProgram* ptr) {
     NSThread* thread = [NSThread currentThread];
@@ -348,6 +352,8 @@ private:
   std::string _debugOutputTextureKey;
 
   int _frameNumber = 0;
+  double _startTime = 0;
+  double _frameTime = 0;
 
   static NSLock* _threadMapLock;
   static std::unique_ptr<std::map<NSThread*, NanoProgram*>> _threadMap;

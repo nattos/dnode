@@ -76,5 +76,75 @@ template<> vector_float3 inline Convert<vector_float4, vector_float3>(vector_flo
   return vector_float3 { value.x, value.y, value.z };
 }
 
+
+
+
+
+static inline float modulo_op(int a, int b) { return (a % b); }
+static inline float modulo_op(float a, float b) { return modf(a, b); }
+static inline vector_float2 modulo_op(vector_float2 a, vector_float2 b) { return vector_float2 { modulo_op(a.x, b.x), modulo_op(a.y, b.y) }; }
+static inline vector_float3 modulo_op(vector_float3 a, vector_float3 b) { return vector_float3 { modulo_op(a.x, b.x), modulo_op(a.y, b.y), modulo_op(a.z, b.z) }; }
+static inline vector_float4 modulo_op(vector_float4 a, vector_float4 b) { return vector_float4 { modulo_op(a.x, b.x), modulo_op(a.y, b.y), modulo_op(a.z, b.z), modulo_op(a.w, b.w) }; }
+
+static inline float lerp(float a, float b, float t) { return a * (1.0f - t) + b * t; }
+static inline vector_float2 lerp(vector_float2 a, vector_float2 b, float t) { return vector_float2 { lerp(a.x, b.x, t), lerp(a.y, b.y, t) }; }
+static inline vector_float3 lerp(vector_float3 a, vector_float3 b, float t) { return vector_float3 { lerp(a.x, b.x, t), lerp(a.y, b.y, t), lerp(a.z, b.z, t) }; }
+static inline vector_float4 lerp(vector_float4 a, vector_float4 b, float t) { return vector_float4 { lerp(a.x, b.x, t), lerp(a.y, b.y, t), lerp(a.z, b.z, t), lerp(a.w, b.w, t) }; }
+
+static inline float log(float a, float b) { return log(a) / log(b); }
+static inline vector_float2 log(vector_float2 a, vector_float2 b) { return vector_float2 { log(a.x, b.x), log(a.y, b.y) }; }
+static inline vector_float3 log(vector_float3 a, vector_float3 b) { return vector_float3 { log(a.x, b.x), log(a.y, b.y), log(a.z, b.z) }; }
+static inline vector_float4 log(vector_float4 a, vector_float4 b) { return vector_float4 { log(a.x, b.x), log(a.y, b.y), log(a.z, b.z), log(a.w, b.w) }; }
+
+static inline float negate(float a) { return -a; }
+static inline vector_float2 negate(vector_float2 a) { return vector_float2 { negate(a.x), negate(a.y) }; }
+static inline vector_float3 negate(vector_float3 a) { return vector_float3 { negate(a.x), negate(a.y), negate(a.z) }; }
+static inline vector_float4 negate(vector_float4 a) { return vector_float4 { negate(a.x), negate(a.y), negate(a.z), negate(a.w) }; }
+
+static inline float invert(float a) { return -a; }
+static inline vector_float2 invert(vector_float2 a) { return vector_float2 { invert(a.x), invert(a.y) }; }
+static inline vector_float3 invert(vector_float3 a) { return vector_float3 { invert(a.x), invert(a.y), invert(a.z) }; }
+static inline vector_float4 invert(vector_float4 a) { return vector_float4 { invert(a.x), invert(a.y), invert(a.z), invert(a.w) }; }
+
+static inline float one_minus(float a) { return 1.0f - a; }
+static inline vector_float2 one_minus(vector_float2 a) { return vector_float2 { one_minus(a.x), one_minus(a.y) }; }
+static inline vector_float3 one_minus(vector_float3 a) { return vector_float3 { one_minus(a.x), one_minus(a.y), one_minus(a.z) }; }
+static inline vector_float4 one_minus(vector_float4 a) { return vector_float4 { one_minus(a.x), one_minus(a.y), one_minus(a.z), one_minus(a.w) }; }
+
+static inline float floor_op(float a) { return floor(a); }
+static inline vector_float2 floor_op(vector_float2 a) { return vector_float2 { floor_op(a.x), floor_op(a.y) }; }
+static inline vector_float3 floor_op(vector_float3 a) { return vector_float3 { floor_op(a.x), floor_op(a.y), floor_op(a.z) }; }
+static inline vector_float4 floor_op(vector_float4 a) { return vector_float4 { floor_op(a.x), floor_op(a.y), floor_op(a.z), floor_op(a.w) }; }
+
+static inline float ceil_op(float a) { return ceil(a); }
+static inline vector_float2 ceil_op(vector_float2 a) { return vector_float2 { ceil_op(a.x), ceil_op(a.y) }; }
+static inline vector_float3 ceil_op(vector_float3 a) { return vector_float3 { ceil_op(a.x), ceil_op(a.y), ceil_op(a.z) }; }
+static inline vector_float4 ceil_op(vector_float4 a) { return vector_float4 { ceil_op(a.x), ceil_op(a.y), ceil_op(a.z), ceil_op(a.w) }; }
+
+static inline float round_op(float a) { return round(a); }
+static inline vector_float2 round_op(vector_float2 a) { return vector_float2 { round_op(a.x), round_op(a.y) }; }
+static inline vector_float3 round_op(vector_float3 a) { return vector_float3 { round_op(a.x), round_op(a.y), round_op(a.z) }; }
+static inline vector_float4 round_op(vector_float4 a) { return vector_float4 { round_op(a.x), round_op(a.y), round_op(a.z), round_op(a.w) }; }
+
+static inline float pow2(float a) { return pow(2.0f, a); }
+static inline vector_float2 pow2(vector_float2 a) { return vector_float2 { pow2(a.x), pow2(a.y) }; }
+static inline vector_float3 pow2(vector_float3 a) { return vector_float3 { pow2(a.x), pow2(a.y), pow2(a.z) }; }
+static inline vector_float4 pow2(vector_float4 a) { return vector_float4 { pow2(a.x), pow2(a.y), pow2(a.z), pow2(a.w) }; }
+
+static inline float pow10(float a) { return pow(10.0f, a); }
+static inline vector_float2 pow10(vector_float2 a) { return vector_float2 { pow10(a.x), pow10(a.y) }; }
+static inline vector_float3 pow10(vector_float3 a) { return vector_float3 { pow10(a.x), pow10(a.y), pow10(a.z) }; }
+static inline vector_float4 pow10(vector_float4 a) { return vector_float4 { pow10(a.x), pow10(a.y), pow10(a.z), pow10(a.w) }; }
+
+static inline float logE(float a) { return log(a); }
+static inline vector_float2 logE(vector_float2 a) { return vector_float2 { log(a.x), log(a.y) }; }
+static inline vector_float3 logE(vector_float3 a) { return vector_float3 { log(a.x), log(a.y), log(a.z) }; }
+static inline vector_float4 logE(vector_float4 a) { return vector_float4 { log(a.x), log(a.y), log(a.z), log(a.w) }; }
+
+
+
+
+
+
 #include "Generated/Program.metal.incl.h"
 

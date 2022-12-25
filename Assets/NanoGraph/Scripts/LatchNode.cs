@@ -15,7 +15,11 @@ namespace NanoGraph {
     void EmitPostValidateCache(NanoFunction validateCacheFunc, IComputeNode fromNode);
   }
 
-  public class LatchNode : ScalarComputeNode, ISplitComputeNode {
+  public class LatchNode : ScalarComputeNode, ISplitComputeNode, IAutoTypeNode {
+    [EditableAttribute]
+    public AutoType OutType = AutoType.Auto;
+    public TypeSpec InternalElementType = TypeSpec.MakePrimitive(PrimitiveType.Float);
+
     [EditableAttribute]
     public bool IsGpuContext = false;
 
@@ -23,10 +27,10 @@ namespace NanoGraph {
     public override DataSpec OutputSpec => DataSpec.FromFields(DataField.MakeType("Out", ValueType));
     public override DataSpec ComputeOutputSpec => DataSpec.FromFields(DataField.MakeType("Out", StorageType));
 
-    public TypeSpec ValueType {
-      get {
-        return TypeSpec.MakePrimitive(PrimitiveType.Float);
-      }
+    public TypeSpec ValueType => InternalElementType;
+
+    public void UpdateTypesFromInputs() {
+      AutoTypeUtils.UpdateAutoType(Graph.GetInputEdges(this), ref InternalElementType, forceIsArray: false);
     }
 
     public TypeSpec StorageType => IsGpuContext ? TypeSpec.MakeArray(ValueType) : ValueType;

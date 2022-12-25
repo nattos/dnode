@@ -10,6 +10,7 @@ namespace NanoGraph {
     Auto,
     Bool,
     Int,
+    Double,
     Float,
     Float2,
     Float3,
@@ -27,6 +28,8 @@ namespace NanoGraph {
           return TypeSpec.MakePrimitive(PrimitiveType.Bool);
         case AutoType.Int:
           return TypeSpec.MakePrimitive(PrimitiveType.Int);
+        case AutoType.Double:
+          return TypeSpec.MakePrimitive(PrimitiveType.Double);
         case AutoType.Float:
           return TypeSpec.MakePrimitive(PrimitiveType.Float);
         case AutoType.Float2:
