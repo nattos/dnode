@@ -29,8 +29,9 @@ namespace NanoGraph {
   public struct NanoGpuBufferRef {
     public string FieldName;
     public string Expression;
+    public string ParameterName;
     public int Index;
-    public TypeSpec Type;
+    public NanoProgramType Type;
   }
 
   public class NanoGpuContext : INanoCodeContext {
@@ -291,6 +292,7 @@ namespace NanoGraph {
       public NanoProgramType Type;
       public string Name;
       public IReadOnlyList<string> Attributes;
+      public string InitializerStr;
     }
 
     public readonly NanoProgram Program;
@@ -318,11 +320,11 @@ namespace NanoGraph {
       return Identifier;
     }
 
-    public string AddField(NanoProgramType type, string nameHint, IReadOnlyList<string> attributes = null) {
+    public string AddField(NanoProgramType type, string nameHint, IReadOnlyList<string> attributes = null, string initializerStr = null) {
       attributes = attributes ?? Array.Empty<string>();
       int index = _fields.Count;
       string name = $"_{NanoProgram.SanitizeIdentifierFragment(nameHint)}_{index:D3}";
-      _fields.Add(new Field { Type = type, Name = name, Attributes = attributes });
+      _fields.Add(new Field { Type = type, Name = name, Attributes = attributes, InitializerStr = initializerStr });
       _fieldMap[nameHint] = name;
       return name;
     }
@@ -341,7 +343,11 @@ namespace NanoGraph {
         if (field.Attributes?.Count > 0) {
           suffix = $" {string.Join(" ", field.Attributes)}";
         }
-        string line = $"{fieldType.EmitIdentifier(context)} {name}{suffix};";
+        string initializerPart = "";
+        if (field.InitializerStr != null && context is NanoCpuContext) {
+          initializerPart = $" = ({field.InitializerStr})";
+        }
+        string line = $"{fieldType.EmitIdentifier(context)} {name}{suffix}{initializerPart};";
         output.AppendLine("  " + line);
       }
       output.AppendLine($"}};");
@@ -402,6 +408,7 @@ namespace NanoGraph {
     public readonly NanoProgramType Float2Type;
     public readonly NanoProgramType Float3Type;
     public readonly NanoProgramType Float4Type;
+    public readonly NanoProgramType Double4Type;
     public readonly NanoProgramType Texture;
     public readonly NanoProgramType WriteTexture;
     public readonly NanoProgramType MTLComputePipelineStateType;
@@ -420,6 +427,7 @@ namespace NanoGraph {
       _types.Add(Float2Type = NanoProgramType.MakeBuiltIn(this, "vector_float2"));
       _types.Add(Float3Type = NanoProgramType.MakeBuiltIn(this, "vector_float3"));
       _types.Add(Float4Type = NanoProgramType.MakeBuiltIn(this, "vector_float4"));
+      _types.Add(Double4Type = NanoProgramType.MakeBuiltIn(this, "vector_double4"));
       _types.Add(Texture = NanoProgramType.MakeBuiltIn(this, "NanoTexture"));
       _types.Add(WriteTexture = NanoProgramType.MakeBuiltIn(this, "NanoWriteTexture"));
       _types.Add(MTLComputePipelineStateType = NanoProgramType.MakeBuiltIn(this, "id<MTLComputePipelineState>"));
@@ -497,6 +505,14 @@ namespace NanoGraph {
       return programType;
     }
 
+    public NanoProgramType AddCustomType(string nameHint) {
+      int index = _types.Count;
+      string name = $"CustomType_{NanoProgram.SanitizeIdentifierFragment(nameHint)}_{index:D3}";
+      NanoProgramType programType = NanoProgramType.MakeType(this, name);
+      _types.Add(programType);
+      return programType;
+    }
+
     private NanoProgramType BuildProtoType(TypeDecl type) {
       NanoProgramType programType = NanoProgramType.MakeType(this, "Proto");
       foreach (var field in type.Fields) {
@@ -561,11 +577,15 @@ namespace NanoGraph {
       return null;
     }
 
-    public string AddInstanceField(NanoProgramType type, string nameHint) {
+    public string AddInstanceField(NanoProgramType type, string nameHint, string initializerStr = null) {
       int index = _fields.Count;
       string name = $"_{NanoProgram.SanitizeIdentifierFragment(nameHint)}_{index:D3}";
       _fields.Add(name);
-      _fieldsCode.Add($"{type.EmitIdentifier(CpuContext)} {name};");
+      string initializerPart = "";
+      if (initializerStr != null) {
+        initializerPart = $" = ({initializerStr})";
+      }
+      _fieldsCode.Add($"{type.EmitIdentifier(CpuContext)} {name}{initializerPart};");
       _fieldMap[nameHint] = name;
       return name;
     }

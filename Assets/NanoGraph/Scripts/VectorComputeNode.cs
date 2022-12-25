@@ -67,6 +67,7 @@ namespace NanoGraph {
         // Note: Only load inputs that we really read.
         int bufferIndex = 0;
         AddGpuFuncInputs(func, CollectComputeInputs(DependentComputeInputsToLoad), gpuInputBuffers, ref bufferIndex);
+        AddDebugGpuFuncInputs(func, gpuInputBuffers, ref bufferIndex);
         // Define outputs.
         AddGpuFuncOutputs(func, computeOutputSpec.Fields, gpuOutputBuffers, ref bufferIndex);
         func.AddParam(Array.Empty<string>(), program.GetPrimitiveType(PrimitiveType.Uint), $"gid_uint", "[[thread_position_in_grid]]");

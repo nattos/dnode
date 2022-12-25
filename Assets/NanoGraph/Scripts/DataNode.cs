@@ -12,6 +12,15 @@ namespace NanoGraph {
     [EditableAttribute]
     public string Name;
 
+    [EditableAttribute]
+    public string DebugId;
+    string IDataNode.DebugId {
+      get {
+        EnsureDebugId();
+        return DebugId;
+      }
+    }
+
     [DoNotSerialize]
     public NanoGraph Graph { get; set; }
     [DoNotSerialize]
@@ -29,7 +38,14 @@ namespace NanoGraph {
     }
 
     public void Validate(List<Action> cleanupActions) {
+      EnsureDebugId();
       _errorMessages.Clear();
+    }
+
+    public void EnsureDebugId() {
+      if (string.IsNullOrEmpty(DebugId)) {
+        DebugId = Guid.NewGuid().ToString();
+      }
     }
 
     public override string ToString() {

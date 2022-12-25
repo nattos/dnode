@@ -11,6 +11,7 @@ namespace NanoGraph {
     public static string GeneratedCodeOutputPath => System.IO.Path.Combine(System.IO.Path.GetDirectoryName(UnityEngine.Application.dataPath), "NanoFFGL/NanoFFGL/Generated");
 
     public string EffectName = "Program";
+    public bool DebugEnabled = true;
     private readonly List<IDataNode> _nodes = new List<IDataNode>();
     private readonly HashSet<IDataNode> _dirtyNodes = new HashSet<IDataNode>();
 
@@ -852,6 +853,27 @@ namespace NanoGraph {
       program.AddPreambleStatement($"@implementation {objCPlaceholderClassIdentifier}");
       program.AddPreambleStatement($"@end");
 
+      var getDebugValuesFunction = program.AddOverrideFunction("GetDebugValues", NanoProgram.CpuContext, NanoProgramType.MakeBuiltIn(program, "std::vector<DebugValue>"), modifiers: new[] { "virtual" });
+      getDebugValuesFunction.AddStatement("std::vector<DebugValue> debugValues;");
+
+      NanoProgramType debugCpuStateType = program.AddCustomType("DebugCpuState");
+      NanoProgramType debugGpuStateType = program.AddCustomType("DebugGpuState");
+      string debugCpuStateIdentifier = program.AddInstanceField(debugCpuStateType, "DebugCpuState");
+      string debugGpuStateIdentifier = program.AddInstanceField(debugGpuStateType, "DebugGpuState");
+
+      var getDebugSettableValuesFunction = program.AddOverrideFunction("GetDebugSettableValues", NanoProgram.CpuContext, NanoProgramType.MakeBuiltIn(program, "std::vector<DebugSettableValue>"), modifiers: new[] { "virtual" });
+      getDebugSettableValuesFunction.AddStatement("std::vector<DebugSettableValue> debugValues;");
+      getDebugSettableValuesFunction.AddStatement($"auto* cpuState = &{debugCpuStateIdentifier};");
+      getDebugSettableValuesFunction.AddStatement($"auto* gpuState = &{debugGpuStateIdentifier};");
+
+      DebugState debugState = new DebugState() {
+        GetDebugSettableValuesFunction = getDebugSettableValuesFunction,
+        DebugCpuStateType = debugCpuStateType,
+        DebugCpuStateIdentifier = debugCpuStateIdentifier,
+        DebugGpuStateType = debugGpuStateType,
+        DebugGpuStateIdentifier = debugGpuStateIdentifier,
+      };
+
       // Prepare to traverse graph of compute nodes.
       var computeNodeResults = new Dictionary<IComputeNode, (CodeCachedResult? result, IComputeNodeEmitCodeOperation op)>();
       Queue<IComputeNode> queuedCalcNodes = new Queue<IComputeNode>();
@@ -924,6 +946,7 @@ namespace NanoGraph {
             errors = errors,
             graph = this,
             program = program,
+            debugState = debugState,
             createPipelinesFunction = createPipelinesFunction,
             dependentComputeNodes = dependentComputeNodeResults,
             dependentComputeInputs = dependentComputeInputs,
@@ -989,6 +1012,7 @@ namespace NanoGraph {
             cachedNodePreambleInputLocals[codeGenerator] = inputLocals;
           }
 
+          List<string> outputFieldNames = new List<string>();
           List<CodeLocal> outputLocals =  new List<CodeLocal>();
           if (!isPreamble) {
             var outputSpec = codeGenerator.OutputSpec;
@@ -999,11 +1023,13 @@ namespace NanoGraph {
               string outputLocal = func.AllocLocal($"{codeGenerator.SourceNode.ShortName}_{field.Name}");
               resultLocalMap[new DataPlug { Node = codeGenerator.SourceNode, FieldName = field.Name }] = new CodeLocal { Identifier = outputLocal, Type = field.Type };
               outputLocals.Add(new CodeLocal { Identifier = outputLocal, Type = field.Type });
+              outputFieldNames.Add(field.Name);
             }
           }
 
           var context = new CodeContext {
             Function = func,
+            DebugState = debugState,
             InputLocals = inputLocals,
             OutputLocals = outputLocals,
             Errors = errors,
@@ -1012,6 +1038,77 @@ namespace NanoGraph {
             codeGenerator.EmitPreambleCode(context);
           } else {
             codeGenerator.EmitCode(context);
+          }
+          if (DebugEnabled && !(func.Context is NanoGpuContext)) {
+            string debugId = codeGenerator.SourceNode.DebugId;
+            for (int i = 0; i < outputLocals.Count; ++i) {
+              string fieldName = outputFieldNames[i];
+              CodeLocal outputLocal = outputLocals[i];
+
+              string[] GetExtractDebugValueExprs(string inputExpr, TypeSpec type, int limit) {
+                if (type.IsArray) {
+                  List<string> resultExprs = new List<string>();
+                  int arrayIndex = 0;
+                  while (resultExprs.Count < limit) {
+                    string elementInputExpr = func.Context.EmitSampleBuffer(inputExpr, func.EmitLiteral(arrayIndex));
+                    string[] elementExprs = GetExtractDebugValueExprs(elementInputExpr, type.ElementSpec, limit);
+                    if (elementExprs.Length == 0) {
+                      break;
+                    }
+                    foreach (string elementExpr in elementExprs) {
+                      resultExprs.Add($"({arrayIndex} < GetLength({inputExpr}) ? ({elementExpr}) : (0.0))");
+                    }
+                    ++arrayIndex;
+                  }
+                  return resultExprs.ToArray();
+                }
+                if (type.Primitive != null) {
+                  switch (type.Primitive.Value) {
+                    case PrimitiveType.Bool:
+                      return new[] { $"(({inputExpr}) ? 1.0 : 0.0)" };
+                    case PrimitiveType.Int:
+                      return new[] { $"((double)({inputExpr}))" };
+                    case PrimitiveType.Uint:
+                      return new[] { $"((double)({inputExpr}))" };
+                    case PrimitiveType.Uint2:
+                      return new[] { $"((double)(({inputExpr}).x))", $"((double)(({inputExpr}).y))" };
+                    case PrimitiveType.Float:
+                      return new[] { $"((double)({inputExpr}))" };
+                    case PrimitiveType.Float2:
+                      return new[] { $"((double)(({inputExpr}).x))", $"((double)(({inputExpr}).y))" };
+                    case PrimitiveType.Float3:
+                      return new[] { $"((double)(({inputExpr}).x))", $"((double)(({inputExpr}).y))", $"((double)(({inputExpr}).z))" };
+                    case PrimitiveType.Float4:
+                      return new[] { $"((double)(({inputExpr}).x))", $"((double)(({inputExpr}).y))", $"((double)(({inputExpr}).z))", $"((double)(({inputExpr}).w))" };
+                    default:
+                      return Array.Empty<string>();
+                  }
+                }
+                if (type.Type != null) {
+                  return type.Type.Fields.SelectMany(field => {
+                    string fieldInputExpr = $"{inputExpr}.{program.GetProgramType(field.Type).GetField(field.Name)}";
+                    return GetExtractDebugValueExprs(fieldInputExpr, field.Type, limit);
+                  }).ToArray();
+                }
+                return Array.Empty<string>();
+              }
+
+              string extractDebugValueExpr = null;
+              string valueLengthExpr = null;
+              string[] valueExprs = GetExtractDebugValueExprs(outputLocal.Identifier, outputLocal.Type, limit: 4);
+              if (valueExprs.Length > 0) {
+                extractDebugValueExpr = $"vector_double4 {{ {string.Join(", ", valueExprs.Take(4))} }}";
+                valueLengthExpr = getDebugValuesFunction.EmitLiteral(Math.Min(4, valueExprs.Length));
+              }
+
+              if (extractDebugValueExpr == null) {
+                continue;
+              }
+              string debugValueKey = $"{debugId}.{fieldName}";
+              string debugIdentifier = program.AddInstanceField(program.Double4Type, debugValueKey);
+              func.AddStatement($"{debugIdentifier} = {extractDebugValueExpr};");
+              getDebugValuesFunction.AddStatement($"debugValues.push_back(DebugValue {{ .Key = {getDebugValuesFunction.EmitLiteral(debugValueKey)}, .Length = {valueLengthExpr}, .Value = {debugIdentifier} }});");
+            }
           }
         }
 
@@ -1087,6 +1184,8 @@ namespace NanoGraph {
         getParamsFunc.AddStatement("};");
         getParamsFunc.AddStatement($"return parameters;");
       }
+      getDebugValuesFunction.AddStatement($"return debugValues;");
+      getDebugSettableValuesFunction.AddStatement($"return debugValues;");
 
       string outerCpuCode = program.OuterCpuCode;
       if (DebugVerbose) {
@@ -1131,121 +1230,5 @@ namespace NanoGraph {
       return new NanoGraph { EffectName = "Program" };
     });
     public static NanoGraph DebugInstance => _debugInstance.Value;
-
-
-
-
-
-
-
-
-
-    [UnityEditor.MenuItem("Do/Something")]
-    public static void Test() {
-      new NanoGraph().DoSomething();
-    }
-
-    public void DoSomething() {
-
-      // VectorIndexNode calc3VectorIndex = new VectorIndexNode { Name = "Calc3 VectorIndexNode" };
-      // ReadNode calc3ReadNode = new ReadNode { Name = "Calc3 ReadNode", ElementType = TypeSpec.MakePrimitive(PrimitiveType.Float) };
-      // MathNode calc3AddInputs = MathNode.Make(PrimitiveType.Float, StandardOperatorSpec.MakeBinary(StandardBinaryOperator.Add)); calc3AddInputs.Name = "Calc3 Add";
-      // VectorComputeNode calc3OutputNode = new VectorComputeNode { InputOutputSpec = DataSpec.FromFields(DataField.MakeType("Some Value", TypeSpec.MakeArray(TypeSpec.MakePrimitive(PrimitiveType.Float)))), Name = "Calc3" };
-      // // LiteralNode lhsInput = new LiteralNode(PrimitiveType.Float) { Name = "Calc1 LHS" };
-      // // LiteralNode rhsInput = new LiteralNode(PrimitiveType.Float) { Name = "Calc1 RHS" };
-      // // MathNode addInputs = MathNode.Make(PrimitiveType.Float, StandardOperatorSpec.MakeBinary(StandardBinaryOperator.Add)); addInputs.Name = "Calc1 Add";
-      // // CalcStageNode outputNode = CalcStageNode.MakeFromDataSpec(DataSpec.FromFields(DataField.MakePrimitive("Some Value", PrimitiveType.Float))); outputNode.Name = "Calc1";
-
-      // // LiteralNode calc2Input = new LiteralNode(PrimitiveType.Float) { Name = "Calc2 Value" };
-      // // CalcStageNode calc2OutputNode = CalcStageNode.MakeFromDataSpec(DataSpec.FromFields(DataField.MakePrimitive("Some Value", PrimitiveType.Float))); calc2OutputNode.Name = "Calc2";
-      // LiteralNode lhsInput = new LiteralNode(PrimitiveType.Float) { Name = "Calc1 LHS" };
-      // LiteralNode rhsInput = new LiteralNode(PrimitiveType.Float) { Name = "Calc1 RHS" };
-      // MakeArrayNode addInputs = MakeArrayNode.Make(TypeSpec.MakePrimitive(PrimitiveType.Float), 2); addInputs.Name = "Calc1 MakeArray";
-      // ConcatNode addInputs2 = ConcatNode.Make(TypeSpec.MakePrimitive(PrimitiveType.Float), 2); addInputs2.Name = "Calc1 Concat";
-      // // LiteralNode readIndex = new LiteralNode(PrimitiveType.Float) { Name = "Calc1 readIndex" };
-      // // ReadNode readInput = new ReadNode { ElementType = TypeSpec.MakePrimitive(PrimitiveType.Float), Name = "Calc1 ReadNode" };
-      // ScalarComputeNode outputNode = new ScalarComputeNode { InputOutputSpec = DataSpec.FromFields(DataField.MakeType("Some Value", TypeSpec.MakeArray(TypeSpec.MakePrimitive(PrimitiveType.Float)))), Name = "Calc1" };
-
-      // LiteralNode calc2Input = new LiteralNode(PrimitiveType.Float) { Name = "Calc2 Value", Value = -1 };
-      // ScalarComputeNode calc2OutputNode = new ScalarComputeNode { InputOutputSpec = DataSpec.FromFields(DataField.MakePrimitive("Some Value", PrimitiveType.Float)), Name = "Calc2" };
-      // AddNode(calc2Input);
-      // AddNode(calc2OutputNode);
-      // Connect(calc2Input, "Out", calc2OutputNode, "Some Value");
-
-      // AddNode(lhsInput);
-      // AddNode(rhsInput);
-      // AddNode(addInputs);
-      // AddNode(addInputs2);
-      // // AddNode(readIndex);
-      // // AddNode(readInput);
-      // AddNode(outputNode);
-      // // Connect(lhsInput, "Out", addInputs, "0");
-      // Connect(calc2OutputNode, "Some Value", addInputs, "0");
-      // Connect(rhsInput, "Out", addInputs, "1");
-      // Connect(addInputs, "Out", addInputs2, "0");
-      // Connect(addInputs, "Out", addInputs2, "1");
-      // // Connect(addInputs2, "Out", readInput, "In");
-      // // Connect(readIndex, "Out", readInput, "Index");
-      // // Connect(readInput, "Out", outputNode, "Some Value");
-      // Connect(addInputs2, "Out", outputNode, "Some Value");
-
-      // AddNode(calc3VectorIndex);
-      // AddNode(calc3ReadNode);
-      // AddNode(calc3AddInputs);
-      // AddNode(calc3OutputNode);
-      // Connect(outputNode, "Some Value", calc3ReadNode, "In");
-      // Connect(calc3VectorIndex, "Out", calc3ReadNode, "Index");
-      // Connect(calc3ReadNode, "Out", calc3AddInputs, "0");
-      // Connect(calc3ReadNode, "Out", calc3AddInputs, "1");
-      // Connect(calc3AddInputs, "Out", calc3OutputNode, "Some Value");
-
-      T AddNewNode<T>(T node) where T : IDataNode {
-        AddNode(node);
-        return node;
-      }
-
-      var typeStandardVertex = new TypeDecl(TypeField.MakePrimitive("position", PrimitiveType.Float2),
-                                            TypeField.MakePrimitive("color", PrimitiveType.Float4),
-                                            TypeField.MakePrimitive("uv", PrimitiveType.Float2));
-      var typeStandardVertexNode = AddNewNode(new TypeDeclNode { EditableFields = {
-        new TypeDeclNode.Field { Name = "position", Primitive = PrimitiveType.Float2 },
-        new TypeDeclNode.Field { Name = "color", Primitive = PrimitiveType.Float4 },
-        new TypeDeclNode.Field { Name = "uv", Primitive = PrimitiveType.Float2 },
-      } });
-
-      var vertex1Cpu = AddNewNode(new LiteralNode { Name = "vertex1Cpu", Type = PrimitiveType.Float3, ValueSource = InputSource.Internal, InternalValue = new Vector3(0.0f, 0.0f, 0.0f) });
-      var vertex2Cpu = AddNewNode(new LiteralNode { Name = "vertex2Cpu", Type = PrimitiveType.Float3, ValueSource = InputSource.Internal, InternalValue = new Vector3(1.0f, 1.0f, 0.0f) });
-      var vertex3Cpu = AddNewNode(new LiteralNode { Name = "vertex3Cpu", Type = PrimitiveType.Float3, ValueSource = InputSource.Internal, InternalValue = new Vector3(0.0f, 1.0f, 0.0f) });
-      var vertex4Cpu = AddNewNode(new LiteralNode { Name = "vertex4Cpu", Type = PrimitiveType.Float3, ValueSource = InputSource.Internal, InternalValue = new Vector3(0.0f, 0.0f, 0.0f) });
-      var vertex5Cpu = AddNewNode(new LiteralNode { Name = "vertex5Cpu", Type = PrimitiveType.Float3, ValueSource = InputSource.Internal, InternalValue = new Vector3(-1.0f, -1.0f, 0.0f) });
-      var vertex6Cpu = AddNewNode(new LiteralNode { Name = "vertex6Cpu", Type = PrimitiveType.Float3, ValueSource = InputSource.Internal, InternalValue = new Vector3(0.0f, -1.0f, 0.0f) });
-      var makeArrayCpu = AddNewNode(new MakeArrayNode { Name = "makeArrayCpu", InputCount = 6 });
-      var cpuNode = AddNewNode(new ScalarComputeNode { Name = "cpuNode", InternalType = new TypeDecl(TypeField.MakeType("0", TypeSpec.MakeArray(TypeSpec.MakePrimitive(PrimitiveType.Float3)))), TypeDeclMode = TypeDeclMode.Internal });
-      Connect(vertex1Cpu, "Out", makeArrayCpu, "0");
-      Connect(vertex2Cpu, "Out", makeArrayCpu, "1");
-      Connect(vertex3Cpu, "Out", makeArrayCpu, "2");
-      Connect(vertex4Cpu, "Out", makeArrayCpu, "3");
-      Connect(vertex5Cpu, "Out", makeArrayCpu, "4");
-      Connect(vertex6Cpu, "Out", makeArrayCpu, "5");
-      Connect(makeArrayCpu, "Out", cpuNode, "0");
-
-      var vectorIndexGpu = AddNewNode(new VectorIndexNode { Name = "vectorIndexGpu" });
-      var readInputGpu = AddNewNode(new ReadNode { Name = "readInputGpu" });
-      var makeStandardVertexGpu = AddNewNode(new PackNode { Name = "makeStandardVertexGpu" });
-      var gpuNode = AddNewNode(new VectorComputeNode { Name = "gpuNode", ThreadCountMode = ThreadCountMode.ArraySize });
-      Connect(cpuNode, "0", readInputGpu, "In");
-      Connect(vectorIndexGpu, "Out", readInputGpu, "Index");
-      Connect(typeStandardVertexNode, "Out", makeStandardVertexGpu, "TypeDecl");
-      Connect(readInputGpu, "Out", makeStandardVertexGpu, "position");
-      Connect(readInputGpu, "Out", makeStandardVertexGpu, "color");
-      Connect(readInputGpu, "Out", makeStandardVertexGpu, "uv");
-      Connect(typeStandardVertexNode, "Out", gpuNode, "TypeDecl");
-      Connect(makeStandardVertexGpu, "Out", gpuNode, "Out");
-      Connect(cpuNode, "0", gpuNode, "ThreadCountFromArray");
-
-
-      Validate();
-      GenerateProgram(new[] { gpuNode });
-    }
   }
 }

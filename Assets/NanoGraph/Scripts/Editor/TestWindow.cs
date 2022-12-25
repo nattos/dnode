@@ -1,16 +1,14 @@
-using System;
+using NanoGraph.Plugin;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 using UnityEditor;
 using UnityEngine;
 
-namespace NanoGraph.Plugin {
+namespace NanoGraph {
   public class TestWindow : EditorWindow {
     public bool Input;
+    public bool Locked;
+
+    public static string DesiredDebugOutputTextureKey;
 
     public void OnEnable() {
       PluginService.Instance.TextureOutputsUpdated += OnTextureOutputsUpdated;
@@ -37,9 +35,10 @@ namespace NanoGraph.Plugin {
           };
         }
         Input = EditorGUILayout.ToggleLeft("Show Input", Input);
-        EditorGUILayout.Space();
+        Locked = EditorGUILayout.ToggleLeft("Locked", Locked);
+        EditorGUILayout.Space(0, expand: true);
       }
-      Texture2D texture = Input ? PluginService.Instance.GetTextureInput() : PluginService.Instance.GetTextureOutput();
+      Texture2D texture = Input ? PluginService.Instance.GetTextureInput() : PluginService.Instance.GetDebugOutputTexture();
       if (!texture) {
         texture = Texture2D.blackTexture;
       }
@@ -80,6 +79,11 @@ namespace NanoGraph.Plugin {
           }
         }
       }
+
+      if (!string.IsNullOrEmpty(DesiredDebugOutputTextureKey) && !Locked) {
+        PluginService.Instance.DebugOutputTextureKey = DesiredDebugOutputTextureKey;
+      }
+      DesiredDebugOutputTextureKey = null;
     }
 
 

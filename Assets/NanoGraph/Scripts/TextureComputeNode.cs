@@ -104,7 +104,12 @@ namespace NanoGraph {
         // Note: Only load inputs that we really read.
         int bufferIndex = 0;
         AddGpuFuncInputs(func, computeInputs, gpuInputBuffers, ref bufferIndex);
+        AddDebugGpuFuncInputs(func, gpuInputBuffers, ref bufferIndex);
         AddGpuFuncOutputs(func, computeOutputSpec.Fields, gpuOutputBuffers, ref bufferIndex);
+        if (graph.DebugEnabled) {
+          AddGpuFuncInput(func, "debugOutputNodeIndex", program.IntType, "debugOutputNodeIndex", "debugOutputNodeIndex", gpuInputBuffers, ref bufferIndex, isReadWrite: false);
+          AddGpuFuncOutput(func, "debugOutputTexture", program.Texture, "debugOutputTexture", "debugOutputTexture", gpuOutputBuffers, ref bufferIndex);
+        }
         func.AddParam(Array.Empty<string>(), program.GetPrimitiveType(PrimitiveType.Uint2), $"gid_xy_uint", "[[thread_position_in_grid]]");
         func.AddParam(Array.Empty<string>(), program.GetPrimitiveType(PrimitiveType.Uint2), $"size_xy_uint", "[[threads_per_grid]]");
         func.AddStatement($"{func.GetTypeIdentifier(PrimitiveType.Uint)} gid_uint = gid_xy_uint.x + (gid_xy_uint.y * size_xy_uint.x);");
@@ -125,7 +130,29 @@ namespace NanoGraph {
           return;
         }
         var outputColorBuffer = gpuOutputBuffers.First(buffer => buffer.FieldName == "Out");
-        func.AddStatement($"WriteTexture({outputColorBuffer.Expression}, gid_xy_uint, {func.EmitConvert(outputColorLocal.Type, TypeSpec.MakePrimitive(PrimitiveType.Float4), outputColorLocal.Identifier)});");
+        func.AddStatement($"WriteTexture({outputColorBuffer.ParameterName}, gid_xy_uint, {func.EmitConvert(outputColorLocal.Type, TypeSpec.MakePrimitive(PrimitiveType.Float4), outputColorLocal.Identifier)});");
+
+        if (graph.DebugEnabled) {
+          var outputDebugBuffer = gpuOutputBuffers.First(buffer => buffer.Expression == "debugOutputTexture");
+          string debugOutLocal = func.AllocLocal("DebugOut");
+          func.AddStatement($"{func.GetTypeIdentifier(PrimitiveType.Float4)} {debugOutLocal} = 0.0;");
+          func.AddStatement($"if (debugOutputNodeIndex >= 0) {{");
+          func.AddStatement($"  switch (debugOutputNodeIndex) {{");
+          int resultIndex = 0;
+          foreach ((DataPlug dataPlug, CodeLocal resultLocal) in SortedResutLocalMap.Values) {
+            func.AddStatement($"    case {func.EmitLiteral(resultIndex)}:");
+            func.AddStatement($"      {debugOutLocal} = {func.EmitConvert(resultLocal.Type, TypeSpec.MakePrimitive(PrimitiveType.Float4), resultLocal.Identifier)};");
+            func.AddStatement($"      break;");
+            ++resultIndex;
+          }
+          func.AddStatement($"    case {func.EmitLiteral(resultIndex)}:");
+          func.AddStatement($"      {debugOutLocal} = {func.EmitConvert(outputColorLocal.Type, TypeSpec.MakePrimitive(PrimitiveType.Float4), outputColorLocal.Identifier)};");
+          func.AddStatement($"      break;");
+          func.AddStatement($"  }}");
+          func.AddStatement($"  WriteTexture({outputDebugBuffer.ParameterName}, gid_xy_uint, {debugOutLocal});");
+          func.AddStatement($"}}");
+        }
+
         result = codeCachedResult;
       }
 
@@ -192,9 +219,41 @@ namespace NanoGraph {
         string gridSizeLocal = validateCacheFunction.AllocLocal("Size");
         validateCacheFunction.AddStatement($"{validateCacheFunction.Program.Int2Type.Identifier} {gridSizeLocal} = {EmitTextureSizeExpr(validateCacheFunction)};");
         string gridSizeExpr = gridSizeLocal;
-        string gridSizeXExpr = $"(({gridSizeExpr}).x * {sizeNumerator} / {sizeDenominator})";
-        string gridSizeYExpr = $"(({gridSizeExpr}).y * {sizeNumerator} / {sizeDenominator})";
+        string gridSizeXLocal = validateCacheFunction.AllocLocal("SizeX");
+        string gridSizeYLocal = validateCacheFunction.AllocLocal("SizeY");
+        validateCacheFunction.AddStatement($"{validateCacheFunction.Program.IntType.Identifier} {gridSizeXLocal} = (int)(({gridSizeExpr}).x * {sizeNumerator} / {sizeDenominator});");
+        validateCacheFunction.AddStatement($"{validateCacheFunction.Program.IntType.Identifier} {gridSizeYLocal} = (int)(({gridSizeExpr}).y * {sizeNumerator} / {sizeDenominator});");
+        string gridSizeXExpr = gridSizeXLocal;
+        string gridSizeYExpr = gridSizeYLocal;
         string totalThreadCountExpr = $"(({gridSizeXExpr}) * ({gridSizeYExpr}))";
+
+        if (graph.DebugEnabled) {
+          validateCacheFunction.AddStatement($"const std::string& debugOutputTextureKey = DebugGetOutputTextureKey();");
+          validateCacheFunction.AddStatement($"int debugOutputNodeIndex = -1;");
+          {
+            bool first = true;
+            int resultIndex = 0;
+            foreach ((DataPlug dataPlug, CodeLocal resultLocal) in SortedResutLocalMap.Values) {
+              string ifBranch = first ? "if (" : "} else if (";
+              first = false;
+              string thisKey = $"{dataPlug.Node.DebugId}.{dataPlug.FieldName}";
+              validateCacheFunction.AddStatement($"{ifBranch}debugOutputTextureKey == {validateCacheFunction.EmitLiteral(thisKey)}) {{");
+              validateCacheFunction.AddStatement($"  debugOutputNodeIndex = {resultIndex};");
+              ++resultIndex;
+            }
+            {
+              string ifBranch = first ? "if (" : "} else if (";
+              first = false;
+              string thisKey = $"{Node.DebugId}.Out";
+              validateCacheFunction.AddStatement($"{ifBranch}debugOutputTextureKey == {validateCacheFunction.EmitLiteral(thisKey)}) {{");
+              validateCacheFunction.AddStatement($"  debugOutputNodeIndex = {resultIndex};");
+            }
+            validateCacheFunction.AddStatement($"}}");
+          }
+
+          validateCacheFunction.AddStatement($"ResizeSharedTexture(_debugOutputTexture, GetDevice(), {gridSizeXExpr}, {gridSizeYExpr});");
+          validateCacheFunction.AddStatement($"id<MTLTexture> debugOutputTexture = debugOutputNodeIndex >= 0 ? _debugOutputTexture->Texture : nullptr;");
+        }
 
         foreach (var dependency in dependentComputeNodes.Where(dependency => dependency.Operation is ISplitComputeNodeEmitCodeOperation)) {
           var op = dependency.Operation as ISplitComputeNodeEmitCodeOperation;

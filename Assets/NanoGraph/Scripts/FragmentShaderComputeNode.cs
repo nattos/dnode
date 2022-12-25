@@ -69,6 +69,7 @@ namespace NanoGraph {
           }
           AddGpuFuncInput(func, computeInput, $"input{inputIndex++}", gpuInputBuffers, ref bufferIndex);
         }
+        AddDebugGpuFuncInputs(func, gpuInputBuffers, ref bufferIndex);
       }
 
       public override void EmitFunctionReturn(out CodeCachedResult? result) {

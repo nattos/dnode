@@ -31,21 +31,32 @@ namespace DNode {
       base.DrawForeground();
 
       if (BoltFlow.Configuration.showConnectionValues) {
-        var showLastValue = EditorApplication.isPlaying && ConnectionDebugData.assignedLastValue;
+        var showLastValue = true;//EditorApplication.isPlaying && ConnectionDebugData.assignedLastValue;
         var showPredictedvalue = BoltFlow.Configuration.predictConnectionValues && !EditorApplication.isPlaying && Flow.CanPredict(connection.source, reference);
 
         if (showLastValue || showPredictedvalue) {
           var previousIconSize = EditorGUIUtility.GetIconSize();
           EditorGUIUtility.SetIconSize(new Vector2(IconSize.Small, IconSize.Small));
 
-          object value;
-
-          if (showLastValue) {
-            value = ConnectionDebugData.lastValue;
-          } else // if (showPredictedvalue)
-            {
-            value = Flow.Predict(connection.source, reference);
+          object value = null;
+          string debugId = (connection.source?.unit as NanoGraph.VisualScripting.BaseNode)?.Node?.DebugId;
+          if (debugId != null) {
+            string debugKey = $"{debugId}.{connection.source.key}";
+            double[] values = NanoGraph.Plugin.PluginService.Instance.GetDebugValues(debugKey);
+            if (values != null) {
+              value = (DValue)values;
+            }
           }
+          if (value == null) {
+            return;
+          }
+
+          // if (showLastValue) {
+          //   value = ConnectionDebugData.lastValue;
+          // } else // if (showPredictedvalue)
+          //   {
+          //   value = Flow.Predict(connection.source, reference);
+          // }
 
           string labelShortString;
           Type typeForIcon = null;

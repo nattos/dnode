@@ -12,6 +12,8 @@ namespace NanoGraph.Plugin {
     public GetParametersRequest GetParameters;
     public SetParametersRequest SetParameters;
     public ProcessTexturesRequest ProcessTextures;
+    public DebugGetWatchedValuesRequest DebugGetWatchedValues;
+    public DebugSetValuesRequest DebugSetValues;
   }
 
   public class GetDefinitionRequest {}
@@ -40,8 +42,39 @@ namespace NanoGraph.Plugin {
   public class ProcessTexturesRequest {
     public Int32[] TextureInputs;
     public Int32[] TextureOutputs;
+    public string DebugOutputTextureKey;
   }
-  public class ProcessTexturesResponse {}
+  public class ProcessTexturesResponse {
+    public Int32 DebugOutputTexture;
+  }
+
+  public class DebugSetWatchedKeysRequest {
+    public string[] Keys;
+  }
+  public class DebugSetWatchedKeysResponse {}
+  public class DebugGetWatchedValuesRequest {}
+  public class DebugGetWatchedValuesResponse {
+    public enum ValueType {
+      Element,
+      Array,
+      Texture,
+    }
+    public struct Value {
+      public string Key;
+      public ValueType Type;
+      public double[] Values;
+    }
+    public Value[] Values;
+  }
+
+  public class DebugSetValuesRequest {
+    public struct Value {
+      public string Key;
+      public double[] Values;
+    }
+    public Value[] Values;
+  }
+  public class DebugSetValuesResponse {}
 
   public class PluginServer : IDisposable {
     public static string PluginPackagePath => System.IO.Path.Combine(System.IO.Path.GetDirectoryName(UnityEngine.Application.dataPath), "NanoFFGL/build/NanoFFGL/Build/Products/Debug/NanoFFGL.app");
@@ -92,12 +125,25 @@ namespace NanoGraph.Plugin {
       });
     }
 
-    public async Task<ProcessTexturesResponse> ProcessTextures(IReadOnlyList<SharedTexture> textureInputs, IReadOnlyList<SharedTexture> textureOutputs) {
+    public async Task<ProcessTexturesResponse> ProcessTextures(IReadOnlyList<SharedTexture> textureInputs, IReadOnlyList<SharedTexture> textureOutputs, string debugOutputTextureKey = null) {
       return await SendRequestAsync<ProcessTexturesResponse>(new Request {
         ProcessTextures = new ProcessTexturesRequest {
           TextureInputs = textureInputs.Select(t => t.IOSurfaceID).ToArray(),
           TextureOutputs = textureOutputs.Select(t => t.IOSurfaceID).ToArray(),
+          DebugOutputTextureKey = debugOutputTextureKey,
         }
+      });
+    }
+
+    public async Task<DebugGetWatchedValuesResponse> DebugGetWatchedValues() {
+      return await SendRequestAsync<DebugGetWatchedValuesResponse>(new Request {
+        DebugGetWatchedValues = new DebugGetWatchedValuesRequest {}
+      });
+    }
+
+    public async Task<DebugSetValuesResponse> DebugSetValues(params DebugSetValuesRequest.Value[] values) {
+      return await SendRequestAsync<DebugSetValuesResponse>(new Request {
+        DebugSetValues = new DebugSetValuesRequest { Values = values }
       });
     }
 

@@ -742,7 +742,7 @@ namespace NanoGraph {
 
     bool IInternalNode.IsInternal => ValueSource == InputSource.Internal;
 
-    private DValue EffectiveInternalValue => InternalValueProvider?.Invoke() ?? InternalValue;
+    public DValue EffectiveInternalValue => InternalValueProvider?.Invoke() ?? InternalValue;
 
     public TypeSpec OutTypeSpec => new TypeSpec { Primitive = Type, IsArray = IsArray };
     public bool IsArray => ValueSource == InputSource.Internal ? (EffectiveInternalValue.Rows > 1) : false;
@@ -754,11 +754,55 @@ namespace NanoGraph {
       TypeSpec type = OutTypeSpec;
       if (ValueSource == InputSource.Internal) {
         var internalValue = EffectiveInternalValue;
-        context.Function.AddStatement($"{context.Function.GetTypeIdentifier(type)} {context.OutputLocals[0].Identifier} = {context.Function.EmitLiteral(type, internalValue)};");
+        string internalValueExpr = context.Function.EmitLiteral(type, internalValue);
+        string valueExpr = internalValueExpr;
+        if (Graph.DebugEnabled) {
+          bool isGpuContext = context.Function.Context is NanoGpuContext;
+          string debugValueKey = DebugValueKey;
+          NanoProgramType debugStateType = isGpuContext ? context.DebugState.DebugGpuStateType : context.DebugState.DebugCpuStateType;
+          string debugValueIdentifier = debugStateType.AddField(context.Function.Program.GetProgramType(type), debugValueKey, initializerStr: internalValueExpr);
+          string accessPrefix = isGpuContext ? "debugState." : $"{context.DebugState.DebugCpuStateIdentifier}.";
+          valueExpr = $"{accessPrefix}{debugValueIdentifier}";
+
+          string decodeValuesExpr = null;
+          switch (type.Primitive) {
+            case PrimitiveType.Bool:
+              decodeValuesExpr = $"(values.size() >= 1 ? (values[0] > 0.0 ? true : false) : false)";
+              break;
+            case PrimitiveType.Int:
+              decodeValuesExpr = $"(values.size() >= 1 ? ((int)std::round(values[0])) : 0)";
+              break;
+            case PrimitiveType.Uint:
+              decodeValuesExpr = $"(values.size() >= 1 ? ((uint)std::round(values[0])) : 0)";
+              break;
+            case PrimitiveType.Float:
+              decodeValuesExpr = $"(values.size() >= 1 ? ((float)(values[0])) : 0.0f)";
+              break;
+            case PrimitiveType.Float2:
+              decodeValuesExpr = $"vector_float2 {{ (values.size() >= 1 ? ((float)(values[0])) : 0.0f), (values.size() >= 2 ? ((float)(values[1])) : 0.0f) }}";
+              break;
+            case PrimitiveType.Float3:
+              decodeValuesExpr = $"vector_float3 {{ (values.size() >= 1 ? ((float)(values[0])) : 0.0f), (values.size() >= 2 ? ((float)(values[1])) : 0.0f), (values.size() >= 3 ? ((float)(values[2])) : 0.0f) }}";
+              break;
+            case PrimitiveType.Float4:
+              decodeValuesExpr = $"vector_float4 {{ (values.size() >= 1 ? ((float)(values[0])) : 0.0f), (values.size() >= 2 ? ((float)(values[1])) : 0.0f), (values.size() >= 3 ? ((float)(values[2])) : 0.0f), (values.size() >= 4 ? ((float)(values[3])) : 0.0f) }}";
+              break;
+            default:
+              break;
+          }
+          if (decodeValuesExpr != null) {
+            string debugStatePtrExpr = isGpuContext ? "gpuState" : "cpuState";
+            string debugKeyExpr = context.DebugState.GetDebugSettableValuesFunction.EmitLiteral(debugValueKey);
+            context.DebugState.GetDebugSettableValuesFunction.AddStatement($"debugValues.push_back(DebugSettableValue {{ .Key = {debugKeyExpr}, .Setter = [{debugStatePtrExpr}](const std::vector<double>& values) {{ {debugStatePtrExpr}->{debugValueIdentifier} = {decodeValuesExpr}; }} }});");
+          }
+        }
+        context.Function.AddStatement($"{context.Function.GetTypeIdentifier(type)} {context.OutputLocals[0].Identifier} = {valueExpr};");
       } else {
         context.Function.AddStatement($"{context.Function.GetTypeIdentifier(type)} {context.OutputLocals[0].Identifier} = {context.InputLocals[0].Identifier};");
       }
     }
+
+    public string DebugValueKey => $"{DebugId}.value";
   }
 
   public class GenerateValueNode : DataNode, ICodeNode, IAutoTypeNode {

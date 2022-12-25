@@ -20,7 +20,7 @@ namespace NanoGraph.VisualScripting {
     private bool _isRegisteredAsOutputNode;
 
     public BaseNode() {
-      _nodeInvalidatedHandler = () => { PortsChanged(); Define(); };
+      _nodeInvalidatedHandler = () => { PortsChanged(); Define(); SyncInputConnectionsToGraphEdges(); };
     }
 
     public override void BeforeAdd() {
@@ -55,7 +55,11 @@ namespace NanoGraph.VisualScripting {
       SyncOutputNodeRegistration();
     }
 
-    void IValueEditedHandler.OnValueEdited() {
+    void IValueEditedHandler.OnValueEdited(string fieldName) {
+      if (_fieldNameToLiteralNodes.TryGetValue(fieldName, out LiteralNode literalNode)) {
+        Plugin.PluginService.Instance.SetDebugValue(literalNode.DebugValueKey, literalNode.EffectiveInternalValue.ValueArray);
+        return;
+      }
       Node?.Graph?.CompileLater();
     }
 

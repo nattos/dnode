@@ -40,6 +40,7 @@ namespace NanoGraph {
         // Note: Only load inputs that we really read.
         int bufferIndex = 0;
         AddGpuFuncInputs(func, CollectComputeInputs(DependentComputeInputsToLoad), gpuInputBuffers, ref bufferIndex);
+        AddDebugGpuFuncInputs(func, gpuInputBuffers, ref bufferIndex);
       }
 
       public override void EmitFunctionReturn(out CodeCachedResult? result) {

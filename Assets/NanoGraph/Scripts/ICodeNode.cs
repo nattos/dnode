@@ -10,10 +10,19 @@ namespace NanoGraph {
     public TypeSpec Type;
   }
 
+  public struct DebugState {
+    public NanoFunction GetDebugSettableValuesFunction;
+    public NanoProgramType DebugCpuStateType;
+    public string DebugCpuStateIdentifier;
+    public NanoProgramType DebugGpuStateType;
+    public string DebugGpuStateIdentifier;
+  }
+
   public struct CodeContext {
     public NanoFunction Function;
     public IReadOnlyList<CodeLocal> InputLocals;
     public IReadOnlyList<CodeLocal> OutputLocals;
+    public DebugState DebugState;
     public List<string> Errors;
   }
 
@@ -41,6 +50,7 @@ namespace NanoGraph {
     public List<string> errors;
     public NanoGraph graph;
     public NanoProgram program;
+    public DebugState debugState;
 
     public NanoFunction createPipelinesFunction;
 

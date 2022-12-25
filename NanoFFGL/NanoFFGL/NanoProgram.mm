@@ -166,6 +166,38 @@ public:
 
 
 
+
+class NanoSharedTexture {
+ public:
+  id<MTLTexture> Texture;
+  IOSurfaceRef IOSurface;
+  int32_t IOSurfaceId;
+
+  ~NanoSharedTexture() {
+    if (IOSurface) {
+      CFRelease(IOSurface);
+    }
+  }
+  
+  static NanoSharedTexture* Create(id<MTLDevice> device, int32_t width, int32_t height) {
+    NSDictionary *attribs = @{ (NSString *)kIOSurfaceIsGlobal: @YES,
+                               (NSString *)kIOSurfaceWidth: @(width),
+                               (NSString *)kIOSurfaceHeight: @(height),
+                               (NSString *)kIOSurfaceBytesPerElement: @4u };
+    IOSurfaceRef ioSurface = IOSurfaceCreate((CFDictionaryRef)attribs);
+
+    MTLTextureDescriptor *desc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm_sRGB
+                                                                                    width:width
+                                                                                   height:height
+                                                                                mipmapped:NO];
+    id<MTLTexture> texture = [device newTextureWithDescriptor:desc iosurface:ioSurface plane:0];
+    int32_t ioSurfaceId = IOSurfaceGetID(ioSurface);
+    return new NanoSharedTexture { texture, ioSurface, ioSurfaceId };
+  }
+};
+
+
+
 class NanoProgram {
 public:
   struct ParameterDecl {
@@ -173,6 +205,17 @@ public:
     double DefaultValue;
     double MinValue;
     double MaxValue;
+  };
+  
+  struct DebugValue {
+    std::string Key;
+    int Length;
+    vector_double4 Value;
+  };
+
+  struct DebugSettableValue {
+    std::string Key;
+    std::function<void(const std::vector<double>&)> Setter;
   };
 
   NanoProgram() {}
@@ -207,6 +250,8 @@ public:
   }
 
   virtual std::vector<ParameterDecl> GetParameterDecls() = 0;
+  virtual std::vector<DebugValue> GetDebugValues() = 0;
+  virtual std::vector<DebugSettableValue> GetDebugSettableValues() = 0;
 
   void SetupParameters() {
     std::vector<ParameterDecl> parameters = GetParameterDecls();
@@ -246,6 +291,10 @@ public:
     }
     _inputTextures[index] = value;
   }
+  
+  int32_t DebugGetOutputTextureSurfaceId() const { return _debugOutputTexture ? _debugOutputTexture->IOSurfaceId : 0; }
+  const std::string& DebugGetOutputTextureKey() const { return _debugOutputTextureKey; }
+  void DebugSetOutputTextureKey(const std::string& value) { _debugOutputTextureKey = value; }
 
   template<typename T> T SampleBuffer(const std::shared_ptr<NanoTypedBuffer<T>>& buffer, int index) { return (*buffer)[index]; }
   template<typename T> void WriteBuffer(const std::shared_ptr<NanoTypedBuffer<T>>& buffer, int index, T value) { (*buffer)[index] = value; }
@@ -296,6 +345,7 @@ private:
   bool _createdPipelines = false;
   std::vector<double> _valueInputs;
   std::vector<id<MTLTexture>> _inputTextures;
+  std::string _debugOutputTextureKey;
 
   int _frameNumber = 0;
 
@@ -303,6 +353,7 @@ private:
   static std::unique_ptr<std::map<NSThread*, NanoProgram*>> _threadMap;
 
 protected:
+  std::unique_ptr<NanoSharedTexture> _debugOutputTexture;
 
   id<MTLTexture> ResizeTexture(id<MTLTexture> originalTexture, int width, int height) {
     width = std::max(1, width);
@@ -312,6 +363,15 @@ protected:
     }
     MTLTextureDescriptor* desc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:DefaultTextureFormat width:width height:height mipmapped:NO];
     return [_device newTextureWithDescriptor:desc];
+  }
+  
+  static void ResizeSharedTexture(std::unique_ptr<NanoSharedTexture>& ptr, id<MTLDevice> device, int32_t width, int32_t height) {
+    width = std::max(1, width);
+    height = std::max(1, height);
+    if (ptr && ptr->Texture.width == width && ptr->Texture.height == height) {
+      return;
+    }
+    ptr.reset(NanoSharedTexture::Create(device, width, height));
   }
 
 
@@ -547,6 +607,8 @@ namespace {
   constexpr const char* kGetParametersRequestKey = "GetParameters";
   constexpr const char* kSetParametersRequestKey = "SetParameters";
   constexpr const char* kProcessTexturesRequestKey = "ProcessTextures";
+  constexpr const char* kDebugGetWatchedValuesRequestKey = "DebugGetWatchedValues";
+  constexpr const char* kDebugSetValuesRequestKey = "DebugSetValues";
 }
 
 
@@ -562,6 +624,13 @@ int main(int argc, const char* argv[]) {
       for (const auto& parameterDecl : g_program->GetParameterDecls()) {
         parameterMap[parameterDecl.Name] = parameterIndex;
         ++parameterIndex;
+      }
+    }
+    std::unordered_map<std::string, NanoProgram::DebugSettableValue> debugValuesMap;
+    {
+      std::vector<NanoProgram::DebugSettableValue> debugValues = g_program->GetDebugSettableValues();
+      for (const auto& entry : debugValues) {
+        debugValuesMap[entry.Key] = entry;
       }
     }
 
@@ -617,7 +686,7 @@ int main(int argc, const char* argv[]) {
           nlohmann::json request = json[kSetParametersRequestKey].get<nlohmann::json>();
           std::cerr << "Request: " << request << "\n";
           
-          nlohmann::json parameters = request["Values"].get<nlohmann::json>();
+          const nlohmann::json& parameters = request["Values"].get<nlohmann::json>();
           for (const auto& [key, value] : parameters.items()) {
             auto findIt = parameterMap.find(key);
             if (findIt == parameterMap.end()) {
@@ -663,6 +732,8 @@ int main(int argc, const char* argv[]) {
             }
             g_program->SetTextureInput(i, texture);
           }
+          std::string debugOutputTextureKey = request.value<std::string>("DebugOutputTextureKey", "");
+          g_program->DebugSetOutputTextureKey(debugOutputTextureKey);
 
           g_program->Run();
 
@@ -689,6 +760,60 @@ int main(int argc, const char* argv[]) {
           }
 
           nlohmann::json response;
+          response["DebugOutputTexture"] = g_program->DebugGetOutputTextureSurfaceId();
+          std::cout << EncodeResponse(response) << "\n";
+          hadResponse = true;
+        } else if (json.contains(kDebugGetWatchedValuesRequestKey)) {
+          nlohmann::json request = json[kDebugGetWatchedValuesRequestKey].get<nlohmann::json>();
+          std::cerr << "Request: " << request << "\n";
+
+          nlohmann::json response;
+          nlohmann::json values;
+          for (const auto& value : g_program->GetDebugValues()) {
+            nlohmann::json currentValue;
+            currentValue.push_back(value.Value.x);
+            if (value.Length >=2) {
+              currentValue.push_back(value.Value.y);
+            }
+            if (value.Length >= 3) {
+              currentValue.push_back(value.Value.z);
+            }
+            if (value.Length >= 4) {
+              currentValue.push_back(value.Value.w);
+            }
+            nlohmann::json valueJson = {
+              { "Key", value.Key },
+              { "Values", currentValue },
+            };
+            values.push_back(valueJson);
+          }
+          response["Values"] = values;
+
+          std::cerr << "Response: " << response << "\n";
+          std::cout << EncodeResponse(response) << "\n";
+          hadResponse = true;
+        } else if (json.contains(kDebugSetValuesRequestKey)) {
+          nlohmann::json request = json[kDebugSetValuesRequestKey].get<nlohmann::json>();
+          std::cerr << "Request: " << request << "\n";
+
+          const nlohmann::json& debugValues = request["Values"].get<nlohmann::json>();
+          std::vector<double> valuesArray;
+          for (const auto& value : debugValues) {
+            std::string key = value["Key"].get<std::string>();
+            auto findIt = debugValuesMap.find(key);
+            if (findIt == debugValuesMap.end()) {
+              continue;
+            }
+            const nlohmann::json valuesJson = value["Values"].get<nlohmann::json>();
+            for (const auto& entry : valuesJson) {
+              valuesArray.push_back(entry.get<double>());
+            }
+            findIt->second.Setter(valuesArray);
+            valuesArray.clear();
+          }
+
+          nlohmann::json response;
+          std::cerr << "Response: " << response << "\n";
           std::cout << EncodeResponse(response) << "\n";
           hadResponse = true;
         }

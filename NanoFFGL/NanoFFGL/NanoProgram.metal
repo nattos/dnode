@@ -40,24 +40,40 @@ template<> vector_float4 inline Convert<float, vector_float4>(float value) {
   return vector_float4 { value, value, value, value };
 }
 
+template<> float inline Convert<vector_float2, float>(vector_float2 value) {
+  return value.x;
+}
+
 template<> vector_float3 inline Convert<vector_float2, vector_float3>(vector_float2 value) {
   return vector_float3 { value.x, value.y, 0.0f };
 }
 
-template<> vector_float4 inline Convert<vector_float3, vector_float4>(vector_float3 value) {
-  return vector_float4 { value.x, value.y, value.z, 0.0f };
+template<> vector_float4 inline Convert<vector_float2, vector_float4>(vector_float2 value) {
+  return vector_float4 { value.x, value.y, 0.0f, 0.0f };
+}
+
+template<> float inline Convert<vector_float3, float>(vector_float3 value) {
+  return value.x;
 }
 
 template<> vector_float2 inline Convert<vector_float3, vector_float2>(vector_float3 value) {
   return vector_float2 { value.x, value.y };
 }
 
-template<> vector_float2 inline Convert<vector_float4, vector_float2>(vector_float4 value) {
-  return vector_float2 { value.x, value.y };
+template<> vector_float4 inline Convert<vector_float3, vector_float4>(vector_float3 value) {
+  return vector_float4 { value.x, value.y, value.z, 0.0f };
 }
 
 template<> float inline Convert<vector_float4, float>(vector_float4 value) {
   return value.x;
+}
+
+template<> vector_float2 inline Convert<vector_float4, vector_float2>(vector_float4 value) {
+  return vector_float2 { value.x, value.y };
+}
+
+template<> vector_float3 inline Convert<vector_float4, vector_float3>(vector_float4 value) {
+  return vector_float3 { value.x, value.y, value.z };
 }
 
 #include "Generated/Program.metal.incl.h"

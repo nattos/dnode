@@ -33,6 +33,17 @@ namespace NanoGraph {
       return texture;
     }
 
+    public SharedTexture CreateTextureFromSurfaceId(Int32 surfaceId) {
+      IntPtr handle = Plugin_CreateSharedTextureFromSurfaceId(surfaceId);
+      IntPtr nativeHandle = Plugin_GetSharedTextureTexture(handle);
+      int width = Plugin_GetSharedTextureWidth(handle);
+      int height = Plugin_GetSharedTextureHeight(handle);
+      Texture2D rawTexture = Texture2D.CreateExternalTexture(width, height, TextureFormat.BGRA32, mipChain: false, linear: false, nativeHandle);
+      SharedTexture texture = new SharedTexture(this, rawTexture, Plugin_GetSharedTextureSurfaceID(handle));
+      _textures[texture] = handle;
+      return texture;
+    }
+
     public void DestroyTexture(SharedTexture texture) {
       if (_textures.TryGetValue(texture, out IntPtr handle)) {
         _textures.Remove(texture);
@@ -52,6 +63,12 @@ namespace NanoGraph {
 
     [DllImport("MetalPlugin")]
     private static extern IntPtr Plugin_CreateSharedTexture(Int32 width, Int32 height);
+    [DllImport("MetalPlugin")]
+    private static extern IntPtr Plugin_CreateSharedTextureFromSurfaceId(Int32 surfaceId);
+    [DllImport("MetalPlugin")]
+    private static extern Int32 Plugin_GetSharedTextureWidth(IntPtr texture);
+    [DllImport("MetalPlugin")]
+    private static extern Int32 Plugin_GetSharedTextureHeight(IntPtr texture);
     [DllImport("MetalPlugin")]
     private static extern Int32 Plugin_GetSharedTextureSurfaceID(IntPtr texture);
     [DllImport("MetalPlugin")]

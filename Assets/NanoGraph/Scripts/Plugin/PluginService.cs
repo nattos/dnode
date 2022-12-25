@@ -32,11 +32,15 @@ namespace NanoGraph.Plugin {
     private CancelationFlag _renderLoopCancelationFlag;
 
     public Vector2Int RenderSize = new Vector2Int(1920, 1080);
+    public string DebugOutputTextureKey = "";
 
     private readonly List<SharedTexture> _textureInputs = new List<SharedTexture>();
     private readonly List<SharedTexture> _textureOutputs = new List<SharedTexture>();
     private Dictionary<string, double> _parameterValues = new Dictionary<string, double>();
     private readonly Dictionary<string, double> _queuedParameterValues = new Dictionary<string, double>();
+    private readonly Dictionary<string, double[]> _queuedDebugSetValues = new Dictionary<string, double[]>();
+
+    private readonly Dictionary<string, double[]> _debugValues = new Dictionary<string, double[]>();
 
     private readonly List<Parameter> _parameters = new List<Parameter>();
 
@@ -49,6 +53,9 @@ namespace NanoGraph.Plugin {
     public bool IsCompiling => _pluginWatcher.IsCompiling || _pluginBuilder.IsCompiling;
     public bool HasCompileError => _pluginBuilder.IsError;
     public bool IsReloading => _pluginWatcher.IsReloading || _isServerStarting;
+
+    private Int32 _debugOutputTextureSurfaceId = 0;
+    private SharedTexture _debugOutputTexture;
 
     public PluginService() {
       _pluginBuilder = new PluginBuilder();
@@ -77,6 +84,11 @@ namespace NanoGraph.Plugin {
     public Texture2D GetTextureOutput() {
       return _textureOutputs.FirstOrDefault()?.Texture;
     }
+
+    public Texture2D GetDebugOutputTexture() {
+      return _debugOutputTexture?.Texture;
+    }
+
 
     public bool IsRendering => _isRendering;
 
@@ -141,9 +153,25 @@ namespace NanoGraph.Plugin {
             await _server.SetParametersRequest(_queuedParameterValues);
             _queuedParameterValues.Clear();
           }
-          var response = await _server.ProcessTextures(_textureInputs, _textureOutputs);
-          // Debug.Log(response);
-          // Graphics.CopyTexture(_textureInputs[0].Texture, _textureOutputs[0].Texture);
+          if (_queuedDebugSetValues.Count > 0) {
+            await _server.DebugSetValues(_queuedDebugSetValues.Select(entry => new DebugSetValuesRequest.Value { Key = entry.Key, Values = entry.Value }).ToArray());
+            _queuedDebugSetValues.Clear();
+          }
+          var response = await _server.ProcessTextures(_textureInputs, _textureOutputs, DebugOutputTextureKey);
+          if (response.DebugOutputTexture != 0 && response.DebugOutputTexture != _debugOutputTextureSurfaceId) {
+            _debugOutputTextureSurfaceId = response.DebugOutputTexture;
+            _debugOutputTexture?.Dispose();
+            _debugOutputTexture = null;
+            _debugOutputTexture = SharedTextureManager.Instance.CreateTextureFromSurfaceId(response.DebugOutputTexture);
+          }
+
+          var debugValues = await _server.DebugGetWatchedValues();
+          _debugValues.Clear();
+          if (debugValues?.Values?.Length > 0) {
+            foreach (var debugValue in debugValues.Values) {
+              _debugValues[debugValue.Key] = debugValue.Values;
+            }
+          }
 
           TextureOutputsUpdated?.Invoke();
 
@@ -179,6 +207,14 @@ namespace NanoGraph.Plugin {
     public void SetParameter(string name, double value) {
       _parameterValues[name] = value;
       _queuedParameterValues[name] = value;
+    }
+
+    public double[] GetDebugValues(string key) {
+      return _debugValues.GetOrDefault(key);
+    }
+
+    public void SetDebugValue(string key, double[] values) {
+      _queuedDebugSetValues[key] = values;
     }
 
     private async Task StartServer() {

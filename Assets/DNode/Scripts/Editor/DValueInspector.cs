@@ -162,7 +162,7 @@ namespace DNode {
           return false;
         }
         outValue = (DValue)_staticValues.ToArray();
-        (metadata.parent?.parent?.parent?.value as IValueEditedHandler)?.OnValueEdited();
+        (metadata.parent?.parent?.parent?.value as IValueEditedHandler)?.OnValueEdited(fieldName);
         return true;
       } else {
         return false;

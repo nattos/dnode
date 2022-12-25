@@ -20,7 +20,7 @@ namespace DNode {
   }
 
   public interface IValueEditedHandler {
-    void OnValueEdited();
+    void OnValueEdited(string fieldName);
   }
 
   [TypeIcon(typeof(OnDrawGizmos))]
