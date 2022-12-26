@@ -5,10 +5,10 @@ using Unity.VisualScripting;
 
 namespace DNode {
   [Widget(typeof(ValueConnection))]
-  public sealed class DValueConnectionWidget : UnitConnectionWidget<ValueConnection> {
+  public sealed class DValueConnectionWidget : NanoGraph.VisualScripting.UnitConnectionWidget<ValueConnection> {
     public static Action<ValueConnection> ConnectionChanged;
 
-    public DValueConnectionWidget(FlowCanvas canvas, ValueConnection connection) : base(canvas, connection) {
+    public DValueConnectionWidget(NanoGraph.VisualScripting.FlowCanvas canvas, ValueConnection connection) : base(canvas, connection) {
       NanoGraph.VisualScripting.BaseNodeInspector.CheckNodeStateListeners();
       ConnectionChanged?.Invoke(this.connection);
     }

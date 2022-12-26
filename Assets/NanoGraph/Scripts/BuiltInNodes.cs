@@ -9,6 +9,8 @@ namespace NanoGraph {
     [EditableAttribute]
     public new StandardOperatorType Operator = StandardOperatorType.Add;
     public override StandardOperatorType OperatorType => Operator;
+
+    protected override string ShortNamePart => Operator.ToString();
   }
 
   public abstract class BaseMathNode : DataNode, ICodeNode, IAutoTypeNode {
@@ -247,6 +249,7 @@ namespace NanoGraph {
   public class FillArrayNode : DataNode, ICodeNode, IAutoTypeNode {
     [EditableAttribute]
     public ValueProviderType Source = ValueProviderType.Random;
+    protected override string ShortNamePart => $"Fill{Source}";
 
     [EditableAttribute]
     public AutoType OutType = AutoType.Auto;
@@ -287,6 +290,7 @@ namespace NanoGraph {
   public class ReduceArrayNode : DataNode, ICodeNode, IAutoTypeNode {
     [EditableAttribute]
     public ReduceOperatorType Operation = ReduceOperatorType.Length;
+    protected override string ShortNamePart => Operation.ToString();
 
     [EditableAttribute]
     public AutoType OutType = AutoType.Auto;
@@ -758,6 +762,7 @@ namespace NanoGraph {
     // TODO: Only allow values that can actually be input :P
     [EditableAttribute]
     public PrimitiveType Type = PrimitiveType.Float;
+    protected override string ShortNamePart => Type.ToString();
 
     public InputSource ValueSource = InputSource.External;
     public DValue InternalValue;
@@ -834,6 +839,7 @@ namespace NanoGraph {
   public class GenerateValueNode : DataNode, ICodeNode, IAutoTypeNode {
     [EditableAttribute]
     public ValueProviderType Source = ValueProviderType.Random;
+    protected override string ShortNamePart => Source.ToString();
 
     [EditableAttribute]
     public AutoType OutType = AutoType.Auto;

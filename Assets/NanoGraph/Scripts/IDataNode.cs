@@ -80,7 +80,7 @@ namespace NanoGraph {
     DataSpec OutputSpec { get; }
     DataNodeCacheData CacheData { get; set; }
     string ShortName { get; }
-    string DebugId { get; }
+    string DebugId { get; set; }
 
     void Validate(List<Action> cleanupActions);
   }

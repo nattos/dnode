@@ -72,6 +72,9 @@ namespace NanoGraph {
     }
 
     public void Connect(IDataNode sourceNode, string sourcePlugName, IDataNode destNode, string destPlugName) {
+      if (sourceNode == null || destNode == null) {
+        return;
+      }
       var sourceSpec = sourceNode.OutputSpec;
       var destSpec = destNode.InputSpec;
 

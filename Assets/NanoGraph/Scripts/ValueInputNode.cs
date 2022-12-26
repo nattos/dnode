@@ -49,7 +49,7 @@ namespace NanoGraph {
 
       public override void EmitFunctionPreamble(out NanoFunction func) {
         base.EmitFunctionPreamble(out func);
-        this.valueInputKey = program.AllocateValueInput(Node.Name, Node.DefaultValue, Node.MinValue, Node.MaxValue);
+        this.valueInputKey = program.AllocateValueInput(Node.ShortName, Node.DefaultValue, Node.MinValue, Node.MaxValue);
       }
 
       public override void EmitValidateCacheFunctionInner() {

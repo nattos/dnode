@@ -86,10 +86,9 @@ namespace NanoGraph {
       DesiredDebugOutputTextureKey = null;
     }
 
-
     [MenuItem("Do/Show Test Window")]
     public static void ShowWindow() {
-      EditorWindow.GetWindow<TestWindow>().Show();
+      EditorWindow.GetWindow<TestWindow>("Monitor").Show();
     }
   }
 }

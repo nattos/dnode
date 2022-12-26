@@ -13,7 +13,10 @@ namespace NanoGraph.VisualScripting {
 
     private readonly Dictionary<string, IUnitInputPort> _fieldNameToInputPortMap = new Dictionary<string, IUnitInputPort>();
 
+    [Serialize]
     private readonly Dictionary<string, LiteralNode> _fieldNameToLiteralNodes = new Dictionary<string, LiteralNode>();
+    [NonSerialized]
+    private bool _didConnectSerializedLiteralNodes = false;
     private readonly Dictionary<string, DCustomInspectorData> _fieldNameToCustomInspectorData = new Dictionary<string, DCustomInspectorData>();
 
     private readonly Action _nodeInvalidatedHandler;
@@ -103,7 +106,7 @@ namespace NanoGraph.VisualScripting {
         _fieldNameToCustomInspectorData[field.Name] = new DCustomInspectorData {
           DefaultValue = value,
           Dimensions = value?.Columns,
-          MinValue = -1.0,
+          MinValue = 0.0,
           MaxValue = 1.0,
         };
       }
@@ -129,11 +132,13 @@ namespace NanoGraph.VisualScripting {
     private void EnsureNode() {
       if (Node != null) {
         if (Node.Graph == null) {
+          Node.DebugId = this.guid.ToString();
           NanoGraph.DebugInstance.AddNode(Node);
         }
         return;
       }
       Node = CreateNode();
+      Node.DebugId = this.guid.ToString();
       NanoGraph.DebugInstance.AddNode(Node);
     }
 
@@ -190,6 +195,11 @@ namespace NanoGraph.VisualScripting {
             if (literalNode.Type != fieldPrimitiveType) {
               RemoveLiteralNode(new KeyValuePair<string, LiteralNode>(inputPort.key, literalNode));
               relinkNode = true;
+            } else {
+              if (!_didConnectSerializedLiteralNodes) {
+                graph.AddNode(literalNode);
+                edgesToAdd.Add(new DataEdge { Source = new DataPlug { Node = literalNode, FieldName = "Out" }, Destination = new DataPlug { Node = Node, FieldName = inputPort.key } });
+              }
             }
           } else {
             relinkNode = true;
@@ -197,7 +207,7 @@ namespace NanoGraph.VisualScripting {
           if (relinkNode) {
             bool isArray = field?.Type.IsArray ?? false;
             Func<DValue> valueProvider = () => defaultValues.GetValueOrDefault(inputPort.key) as DValue? ?? default;
-            literalNode = new LiteralNode { Name = "Value", Type = fieldPrimitiveType, ValueSource = InputSource.Internal, InternalValueProvider = valueProvider };
+            literalNode = new LiteralNode { SerializedName = "Value", Type = fieldPrimitiveType, ValueSource = InputSource.Internal, InternalValueProvider = valueProvider };
             _fieldNameToLiteralNodes[inputPort.key] = literalNode;
 
             graph.AddNode(literalNode);
@@ -232,6 +242,8 @@ namespace NanoGraph.VisualScripting {
       foreach (DataEdge toAdd in edgesToAdd) {
         graph.Connect(toAdd.Source.Node, toAdd.Source.FieldName, toAdd.Destination.Node, toAdd.Destination.FieldName);
       }
+
+      _didConnectSerializedLiteralNodes = true;
     }
 
     private void ClearLiteralNodes() {

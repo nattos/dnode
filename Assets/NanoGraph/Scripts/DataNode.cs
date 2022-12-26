@@ -10,7 +10,20 @@ namespace NanoGraph {
   [Serializable]
   public abstract class DataNode : IDataNode, IEditableAttributeProvider {
     [EditableAttribute]
-    public string Name;
+    public string SerializedName = "#";
+    public string ComputedName {
+      get {
+        string name = SerializedName?.Trim();
+        if (string.IsNullOrEmpty(name)) {
+          return ShortNamePart ?? _typeShortName.Value;
+        }
+        return name.Replace("#", ShortNamePart ?? _typeShortName.Value);
+      }
+    }
+    protected virtual string ShortNamePart => null;
+
+    [NonSerialized]
+    private readonly Lazy<string> _typeShortName;
 
     [EditableAttribute]
     public string DebugId;
@@ -18,6 +31,9 @@ namespace NanoGraph {
       get {
         EnsureDebugId();
         return DebugId;
+      }
+      set {
+        DebugId = value;
       }
     }
 
@@ -34,7 +50,14 @@ namespace NanoGraph {
     private readonly List<string> _errorMessages = new List<string>();
 
     public DataNode() {
-      Name = GetType().Name;
+      _typeShortName = new Lazy<string>(() => {
+            string name = GetType().Name;
+            string suffix = "Node";
+            if (name.EndsWith(suffix)) {
+              name = name.Substring(0, name.Length - "Node".Length);
+            }
+            return name;
+          });
     }
 
     public void Validate(List<Action> cleanupActions) {
@@ -49,7 +72,7 @@ namespace NanoGraph {
     }
 
     public override string ToString() {
-      return $"{Name} ({GetType().Name})";
+      return $"{ShortName} ({GetType().Name})";
     }
 
     public string DebugInfoDump {
@@ -85,7 +108,7 @@ namespace NanoGraph {
       }
     }
 
-    public string ShortName => string.IsNullOrWhiteSpace(Name) ? GetType().Name : Name;
+    public string ShortName => string.IsNullOrWhiteSpace(ComputedName) ? GetType().Name : ComputedName;
 
     public virtual IReadOnlyList<EditableAttribute> EditableAttributes => GetCachedEditableAttributes(GetType());
 
