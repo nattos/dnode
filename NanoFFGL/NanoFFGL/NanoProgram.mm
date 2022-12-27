@@ -695,6 +695,7 @@ int main(int argc, const char* argv[]) {
     }
 
     while (true) {
+    @autoreleasepool {
       std::string input;
       std::getline(std::cin, input);
       std::string inputStr;
@@ -818,7 +819,6 @@ int main(int argc, const char* argv[]) {
           hadResponse = true;
         } else if (json.contains(kDebugGetWatchedValuesRequestKey)) {
           nlohmann::json request = json[kDebugGetWatchedValuesRequestKey].get<nlohmann::json>();
-          std::cerr << "Request: " << request << "\n";
 
           nlohmann::json response;
           nlohmann::json values;
@@ -875,7 +875,7 @@ int main(int argc, const char* argv[]) {
         std::cout << EncodeResponse(response) << "\n";
       }
       std::flush(std::cout);
-    }
+    } }
   }
   return 1;
 }
