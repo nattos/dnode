@@ -46,6 +46,7 @@ namespace NanoGraph.Plugin {
 
     private bool _isServerStarting = false;
 
+    public Action TextureInputsNeedUpdating;
     public Action TextureOutputsUpdated;
 
     public bool EnableAutoReload { get; set; } = true;
@@ -80,6 +81,12 @@ namespace NanoGraph.Plugin {
     public Texture2D GetTextureInput() {
       return _textureInputs.FirstOrDefault()?.Texture;
     }
+
+    public Texture2D[] GetTextureInputs() {
+      return _textureInputs.Select(t => t.Texture).ToArray();
+    }
+
+    public int TextureInputCount => _textureInputs.Count;
 
     public Texture2D GetTextureOutput() {
       return _textureOutputs.FirstOrDefault()?.Texture;
@@ -117,38 +124,7 @@ namespace NanoGraph.Plugin {
         return;
       }
       if (_textureInputs.Count > 0) {
-        var _serverTexture = _textureInputs[_textureInputs.Count - 1].Texture;
-        var temp = RenderTexture.GetTemporary(
-            _serverTexture.width, _serverTexture.height, 0,
-            RenderTextureFormat.Default, RenderTextureReadWrite.Default
-        );
-        RenderTexture oldRT = RenderTexture.active;
-        RenderTexture.active = temp;
-        phase += 0.05f;
-        GL.Clear(clearDepth: false, clearColor: true, new Color(Mathf.Abs(Mathf.Sin(phase)), 0.0f, 0.0f, 1.0f));
-        // GL.PushMatrix();
-        // GL.LoadOrtho();
-        // GL.LoadPixelMatrix();
-        // GL.Begin(GL.LINES);
-        // GL.Vertex3(0.0f, 0.0f, 0.0f);
-        // GL.Vertex3(10.0f, 10.0f, 10.0f);
-        // GL.Color(Color.red);
-        // GL.End();
-        // GL.PopMatrix();
-        RenderTexture.active = oldRT;
-        Graphics.CopyTexture(temp, _serverTexture);
-        // RenderTexture.ReleaseTemporary(temp);
-        // SharedTexture tex = _textureInputs[_textureInputs.Count - 1];
-        // Graphics.CopyTexture(Texture2D.redTexture, 0, 0, 0, 0, Texture2D.redTexture.width, Texture2D.redTexture.height, tex.Texture, 0, 0, 100, 100);
-        // SharedTexture tex = _textureInputs[_textureInputs.Count - 1];
-        // RenderTexture rt = RenderTexture.GetTemporary(1920, 1080, 0, RenderTextureFormat.BGRA32, 0, );
-        // RenderTexture.active = rt;
-        // phase += 0.1f;
-        // GL.Clear(clearDepth: false, clearColor: true, new Color(Mathf.Abs(Mathf.Sin(phase)), 0.0f, 0.0f, 1.0f));
-        // RenderTexture.active = null;
-        // // // var rt = RenderTexture.GetTemporary(tex.Texture.width, tex.Texture.height, 0, RenderTextureFormat.Default, RenderTextureReadWrite.Default);
-        // Graphics.CopyTexture(rt, tex.Texture);
-        // RenderTexture.ReleaseTemporary(rt);
+        TextureInputsNeedUpdating.Invoke();
       }
 
       Dictionary<string, double> queuedParameterValues = null;
@@ -281,26 +257,6 @@ namespace NanoGraph.Plugin {
       ClearTextures();
       for (int i = 0; i < textureInputCount; ++i) {
         _textureInputs.Add(SharedTextureManager.Instance.CreateTexture(RenderSize.x, RenderSize.y));
-
-        // SharedTexture tex = _textureInputs[_textureInputs.Count - 1];
-        // Graphics.CopyTexture(Texture2D.redTexture, 0, 0, 0, 0, Texture2D.redTexture.width, Texture2D.redTexture.height, tex.Texture, 0, 0, 100, 100);
-        // RenderTexture rt = RenderTexture.GetTemporary(1920, 1080, 0, RenderTextureFormat.BGRA32, 0);
-        // RenderTexture.active = rt;
-        // GL.Clear(clearDepth: false, clearColor: true, Color.yellow);
-        // RenderTexture.active = null;
-        // Graphics.CopyTexture(rt, 0, 0, 0, 0, rt.width, rt.height, tex.Texture, 0, 0, 0, 0);
-        // RenderTexture.ReleaseTemporary(rt);
-        // SharedTexture tex = _textureInputs[_textureInputs.Count - 1];
-        // RenderTexture rt = RenderTexture.GetTemporary(1920, 1080, 0, RenderTextureFormat.BGRA32, 0);
-        // RenderTexture.active = rt;
-        // GL.Clear(clearDepth: false, clearColor: true, Color.white);
-        // RenderTexture.active = null;
-        // // var rt = RenderTexture.GetTemporary(tex.Texture.width, tex.Texture.height, 0, RenderTextureFormat.Default, RenderTextureReadWrite.Default);
-        // Graphics.CopyTexture(rt, tex.Texture);
-        // RenderTexture.ReleaseTemporary(rt);
-
-        // var fence = Graphics.CreateGraphicsFence(UnityEngine.Rendering.GraphicsFenceType.AsyncQueueSynchronisation, UnityEngine.Rendering.SynchronisationStageFlags.AllGPUOperations);
-        // Graphics.WaitOnAsyncGraphicsFence(fence);
       }
       _textureOutputs.Add(SharedTextureManager.Instance.CreateTexture(RenderSize.x, RenderSize.y));
 
@@ -364,37 +320,5 @@ namespace NanoGraph.Plugin {
         return instance;
       }
     }
-
-
-    [UnityEditor.MenuItem("Do/Start Rendering")]
-    public static void DoStartRendering() {
-      PluginService.Instance.StartRendering();
-    }
-
-    [UnityEditor.MenuItem("Do/Stop Rendering")]
-    public static void DoStopRendering() {
-      PluginService.Instance.StopRendering();
-    }
-
-      // // SharedTexture texture = Instance.CreateTexture(1920, 1080);
-
-      // using (var server = new PluginServer()) {
-      //   // server.SendRequest(new Request {
-      //   //   GetDefinition = new GetDefinitionRequest {}
-      //   // }, MakeRequestHandler<GetDefinitionResponse>(response => UnityEngine.Debug.Log(response)));
-      //   // server.SendRequest(new Request {
-      //   //   GetDefinition = new GetDefinitionRequest {}
-      //   // });
-      //   // System.Threading.Thread.Sleep(1000);
-
-      //   UnityEngine.Debug.Log(Newtonsoft.Json.JsonConvert.SerializeObject(await server.GetDefinition()));
-      //   UnityEngine.Debug.Log(Newtonsoft.Json.JsonConvert.SerializeObject(await server.GetParameters()));
-      //   UnityEngine.Debug.Log(Newtonsoft.Json.JsonConvert.SerializeObject(await server.SetParametersRequest(new[] {
-      //     new KeyValuePair<string, double>("My Param", 5.0),
-      //   })));
-      //   UnityEngine.Debug.Log(Newtonsoft.Json.JsonConvert.SerializeObject(await server.GetParameters()));
-
-      // }
-    // }
   }
 }

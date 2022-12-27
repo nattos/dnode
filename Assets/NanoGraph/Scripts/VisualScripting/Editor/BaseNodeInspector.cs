@@ -88,20 +88,6 @@ namespace NanoGraph.VisualScripting {
       lowerRect.height = _previewHeight;
       base.OnGUI(innerRect, label);
       OnPreviewGui(lowerRect);
-
-      string nodeDebugId = node.Node?.DebugId ?? "";
-      string nodeDebugFieldKey = "";
-      foreach (var output in node.outputs) {
-        if (string.IsNullOrEmpty(nodeDebugFieldKey)) {
-          nodeDebugFieldKey = output.key;
-        }
-        if (output.key == "Out") {
-          nodeDebugFieldKey = output.key;
-          break;
-        }
-      }
-      string nodeDebugOutputKey = $"{nodeDebugId}.{nodeDebugFieldKey}";
-      TestWindow.DesiredDebugOutputTextureKey = nodeDebugOutputKey;
     }
 
     private void OnPreviewGui(Rect rect) {
