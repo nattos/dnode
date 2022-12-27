@@ -22,20 +22,42 @@ void WriteTexture(NanoWriteTexture texture, vector_uint2 gid_xy, float4 value) {
   texture.write(half4(value), gid_xy);
 }
 
+float2 GetTextureSizeFloat(NanoTexture texture) {
+  return float2(texture.get_width(), texture.get_height());
+}
+
 template<typename T> inline T copy_value(T value) { return value; }
 
 template<typename TFrom, typename TTo> inline TTo Convert(TFrom value) {
   return value;
 }
 
+template<> inline vector_float2 Convert<vector_int2, vector_float2>(vector_int2 value) {
+  return vector_float2 { Convert<int, float>(value.x), Convert<int, float>(value.y) };
+}
+template<> inline vector_float3 Convert<vector_int3, vector_float3>(vector_int3 value) {
+  return vector_float3 { Convert<int, float>(value.x), Convert<int, float>(value.y), Convert<int, float>(value.z) };
+}
+template<> inline vector_float4 Convert<vector_int4, vector_float4>(vector_int4 value) {
+  return vector_float4 { Convert<int, float>(value.x), Convert<int, float>(value.y), Convert<int, float>(value.z), Convert<int, float>(value.w) };
+}
+
+template<> inline vector_int2 Convert<vector_float2, vector_int2>(vector_float2 value) {
+  return vector_int2 { Convert<float, int>(value.x), Convert<float, int>(value.y) };
+}
+template<> inline vector_int3 Convert<vector_float3, vector_int3>(vector_float3 value) {
+  return vector_int3 { Convert<float, int>(value.x), Convert<float, int>(value.y), Convert<float, int>(value.z) };
+}
+template<> inline vector_int4 Convert<vector_float4, vector_int4>(vector_float4 value) {
+  return vector_int4 { Convert<float, int>(value.x), Convert<float, int>(value.y), Convert<float, int>(value.z), Convert<float, int>(value.w) };
+}
+
 template<> vector_float2 inline Convert<float, vector_float2>(float value) {
   return vector_float2 { value, value };
 }
-
 template<> vector_float3 inline Convert<float, vector_float3>(float value) {
   return vector_float3 { value, value, value };
 }
-
 template<> vector_float4 inline Convert<float, vector_float4>(float value) {
   return vector_float4 { value, value, value, value };
 }
@@ -43,11 +65,9 @@ template<> vector_float4 inline Convert<float, vector_float4>(float value) {
 template<> float inline Convert<vector_float2, float>(vector_float2 value) {
   return value.x;
 }
-
 template<> vector_float3 inline Convert<vector_float2, vector_float3>(vector_float2 value) {
   return vector_float3 { value.x, value.y, 0.0f };
 }
-
 template<> vector_float4 inline Convert<vector_float2, vector_float4>(vector_float2 value) {
   return vector_float4 { value.x, value.y, 0.0f, 0.0f };
 }
@@ -55,11 +75,9 @@ template<> vector_float4 inline Convert<vector_float2, vector_float4>(vector_flo
 template<> float inline Convert<vector_float3, float>(vector_float3 value) {
   return value.x;
 }
-
 template<> vector_float2 inline Convert<vector_float3, vector_float2>(vector_float3 value) {
   return vector_float2 { value.x, value.y };
 }
-
 template<> vector_float4 inline Convert<vector_float3, vector_float4>(vector_float3 value) {
   return vector_float4 { value.x, value.y, value.z, 0.0f };
 }
@@ -67,11 +85,9 @@ template<> vector_float4 inline Convert<vector_float3, vector_float4>(vector_flo
 template<> float inline Convert<vector_float4, float>(vector_float4 value) {
   return value.x;
 }
-
 template<> vector_float2 inline Convert<vector_float4, vector_float2>(vector_float4 value) {
   return vector_float2 { value.x, value.y };
 }
-
 template<> vector_float3 inline Convert<vector_float4, vector_float3>(vector_float4 value) {
   return vector_float3 { value.x, value.y, value.z };
 }

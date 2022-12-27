@@ -175,7 +175,9 @@ namespace DNode {
     }
 
     public string ToShortString() {
-      return IsEmpty ? "<empty>" : $"[ {string.Join(", ", ValueArray.Take(3).Select(v => v.ToString("0.##"))) + (ValueArray.Length > 3 ? "..." : "")} ]";
+      string prefix = ValueArray?.Length > 1 ? "[ " : "";
+      string suffix = ValueArray?.Length > 1 ? " ]" : "";
+      return IsEmpty ? "<empty>" : $"{prefix}{string.Join(", ", ValueArray.Take(3).Select(v => v.ToString("0.##").Replace("Infinity", "Inf"))) + (ValueArray.Length > 3 ? "..." : "")}{suffix}";
     }
     
     public Type DisplayIconAsType {

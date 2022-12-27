@@ -162,7 +162,12 @@ namespace DNode {
           return false;
         }
         outValue = (DValue)_staticValues.ToArray();
-        (metadata.parent?.parent?.parent?.value as IValueEditedHandler)?.OnValueEdited(fieldName);
+        IValueEditedHandler valueEditedHandler = (metadata.parent?.parent?.parent?.value as IValueEditedHandler);
+        if (valueEditedHandler != null) {
+          NanoGraph.EditorUtils.DelayCall += () => {
+            valueEditedHandler.OnValueEdited(fieldName);
+          };
+        }
         return true;
       } else {
         return false;

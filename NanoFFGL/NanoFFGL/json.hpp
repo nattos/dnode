@@ -18723,7 +18723,14 @@ class serializer
         // NaN / inf
         if (!std::isfinite(x))
         {
-            o->write_characters("null", 4);
+            if (x > 0) {
+              o->write_characters("Infinity", 8);
+            } else if (x < 0) {
+              o->write_characters("-Infinity", 9);
+            } else {
+              o->write_characters("NaN", 3);
+            }
+            // o->write_characters("null", 4);
             return;
         }
 

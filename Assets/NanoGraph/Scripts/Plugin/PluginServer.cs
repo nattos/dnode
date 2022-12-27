@@ -150,13 +150,20 @@ namespace NanoGraph.Plugin {
 
     private async Task<T> SendRequestAsync<T>(Request request) where T : class, new() {
       var promise = new TaskCompletionSource<T>();
-      SendRequest(request, MakeRequestHandler<T>(r => {
-        if (r == null) {
+      SendRequest(request, data => {
+        T result;
+        try {
+          result = data == null ? default : (Newtonsoft.Json.JsonConvert.DeserializeObject<T>(data, JsonSerializerSettings) ?? new T());
+        } catch (Exception e) {
+          promise.SetException(e);
+          return;
+        }
+        if (result == null) {
           promise.SetException(new Exception("Request failed."));
         } else {
-          promise.SetResult(r);
+          promise.SetResult(result);
         }
-      }));
+      });
       return await promise.Task;
     }
 
@@ -176,13 +183,6 @@ namespace NanoGraph.Plugin {
         _commandQueue.Add((command, responseHandler));
         _threadFlag.Set();
       }
-    }
-
-    private static Action<string> MakeRequestHandler<T>(Action<T> handler) where T : new() {
-      return data => {
-        T result = data == null ? default : (Newtonsoft.Json.JsonConvert.DeserializeObject<T>(data) ?? new T());
-        handler.Invoke(result);
-      };
     }
 
     public static double DebugFrameStartTimeTicks;
