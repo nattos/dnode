@@ -643,30 +643,24 @@ int main(int argc, const char* argv[]) {
     while (true) {
       std::string input;
       std::getline(std::cin, input);
-//      std::cerr << "Happy days: " << input << "\n";
       std::string inputStr;
       macaron::Base64::Decode(input, inputStr);
-//      std::cerr << "Happy byte days: " << inputStr << "\n";
       inputStr = input; // TODO: Remove. This is here for testing so we can type JSON directly.
       bool hadResponse = false;
       try {
         auto json = nlohmann::json::parse(input);
-        std::cerr << json.dump() << "\n";
         if (json.contains(kGetDefinitionKey)) {
           nlohmann::json request = json[kGetDefinitionKey].get<nlohmann::json>();
-          std::cerr << "Request: " << request << "\n";
 
           nlohmann::json response = {
             { "Name", "<placeholder>" },
             { "TextureInputCount", g_program->GetTextureInputCount() },
           };
 
-          std::cerr << "Response: " << response << "\n";
           std::cout << EncodeResponse(response) << "\n";
           hadResponse = true;
         } else if (json.contains(kGetParametersRequestKey)) {
           nlohmann::json request = json[kGetParametersRequestKey].get<nlohmann::json>();
-          std::cerr << "Request: " << request << "\n";
 
           nlohmann::json response;
           nlohmann::json parameters;
@@ -685,12 +679,10 @@ int main(int argc, const char* argv[]) {
           }
           response["Parameters"] = parameters;
 
-          std::cerr << "Response: " << response << "\n";
           std::cout << EncodeResponse(response) << "\n";
           hadResponse = true;
         } else if (json.contains(kSetParametersRequestKey)) {
           nlohmann::json request = json[kSetParametersRequestKey].get<nlohmann::json>();
-          std::cerr << "Request: " << request << "\n";
           
           const nlohmann::json& parameters = request["Values"].get<nlohmann::json>();
           for (const auto& [key, value] : parameters.items()) {
@@ -702,12 +694,11 @@ int main(int argc, const char* argv[]) {
           }
 
           nlohmann::json response;
-          std::cerr << "Response: " << response << "\n";
           std::cout << EncodeResponse(response) << "\n";
           hadResponse = true;
         } else if (json.contains(kProcessTexturesRequestKey)) {
+          double processTextureStartTime = [NSDate now].timeIntervalSince1970;
           nlohmann::json request = json[kProcessTexturesRequestKey].get<nlohmann::json>();
-          std::cerr << "Request: " << request << "\n";
           
           std::vector<id<MTLTexture>> inputTextures;
           std::vector<id<MTLTexture>> outputTextures;
@@ -758,15 +749,17 @@ int main(int argc, const char* argv[]) {
                    destinationOrigin:MTLOriginMake(0, 0, 0)];
             [encoder endEncoding];
             [commandBuffer commit];
-            std::cerr << "Output (" << textureOutput.width << ", " << textureOutput.height << ")\n";
-            std::cerr << "Blitted to output (" << outputTextures[0].width << ", " << outputTextures[0].height << ")\n";
           }
           for (IOSurfaceRef surface : acquiredSurfaces) {
             CFRelease(surface);
           }
 
+          double processTextureEndTime = [NSDate now].timeIntervalSince1970;
+          double processTextureTime = processTextureEndTime - processTextureStartTime;
+
           nlohmann::json response;
           response["DebugOutputTexture"] = g_program->DebugGetOutputTextureSurfaceId();
+          response["DebugFrameTime"] = processTextureTime;
           std::cout << EncodeResponse(response) << "\n";
           hadResponse = true;
         } else if (json.contains(kDebugGetWatchedValuesRequestKey)) {
@@ -795,12 +788,10 @@ int main(int argc, const char* argv[]) {
           }
           response["Values"] = values;
 
-          std::cerr << "Response: " << response << "\n";
           std::cout << EncodeResponse(response) << "\n";
           hadResponse = true;
         } else if (json.contains(kDebugSetValuesRequestKey)) {
           nlohmann::json request = json[kDebugSetValuesRequestKey].get<nlohmann::json>();
-          std::cerr << "Request: " << request << "\n";
 
           const nlohmann::json& debugValues = request["Values"].get<nlohmann::json>();
           std::vector<double> valuesArray;
@@ -819,18 +810,17 @@ int main(int argc, const char* argv[]) {
           }
 
           nlohmann::json response;
-          std::cerr << "Response: " << response << "\n";
           std::cout << EncodeResponse(response) << "\n";
           hadResponse = true;
         }
       } catch(nlohmann::json::exception e) {
         std::cerr << "JSON error.\n";
       }
-//      std::cerr << "GetOutput0: " << g_program->GetOutput0() << "\n";
       if (!hadResponse) {
         nlohmann::json response;
         std::cout << EncodeResponse(response) << "\n";
       }
+      std::flush(std::cout);
     }
   }
   return 1;

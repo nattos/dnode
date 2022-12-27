@@ -22,6 +22,11 @@ namespace NanoGraph {
       Repaint();
     }
 
+    double _previousTime = 0.0f;
+    public void Update() {
+      PluginService.Instance.PushRenderRequest();
+    }
+
     public void OnGUI() {
       using (new EditorGUILayout.HorizontalScope()) {
         bool isRendering = PluginService.Instance.IsRendering;

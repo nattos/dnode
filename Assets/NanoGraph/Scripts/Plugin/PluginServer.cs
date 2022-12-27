@@ -46,6 +46,7 @@ namespace NanoGraph.Plugin {
   }
   public class ProcessTexturesResponse {
     public Int32 DebugOutputTexture;
+    public double DebugFrameTime;
   }
 
   public class DebugSetWatchedKeysRequest {
@@ -147,15 +148,16 @@ namespace NanoGraph.Plugin {
       });
     }
 
-    private async Task<T> SendRequestAsync<T>(Request request) where T : class {
-      ManualResetEvent flag = new ManualResetEvent(false);
-      T response = null;
-
-      return await Task.Run(() => {
-        SendRequest(request, MakeRequestHandler<T>(r => { response = r; flag.Set(); }));
-        flag.WaitOne();
-        return response;
-      });
+    private async Task<T> SendRequestAsync<T>(Request request) where T : class, new() {
+      var promise = new TaskCompletionSource<T>();
+      SendRequest(request, MakeRequestHandler<T>(r => {
+        if (r == null) {
+          promise.SetException(new Exception("Request failed."));
+        } else {
+          promise.SetResult(r);
+        }
+      }));
+      return await promise.Task;
     }
 
     private static readonly Newtonsoft.Json.JsonSerializerSettings JsonSerializerSettings = new Newtonsoft.Json.JsonSerializerSettings {
@@ -176,12 +178,14 @@ namespace NanoGraph.Plugin {
       }
     }
 
-    private static Action<string> MakeRequestHandler<T>(Action<T> handler) {
+    private static Action<string> MakeRequestHandler<T>(Action<T> handler) where T : new() {
       return data => {
-        T result = Newtonsoft.Json.JsonConvert.DeserializeObject<T>(data);
+        T result = data == null ? default : (Newtonsoft.Json.JsonConvert.DeserializeObject<T>(data) ?? new T());
         handler.Invoke(result);
       };
     }
+
+    public static double DebugFrameStartTimeTicks;
 
     private void ThreadProc() {
       Process process = _process;
@@ -239,10 +243,10 @@ namespace NanoGraph.Plugin {
           }
           if (commandQueue.Count > 0) {
             foreach (string command in commandQueue) {
-              // UnityEngine.Debug.Log($"Command: {command}");
               process.StandardInput.WriteLine(command);
             }
             commandQueue.Clear();
+            process.StandardInput.Flush();
           }
 
           bool outputDirty = false;

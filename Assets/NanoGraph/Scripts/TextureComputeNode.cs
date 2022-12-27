@@ -98,6 +98,9 @@ namespace NanoGraph {
             }
             break;
           }
+          case TextureComputeSizeMode.Custom:
+          case TextureComputeSizeMode.PatchSize:
+            break;
         }
 
         // Load inputs.

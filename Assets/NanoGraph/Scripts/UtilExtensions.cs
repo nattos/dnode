@@ -23,6 +23,10 @@ namespace NanoGraph {
       return false;
     }
 
+    public static Dictionary<TKey, TValue> ToDictionary<TKey, TValue>(this IReadOnlyDictionary<TKey, TValue> self) {
+      return new Dictionary<TKey, TValue>(self);
+    }
+
     public static TValue GetOrDefault<TKey, TValue>(this IReadOnlyDictionary<TKey, TValue> self, TKey key, TValue defaultValue = default) {
       if (self.TryGetValue(key, out TValue value)) {
         return value;

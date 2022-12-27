@@ -197,6 +197,8 @@ namespace NanoGraph.VisualScripting {
               relinkNode = true;
             } else {
               if (!_didConnectSerializedLiteralNodes) {
+                Func<DValue> valueProvider = () => defaultValues.GetValueOrDefault(inputPort.key) as DValue? ?? default;
+                literalNode.InternalValueProvider = valueProvider;
                 graph.AddNode(literalNode);
                 edgesToAdd.Add(new DataEdge { Source = new DataPlug { Node = literalNode, FieldName = "Out" }, Destination = new DataPlug { Node = Node, FieldName = inputPort.key } });
               }
