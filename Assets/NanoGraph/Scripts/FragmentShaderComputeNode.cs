@@ -21,8 +21,21 @@ namespace NanoGraph {
 
     public override INanoCodeContext CodeContext => NanoProgram.GpuContext;
 
-    public override DataSpec InputSpec => DataSpec.FromFields(DataField.MakePrimitive("Color", PrimitiveType.Float4), new DataField { Name = "Verts", Type = TypeSpec.MakePrimitive(PrimitiveType.Vertices), IsCompileTimeOnly = true });
+    public override DataSpec InputSpec => DataSpec.FromFields(new[] { new DataField { Name = "Verts", Type = TypeSpec.MakePrimitive(PrimitiveType.Vertices), IsCompileTimeOnly = true } }.Concat(TextureSizeFields).Append(DataField.MakePrimitive("Color", PrimitiveType.Float4)).ToArray());
     public override DataSpec OutputSpec => DataSpec.FromFields(new DataField { Name = "Out", Type = TypeSpec.MakePrimitive(PrimitiveType.Texture) });
+
+    public DataField[] TextureSizeFields {
+      get {
+        switch (SizeMode) {
+          case TextureComputeSizeMode.Auto:
+          case TextureComputeSizeMode.PatchSize:
+          default:
+            return Array.Empty<DataField>();
+          case TextureComputeSizeMode.Custom:
+            return new[] { DataField.MakePrimitive("Size", PrimitiveType.Float2) };
+        }
+      }
+    }
 
     public override IComputeNodeEmitCodeOperation CreateEmitCodeOperation(ComputeNodeEmitCodeOperationContext context) => new EmitterGpu(this, context);
   
@@ -97,10 +110,76 @@ namespace NanoGraph {
         result = new CodeCachedResult { ResultType = resultType, Result = new CodeLocal { Identifier = cachedResult.Identifier, Type = resultTypeSpec } };
       }
 
+      private string GetInputExpr(string fieldName) {
+        var edge = graph.GetEdgeToDestinationOrNull(computeNode, fieldName);
+        if (edge == null) {
+          return null;
+        }
+        if (!(edge.Source.Node is IComputeNode sourceComputeNode)) {
+          errors.Add($"Node {computeNode} depends on an output that is not a compute node ({edge.Source.Node}).");
+          return null;
+        }
+        CodeCachedResult? sourceCachedResult = dependentComputeNodes.FirstOrNull(dependency => dependency.Node == sourceComputeNode)?.Result;
+        if (sourceCachedResult == null) {
+          errors.Add($"Node {computeNode} depends on a compute node that is not yet ready ({edge.Source.Node}).");
+          return null;
+        }
+
+        string inputExpr = $"{sourceCachedResult?.Result.Identifier}.{sourceCachedResult?.ResultType.GetField(edge.Source.FieldName)}";
+        return inputExpr;
+      }
+
+      private string EmitTextureSizeExpr(NanoFunction func) {
+        switch (Node.SizeMode) {
+          case TextureComputeSizeMode.Auto:
+          case TextureComputeSizeMode.PatchSize:
+          default:
+            return "OutputTextureSize";
+          case TextureComputeSizeMode.Custom:
+            return func.EmitConvert(func.Program.Float2Type, func.Program.Int2Type, GetInputExpr("Size"));
+        }
+      }
+
       public override void EmitValidateCacheFunctionInner() {
         string pipelineStateIdentifier = program.AddInstanceField(program.MTLRenderPipelineState, $"{computeNode.ShortName}_RenderPipeline");
         string renderPassDescriptorIdentifier = program.AddInstanceField(program.MTLRenderPassDescriptor, $"{computeNode.ShortName}_RenderPassDescriptor");
         string renderTargetIdentifier = program.AddInstanceField(program.Texture, $"{computeNode.ShortName}_RenderTarget");
+
+        int sizeNumerator;
+        int sizeDenominator;
+        switch (Node.SizeMultiplier) {
+          case TextureComputeSizeMultiplier.Full:
+          default:
+            sizeNumerator = 1;
+            sizeDenominator = 1;
+            break;
+          case TextureComputeSizeMultiplier.Half:
+            sizeNumerator = 1;
+            sizeDenominator = 2;
+            break;
+          case TextureComputeSizeMultiplier.Quarter:
+            sizeNumerator = 1;
+            sizeDenominator = 4;
+            break;
+          case TextureComputeSizeMultiplier.OneEighth:
+            sizeNumerator = 1;
+            sizeDenominator = 8;
+            break;
+          case TextureComputeSizeMultiplier.Double:
+            sizeNumerator = 2;
+            sizeDenominator = 1;
+            break;
+        }
+
+        string gridSizeLocal = validateCacheFunction.AllocLocal("Size");
+        validateCacheFunction.AddStatement($"{validateCacheFunction.Program.Int2Type.Identifier} {gridSizeLocal} = {EmitTextureSizeExpr(validateCacheFunction)};");
+        string gridSizeExpr = gridSizeLocal;
+        string gridSizeXLocal = validateCacheFunction.AllocLocal("SizeX");
+        string gridSizeYLocal = validateCacheFunction.AllocLocal("SizeY");
+        validateCacheFunction.AddStatement($"{validateCacheFunction.Program.IntType.Identifier} {gridSizeXLocal} = (int)(({gridSizeExpr}).x * {sizeNumerator} / {sizeDenominator});");
+        validateCacheFunction.AddStatement($"{validateCacheFunction.Program.IntType.Identifier} {gridSizeYLocal} = (int)(({gridSizeExpr}).y * {sizeNumerator} / {sizeDenominator});");
+        string gridSizeXExpr = gridSizeXLocal;
+        string gridSizeYExpr = gridSizeYLocal;
 
         // Identify which vertex shader is the input.
         VertexShaderComputeNode vertexNode = this.vertexNode;
@@ -128,16 +207,11 @@ namespace NanoGraph {
 
         // Set up render target if necessary.
         // TODO: Allow configuration of texture sizes.
-        validateCacheFunction.AddStatement($"{renderTargetIdentifier} = ResizeTexture({renderTargetIdentifier}, 1920, 1080, {NanoGpuContext.BitDepthToMetal(graph.GetTextureBitDepth(Node.BitDepth))});");
+        validateCacheFunction.AddStatement($"{renderTargetIdentifier} = ResizeTexture({renderTargetIdentifier}, {gridSizeXExpr}, {gridSizeYExpr}, {NanoGpuContext.BitDepthToMetal(graph.GetTextureBitDepth(Node.BitDepth))});");
         string outputTextureExpr = renderTargetIdentifier;
 
         // Sync buffers to GPU.
         EmitSyncBuffersToGpu(validateCacheFunction, gpuVertexInputBuffers.Concat(gpuFragmentInputBuffers).ToArray());
-        // foreach (var inputBuffer in gpuVertexInputBuffers.Concat(gpuFragmentInputBuffers)) {
-        //   if (inputBuffer.Type.IsArray) {
-        //     validateCacheFunction.AddStatement($"{inputBuffer.Expression}->SyncToGpu();");
-        //   }
-        // }
 
         // Create a MTLRenderCommandEncoder.
         validateCacheFunction.AddStatement($"{NanoProgram.IntIdentifier} {vertexCountLocal} = {vertexCountExpr};");
@@ -150,26 +224,8 @@ namespace NanoGraph {
 
         // Bind all inputs for the vertex shader.
         EmitBindBuffers(validateCacheFunction, gpuVertexInputBuffers, variant: "Vertex");
-        // foreach (var inputBuffer in gpuVertexInputBuffers) {
-        //   string expression = inputBuffer.Expression;
-        //   int bufferIndex = inputBuffer.Index;
-        //   if (inputBuffer.Type.IsArray) {
-        //     validateCacheFunction.AddStatement($"[encoder setVertexBuffer:{expression}->GetGpuBuffer() offset:0 atIndex:{bufferIndex}];");
-        //   } else {
-        //     validateCacheFunction.AddStatement($"[encoder setVertexBytes:&{expression} length:sizeof({expression}) atIndex:{bufferIndex}];");
-        //   }
-        // }
         // Bind all inputs for the fragment shader.
         EmitBindBuffers(validateCacheFunction, gpuFragmentInputBuffers, variant: "Fragment");
-        // foreach (var inputBuffer in gpuFragmentInputBuffers) {
-        //   string expression = inputBuffer.Expression;
-        //   int bufferIndex = inputBuffer.Index;
-        //   if (inputBuffer.Type.IsArray) {
-        //     validateCacheFunction.AddStatement($"[encoder setFragmentBuffer:{expression}->GetGpuBuffer() offset:0 atIndex:{bufferIndex}];");
-        //   } else {
-        //     validateCacheFunction.AddStatement($"[encoder setFragmentBytes:&{expression} length:sizeof({expression}) atIndex:{bufferIndex}];");
-        //   }
-        // }
 
         // Draw primitives.
         validateCacheFunction.AddStatement($"[encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:(uint)({vertexCountLocal})];");

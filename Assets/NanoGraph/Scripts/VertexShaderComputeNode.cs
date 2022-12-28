@@ -12,7 +12,7 @@ namespace NanoGraph {
 
     public override DataSpec OutputSpec {
       get {
-        return DataSpec.ExtendWithFields(base.OutputSpec, new DataField { Name = "Verts", Type = TypeSpec.MakePrimitive(PrimitiveType.Vertices), IsCompileTimeOnly = true });
+        return DataSpec.ExtendWithFields(new[] { new DataField { Name = "Verts", Type = TypeSpec.MakePrimitive(PrimitiveType.Vertices), IsCompileTimeOnly = true } }, base.OutputSpec);
       }
     }
 
