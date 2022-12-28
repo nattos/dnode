@@ -18,16 +18,17 @@ namespace NanoGraph {
     private const float CompileStatusBarHeight = 1.0f;
     private const float CompileStatusSpeed = 1.5f;
 
-    public bool Input;
-    public bool Locked;
-
     [SerializeField]
     public List<SelectedInput> SelectedInputs;
 
-    private float _defaultInputTexturePhase = 0.0f;
+    public bool Input;
+    public bool Locked;
+
     private double _lastRenderTime;
     private double _lastRenderFrameTime;
     private IDataNode _selectedOutputNode;
+
+    private float _defaultInputTexturePhase = 0.0f;
 
     private bool _wasCompiling;
     private double _compileStartTime = 0;
@@ -36,6 +37,7 @@ namespace NanoGraph {
     private readonly Lazy<Styles> _styles = new Lazy<Styles>(() => new Styles());
 
     public void OnEnable() {
+      Instance = this;
       SelectedInputs = SelectedInputs ?? new List<SelectedInput>();
       _lastRenderTime = Time.realtimeSinceStartupAsDouble;
       _compileStartTime = Time.realtimeSinceStartupAsDouble;
@@ -44,6 +46,7 @@ namespace NanoGraph {
     }
 
     public void OnDisable() {
+      Instance = null;
       PluginService.Instance.TextureInputsNeedUpdating -= OnTextureInputsNeedUpdating;
       PluginService.Instance.TextureOutputsUpdated -= OnTextureOutputsUpdated;
     }
@@ -90,21 +93,6 @@ namespace NanoGraph {
     }
 
     public void OnGUI() {
-      using (new EditorGUILayout.HorizontalScope()) {
-        bool isRendering = PluginService.Instance.IsRendering;
-        if (GUILayout.Button(isRendering ? "Stop" : "Start")) {
-          EditorApplication.delayCall += () => {
-            if (isRendering) {
-              PluginService.Instance.StopRendering();
-            } else {
-              PluginService.Instance.StartRendering();
-            }
-          };
-        }
-        Input = EditorGUILayout.ToggleLeft("Show Input", Input);
-        Locked = EditorGUILayout.ToggleLeft("Locked", Locked);
-        EditorGUILayout.Space(0, expand: true);
-      }
       Texture2D monitorTexture;
       string monitorDisplayString;
       if (Input) {
@@ -120,7 +108,8 @@ namespace NanoGraph {
       if (!monitorTexture) {
         monitorTexture = Texture2D.blackTexture;
       }
-      float aspectRatio = monitorTexture.height / (float) monitorTexture.width;
+      // float aspectRatio = monitorTexture.height / (float) monitorTexture.width;
+      float aspectRatio = 9.0f / 16.0f;
       float desiredHeight = this.position.width * aspectRatio;
       Rect textureRect = EditorGUILayout.GetControlRect(GUILayout.Height(desiredHeight));
       EditorGUI.DrawPreviewTexture(textureRect, monitorTexture, null, ScaleMode.ScaleToFit);
@@ -176,28 +165,20 @@ namespace NanoGraph {
         EditorGUI.DrawRect(compileStatusBarRect, Color.yellow);
       }
 
-      int inputCount = PluginService.Instance.TextureInputCount;
-      while (SelectedInputs.Count < inputCount) {
-        SelectedInputs.Add(default);
-      }
-
-      (string serverName, string appName)[] serverList = Klak.Syphon.SyphonClientService.ServerList;
-      string[] serverListStrings = serverList.Select(pair => $"{pair.serverName} {pair.appName}").Append("None").ToArray();
-      for (int i = 0; i < inputCount; ++i) {
-        var oldSelectedInput = SelectedInputs[i];
-        int oldInputIndex = System.Array.IndexOf(serverList, (oldSelectedInput.ServerName, oldSelectedInput.AppName));
-        int newInputIndex = EditorGUILayout.Popup(oldInputIndex, serverListStrings);
-        var newSelectedInput = (newInputIndex >= 0 && newInputIndex < serverList.Length) ? serverList[newInputIndex] : default;
-        SelectedInputs[i] = new SelectedInput { ServerName = newSelectedInput.serverName, AppName = newSelectedInput.appName };
-      }
-
-      foreach (var parameter in PluginService.Instance.GetParameters()) {
-        using (var check = new EditorGUI.ChangeCheckScope()) {
-          float newValue = EditorGUILayout.Slider(parameter.Name, (float)parameter.Value, (float)parameter.MinValue, (float)parameter.MaxValue);
-          if (check.changed) {
-            PluginService.Instance.SetParameter(parameter.Name, newValue);
-          }
+      using (new EditorGUILayout.HorizontalScope()) {
+        bool isRendering = PluginService.Instance.IsRendering;
+        if (GUILayout.Button(isRendering ? "Stop" : "Start")) {
+          EditorApplication.delayCall += () => {
+            if (isRendering) {
+              PluginService.Instance.StopRendering();
+            } else {
+              PluginService.Instance.StartRendering();
+            }
+          };
         }
+        Input = EditorGUILayout.ToggleLeft("Show Input", Input);
+        Locked = EditorGUILayout.ToggleLeft("Locked", Locked);
+        EditorGUILayout.Space(0, expand: true);
       }
 
       Event e = Event.current;
@@ -237,6 +218,8 @@ namespace NanoGraph {
       }
     }
 
+    public static TestWindow Instance;
+
     private class Styles {
       public Styles() {
         MiniLabel = EditorStyles.miniLabel;
@@ -248,7 +231,7 @@ namespace NanoGraph {
       public GUIStyle MiniLabelRight;
     }
 
-    [MenuItem("Do/Show Test Window")]
+    [MenuItem("Do/Show Monitor Window")]
     public static void ShowWindow() {
       EditorWindow.GetWindow<TestWindow>("Monitor").Show();
     }
