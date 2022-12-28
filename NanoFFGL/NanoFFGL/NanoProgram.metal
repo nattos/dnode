@@ -13,8 +13,8 @@ template<typename T> void WriteBuffer(device T* buffer, int index, T value) {
   buffer[index] = value;
 }
 
-float4 SampleTexture(NanoTexture texture, float2 uv) {
-  constexpr sampler linearSampler(coord::normalized, address::clamp_to_edge, filter::linear);
+template<filter FilterMode, address AddressMode> float4 SampleTexture(NanoTexture texture, float2 uv) {
+  constexpr sampler linearSampler(coord::normalized, FilterMode, AddressMode);
   return float4(texture.sample(linearSampler, uv));
 }
 
@@ -158,6 +158,23 @@ static inline vector_float3 logE(vector_float3 a) { return vector_float3 { log(a
 static inline vector_float4 logE(vector_float4 a) { return vector_float4 { log(a.x), log(a.y), log(a.z), log(a.w) }; }
 
 
+kernel void CopyTextureSampleNearest(
+    NanoTexture input [[texture(0)]],
+    NanoWriteTexture output [[texture(1)]],
+    vector_uint2 gid_xy_uint [[thread_position_in_grid]]) {
+  constexpr sampler sampler(coord::pixel, filter::nearest, address::clamp_to_edge);
+  output.write(input.sample(sampler, vector_float2(gid_xy_uint)), gid_xy_uint);
+}
+
+kernel void CopyTextureSampleLinear(
+    NanoTexture input [[texture(0)]],
+    NanoWriteTexture output [[texture(1)]],
+    vector_uint2 gid_xy_uint [[thread_position_in_grid]],
+    vector_uint2 size_xy_uint [[threads_per_grid]]) {
+  vector_float2 gid_xy_norm = float2(gid_xy_uint) / float2(size_xy_uint);
+  constexpr sampler sampler(coord::normalized, filter::linear, address::clamp_to_edge);
+  output.write(input.sample(sampler, gid_xy_norm), gid_xy_uint);
+}
 
 
 

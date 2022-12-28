@@ -221,7 +221,6 @@ public:
   NanoProgram() {}
   virtual ~NanoProgram() {}
   
-  MTLPixelFormat DefaultTextureFormat = MTLPixelFormatBGRA8Unorm_sRGB;
   vector_int2 OutputTextureSize = vector_int2 { 1920, 1080 };
 
   void Run() {
@@ -362,13 +361,13 @@ private:
 protected:
   std::unique_ptr<NanoSharedTexture> _debugOutputTexture;
 
-  id<MTLTexture> ResizeTexture(id<MTLTexture> originalTexture, int width, int height) {
+  id<MTLTexture> ResizeTexture(id<MTLTexture> originalTexture, int width, int height, MTLPixelFormat format) {
     width = std::max(1, width);
     height = std::max(1, height);
     if (originalTexture && originalTexture.width == width && originalTexture.height == height) {
       return originalTexture;
     }
-    MTLTextureDescriptor* desc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:DefaultTextureFormat width:width height:height mipmapped:NO];
+    MTLTextureDescriptor* desc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:format width:width height:height mipmapped:NO];
     return [_device newTextureWithDescriptor:desc];
   }
   
@@ -678,6 +677,12 @@ int main(int argc, const char* argv[]) {
     g_program->EnsureResources();
     g_program->SetupParameters();
 
+    NSError* error;
+    id<MTLDevice> device = g_program->GetDevice();
+    id<MTLLibrary> defaultLibrary = [device newDefaultLibraryWithBundle:[NSBundle bundleForClass:[Program_Program_Placeholder class]] error:&error];
+    id<MTLComputePipelineState> copyTextureSampleNearestPipeline = [device newComputePipelineStateWithFunction:[defaultLibrary newFunctionWithName:@"CopyTextureSampleNearest"] error:&error];
+    id<MTLComputePipelineState> copyTextureSampleLinearPipeline = [device newComputePipelineStateWithFunction:[defaultLibrary newFunctionWithName:@"CopyTextureSampleLinear"] error:&error];
+
     std::unordered_map<std::string, int> parameterMap;
     {
       int parameterIndex = 0;
@@ -791,18 +796,42 @@ int main(int argc, const char* argv[]) {
 
           if (outputTextures.size() > 0) {
             id<MTLTexture> textureOutput = g_program->GetOutput0();
+            id<MTLTexture> outputTexture = outputTextures[0];
+
             id<MTLCommandBuffer> commandBuffer = g_program->GetCommandQueue().commandBuffer;
-            id<MTLBlitCommandEncoder> encoder = [commandBuffer blitCommandEncoder];
-            [encoder copyFromTexture:textureOutput
-                         sourceSlice:0
-                         sourceLevel:0
-                        sourceOrigin:MTLOriginMake(0, 0, 0)
-                          sourceSize:MTLSizeMake(textureOutput.width, textureOutput.height, 0)
-                           toTexture:outputTextures[0]
-                    destinationSlice:0
-                    destinationLevel:0
-                   destinationOrigin:MTLOriginMake(0, 0, 0)];
-            [encoder endEncoding];
+            if (textureOutput.width == outputTexture.width && textureOutput.height == outputTexture.height) {
+              if (textureOutput.pixelFormat == outputTexture.pixelFormat) {
+                id<MTLBlitCommandEncoder> encoder = [commandBuffer blitCommandEncoder];
+                [encoder copyFromTexture:textureOutput
+                             sourceSlice:0
+                             sourceLevel:0
+                            sourceOrigin:MTLOriginMake(0, 0, 0)
+                              sourceSize:MTLSizeMake(textureOutput.width, textureOutput.height, 0)
+                               toTexture:outputTextures[0]
+                        destinationSlice:0
+                        destinationLevel:0
+                       destinationOrigin:MTLOriginMake(0, 0, 0)];
+                [encoder endEncoding];
+              } else {
+                id<MTLComputeCommandEncoder> encoder = [commandBuffer computeCommandEncoder];
+                [encoder setComputePipelineState:copyTextureSampleNearestPipeline];
+                [encoder setTexture:textureOutput atIndex:0];
+                [encoder setTexture:outputTexture atIndex:1];
+                MTLSize batchSize = { outputTexture.width, outputTexture.height, 1 };
+                MTLSize threadgroupSize = { copyTextureSampleNearestPipeline.maxTotalThreadsPerThreadgroup, 1, 1 };
+                [encoder dispatchThreads:batchSize threadsPerThreadgroup:threadgroupSize];
+                [encoder endEncoding];
+              }
+            } else {
+              id<MTLComputeCommandEncoder> encoder = [commandBuffer computeCommandEncoder];
+              [encoder setComputePipelineState:copyTextureSampleLinearPipeline];
+              [encoder setTexture:textureOutput atIndex:0];
+              [encoder setTexture:outputTexture atIndex:1];
+              MTLSize batchSize = { outputTexture.width, outputTexture.height, 1 };
+              MTLSize threadgroupSize = { copyTextureSampleLinearPipeline.maxTotalThreadsPerThreadgroup, 1, 1 };
+              [encoder dispatchThreads:batchSize threadsPerThreadgroup:threadgroupSize];
+              [encoder endEncoding];
+            }
             [commandBuffer commit];
           }
           for (IOSurfaceRef surface : acquiredSurfaces) {

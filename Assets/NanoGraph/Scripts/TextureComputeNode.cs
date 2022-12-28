@@ -30,18 +30,31 @@ namespace NanoGraph {
     RGBA,
   }
 
+  public enum GlobalTextureBitDepth {
+    Int8,
+    Float16,
+    Float32,
+  }
+
+  public enum TextureBitDepth {
+    Global,
+    Int8,
+    Float16,
+    Float32,
+  }
+
   public class TextureComputeNode : ComputeNode {
-    // TODO: Support multiple size modes.
     [EditableAttribute]
     public TextureComputeSizeMode SizeMode = TextureComputeSizeMode.Auto;
-    // TODO: Support multiple output modes.
     [EditableAttribute]
     public TextureComputeSizeMultiplier SizeMultiplier = TextureComputeSizeMultiplier.Full;
+    // TODO: Support multiple output modes.
     [EditableAttribute]
     public TextureComputeOutputMode OutputMode = TextureComputeOutputMode.TextureOnly;
     [EditableAttribute]
-    // TODO: Support multiple output formats.
     public TextureChannelFormat Channels = TextureChannelFormat.RGBA;
+    [EditableAttribute]
+    public TextureBitDepth BitDepth = TextureBitDepth.Global;
 
     public override INanoCodeContext CodeContext => NanoProgram.GpuContext;
 
@@ -267,7 +280,7 @@ namespace NanoGraph {
         EmitSyncBuffersToGpu(validateCacheFunction, cachedResult, gpuInputBuffers, gpuOutputBuffers);
 
         string outIdentifier = $"{codeCachedResult.Result.Identifier}.{codeCachedResult.ResultType.GetField("Out")}";
-        validateCacheFunction.AddStatement($"{outIdentifier} = ResizeTexture({outIdentifier}, {gridSizeXExpr}, {gridSizeYExpr});");
+        validateCacheFunction.AddStatement($"{outIdentifier} = ResizeTexture({outIdentifier}, {gridSizeXExpr}, {gridSizeYExpr}, {NanoGpuContext.BitDepthToMetal(graph.GetTextureBitDepth(Node.BitDepth))});");
 
         validateCacheFunction.AddStatement($"id<MTLComputeCommandEncoder> encoder = [GetCurrentCommandBuffer() computeCommandEncoder];");
         validateCacheFunction.AddStatement($"[encoder setComputePipelineState:{pipelineStateIdentifier}];");

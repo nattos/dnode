@@ -15,8 +15,8 @@ namespace NanoGraph.Plugin {
     private bool _isBuilding = false;
 
     public bool IsError { get; private set; } = false;
-
     public bool IsCompiling => _isDirty || _isBuilding;
+    public int CompileEpoch { get; private set; } = 0;
 
     public void MarkDirty() {
       _isDirty = true;
@@ -27,6 +27,7 @@ namespace NanoGraph.Plugin {
       if (_isBuilding) {
         return;
       }
+      ++CompileEpoch;
       _isDirty = false;
       _isBuilding = true;
       IsError = false;

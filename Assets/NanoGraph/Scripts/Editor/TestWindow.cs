@@ -15,6 +15,9 @@ namespace NanoGraph {
       public string AppName;
     }
 
+    private const float CompileStatusBarHeight = 1.0f;
+    private const float CompileStatusSpeed = 1.5f;
+
     public bool Input;
     public bool Locked;
 
@@ -26,11 +29,16 @@ namespace NanoGraph {
     private double _lastRenderFrameTime;
     private IDataNode _selectedOutputNode;
 
+    private bool _wasCompiling;
+    private double _compileStartTime = 0;
+    private int _lastCompileEpoch = 0;
+
     private readonly Lazy<Styles> _styles = new Lazy<Styles>(() => new Styles());
 
     public void OnEnable() {
       SelectedInputs = SelectedInputs ?? new List<SelectedInput>();
       _lastRenderTime = Time.realtimeSinceStartupAsDouble;
+      _compileStartTime = Time.realtimeSinceStartupAsDouble;
       PluginService.Instance.TextureInputsNeedUpdating += OnTextureInputsNeedUpdating;
       PluginService.Instance.TextureOutputsUpdated += OnTextureOutputsUpdated;
     }
@@ -151,6 +159,22 @@ namespace NanoGraph {
       fpsRect.x = fpsRect.xMax - 100.0f;
       fpsRect.width = 100.0f;
       EditorGUI.LabelField(fpsRect, fpsStr, _styles.Value.MiniLabelRight);
+
+      int currentCompileEpoch = PluginService.Instance.CompileEpoch;
+      if (_lastCompileEpoch != currentCompileEpoch || _wasCompiling != isCompiling) {
+        _compileStartTime = Time.realtimeSinceStartupAsDouble;
+        _lastCompileEpoch = currentCompileEpoch;
+        _wasCompiling = isCompiling;
+      }
+      if (isCompiling) {
+        Rect compileStatusBarRect = textureRect;
+        compileStatusBarRect.y = compileStatusBarRect.yMax - CompileStatusBarHeight;
+        compileStatusBarRect.height = CompileStatusBarHeight;
+        float compileTime = (float)(Time.realtimeSinceStartupAsDouble - _compileStartTime);
+        float compileT = Mathf.Atan(compileTime * CompileStatusSpeed) / Mathf.PI * 2.0f;
+        compileStatusBarRect.width *= compileT;
+        EditorGUI.DrawRect(compileStatusBarRect, Color.yellow);
+      }
 
       int inputCount = PluginService.Instance.TextureInputCount;
       while (SelectedInputs.Count < inputCount) {

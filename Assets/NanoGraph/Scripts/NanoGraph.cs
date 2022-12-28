@@ -12,6 +12,7 @@ namespace NanoGraph {
 
     public string EffectName = "Program";
     public bool DebugEnabled = true;
+    public GlobalTextureBitDepth GlobalBitDepth;
     private readonly List<IDataNode> _nodes = new List<IDataNode>();
     private readonly HashSet<IDataNode> _dirtyNodes = new HashSet<IDataNode>();
 
@@ -197,6 +198,20 @@ namespace NanoGraph {
       actions.Remove(callback);
       if (actions.Count == 0) {
         _nodeInvalidatedHanders.Remove(node);
+      }
+    }
+
+    public GlobalTextureBitDepth GetTextureBitDepth(TextureBitDepth bitDepth) {
+      switch (bitDepth) {
+        default:
+        case TextureBitDepth.Global:
+          return GlobalBitDepth;
+        case TextureBitDepth.Int8:
+          return GlobalTextureBitDepth.Int8;
+        case TextureBitDepth.Float16:
+          return GlobalTextureBitDepth.Float16;
+        case TextureBitDepth.Float32:
+          return GlobalTextureBitDepth.Float32;
       }
     }
 

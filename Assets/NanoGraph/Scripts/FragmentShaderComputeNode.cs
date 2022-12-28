@@ -10,10 +10,18 @@ namespace NanoGraph {
   // Its color input must depend on the outputs of exactly one vertex shader node, although it may
   // depend on any number of other scalar or vector compute nodes. It always outputs a texture.
   public class FragmentShaderComputeNode : ComputeNode {
+    [EditableAttribute]
+    public TextureComputeSizeMode SizeMode = TextureComputeSizeMode.Auto;
+    [EditableAttribute]
+    public TextureComputeSizeMultiplier SizeMultiplier = TextureComputeSizeMultiplier.Full;
+    [EditableAttribute]
+    public TextureChannelFormat Channels = TextureChannelFormat.RGBA;
+    [EditableAttribute]
+    public TextureBitDepth BitDepth = TextureBitDepth.Global;
+
     public override INanoCodeContext CodeContext => NanoProgram.GpuContext;
 
     public override DataSpec InputSpec => DataSpec.FromFields(DataField.MakePrimitive("Color", PrimitiveType.Float4), new DataField { Name = "Verts", Type = TypeSpec.MakePrimitive(PrimitiveType.Vertices), IsCompileTimeOnly = true });
-
     public override DataSpec OutputSpec => DataSpec.FromFields(new DataField { Name = "Out", Type = TypeSpec.MakePrimitive(PrimitiveType.Texture) });
 
     public override IComputeNodeEmitCodeOperation CreateEmitCodeOperation(ComputeNodeEmitCodeOperationContext context) => new EmitterGpu(this, context);
@@ -120,7 +128,7 @@ namespace NanoGraph {
 
         // Set up render target if necessary.
         // TODO: Allow configuration of texture sizes.
-        validateCacheFunction.AddStatement($"{renderTargetIdentifier} = ResizeTexture({renderTargetIdentifier}, 1920, 1080);");
+        validateCacheFunction.AddStatement($"{renderTargetIdentifier} = ResizeTexture({renderTargetIdentifier}, 1920, 1080, {NanoGpuContext.BitDepthToMetal(graph.GetTextureBitDepth(Node.BitDepth))});");
         string outputTextureExpr = renderTargetIdentifier;
 
         // Sync buffers to GPU.

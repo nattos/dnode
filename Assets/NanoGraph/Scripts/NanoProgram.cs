@@ -6,11 +6,24 @@ using System.Text;
 using DNode;
 
 namespace NanoGraph {
+  public enum TextureFilterMode {
+    Nearest,
+    Linear,
+    Bicubic,
+  }
+
+  public enum TextureWrapMode {
+    ClampToZero,
+    ClampToEdge,
+    Repeat,
+    MirroredRepeat,
+  }
+
   public interface INanoCodeContext {
     string EmitBufferType(NanoProgramType type);
     string EmitWritableBufferType(NanoProgramType type);
     string EmitSampleBuffer(string source, string index);
-    string EmitSampleTexture(string source, string index);
+    string EmitSampleTexture(string source, string index, TextureFilterMode filterMode, TextureWrapMode wrapMode);
     string EmitWriteBuffer(string destination, string index, string value);
     string EmitFunctionInput(NanoProgram program, CodeLocal cachedResult, string fieldName, int index);
     string EmitThreadId();
@@ -20,7 +33,7 @@ namespace NanoGraph {
     public string EmitBufferType(NanoProgramType type) => $"std::shared_ptr<NanoTypedBuffer<{type.EmitIdentifier(this)}>>";
     public string EmitWritableBufferType(NanoProgramType type) => $"std::shared_ptr<NanoTypedBuffer<{type.EmitIdentifier(this)}>>";
     public string EmitSampleBuffer(string source, string index) => $"SampleBuffer({source}, {index})";
-    public string EmitSampleTexture(string source, string index) => $"SampleTexture({source}, {index})"; // TODO: Invalid.
+    public string EmitSampleTexture(string source, string index, TextureFilterMode filterMode, TextureWrapMode wrapMode) => $"SampleTexture({source}, {index})"; // TODO: Invalid.
     public string EmitWriteBuffer(string destination, string index, string value) => $"WriteBuffer({destination}, {index}, {value})";
     public string EmitFunctionInput(NanoProgram program, CodeLocal cachedResult, string fieldName, int index) => $"{cachedResult.Identifier}.{program.GetProgramType(cachedResult.Type).GetField(fieldName)}";
     public string EmitThreadId() => throw new NotSupportedException();
@@ -38,10 +51,48 @@ namespace NanoGraph {
     public string EmitBufferType(NanoProgramType type) => $"device const {type.EmitIdentifier(this)}*";
     public string EmitWritableBufferType(NanoProgramType type) => $"device {type.EmitIdentifier(this)}*";
     public string EmitSampleBuffer(string source, string index) => $"SampleBuffer({source}, {index})";
-    public string EmitSampleTexture(string source, string index) => $"SampleTexture({source}, {index})";
+    public string EmitSampleTexture(string source, string index, TextureFilterMode filterMode, TextureWrapMode wrapMode) => $"SampleTexture<{TextureFilterModeToMetal(filterMode)}, {TextureWrapModeToMetal(wrapMode)}>({source}, {index})";
     public string EmitWriteBuffer(string destination, string index, string value) => $"WriteBuffer({destination}, {index}, {value})";
     public string EmitFunctionInput(NanoProgram program, CodeLocal cachedResult, string fieldName, int index) => $"input{index}";
     public string EmitThreadId() => "gid";
+
+    public static string BitDepthToMetal(GlobalTextureBitDepth bitDepth) {
+      switch (bitDepth) {
+        default:
+        case GlobalTextureBitDepth.Int8:
+          return "MTLPixelFormatBGRA8Unorm_sRGB";
+        case GlobalTextureBitDepth.Float16:
+          return "MTLPixelFormatRGBA16Float";
+        case GlobalTextureBitDepth.Float32:
+          return "MTLPixelFormatRGBA32Float";
+      }
+    }
+
+    private string TextureFilterModeToMetal(TextureFilterMode mode) {
+      switch (mode) {
+        default:
+        case TextureFilterMode.Nearest:
+          return "filter::nearest";
+        case TextureFilterMode.Linear:
+          return "filter::nearest";
+        case TextureFilterMode.Bicubic:
+          return "filter::nearest";
+      }
+    }
+
+    private string TextureWrapModeToMetal(TextureWrapMode mode) {
+      switch (mode) {
+        case TextureWrapMode.ClampToZero:
+          return "address::clamp_to_zero";
+        case TextureWrapMode.ClampToEdge:
+          return "address::clamp_to_edge";
+        default:
+        case TextureWrapMode.Repeat:
+          return "address::repeat";
+        case TextureWrapMode.MirroredRepeat:
+          return "address::mirrored_repeat";
+      }
+    }
   }
 
   public struct NanoParameterOptions {
@@ -280,7 +331,7 @@ namespace NanoGraph {
         return $"ConvertArray<{fromElementType.Identifier}, {toElementType.Identifier}>({expr})";
       }
       if (fromType == Program.Texture) {
-        return EmitConvert(Program.Float4Type, toType, $"SampleTexture(({expr}), gid_xy_norm)");
+        return EmitConvert(Program.Float4Type, toType, Context.EmitSampleTexture(expr, "gid_xy_norm", TextureFilterMode.Linear, TextureWrapMode.Repeat));
       }
       if (fromType.IsBuiltIn && toType.IsBuiltIn) {
         return $"Convert<{GetTypeIdentifier(fromType)}, {GetTypeIdentifier(toType)}>({expr})";
