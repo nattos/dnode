@@ -156,6 +156,22 @@ static inline float logE(float a) { return log(a); }
 static inline vector_float2 logE(vector_float2 a) { return vector_float2 { log(a.x), log(a.y) }; }
 static inline vector_float3 logE(vector_float3 a) { return vector_float3 { log(a.x), log(a.y), log(a.z) }; }
 static inline vector_float4 logE(vector_float4 a) { return vector_float4 { log(a.x), log(a.y), log(a.z), log(a.w) }; }
+  
+template<bool useAlpha, typename T> static inline T blend_mix(T rhs, float t) { return rhs * t; }
+template<bool useAlpha, typename T> static inline T blend_mix(T rhs, T lhs, float t) { return lerp(rhs, lhs, t); }
+template<> inline vector_float4 blend_mix<true, vector_float4>(vector_float4 rhs, vector_float4 lhs, float t) {
+  if (t < 0.5f) {
+    float a = lhs.a * t * 2.0f;
+    vector_float3 rgb = lerp(vector_float3 { rhs.x, rhs.y, rhs.z }, vector_float3 { lhs.x, lhs.y, lhs.z }, a);
+    float aOut = lerp(rhs.a, 1.0f, a);
+    return vector_float4 { rgb.x, rgb.y, rgb.z, aOut };
+  } else {
+    float a = t * 2.0f - 1.0f;
+    vector_float3 rgb = lerp(vector_float3 { rhs.x, rhs.y, rhs.z } * (1.0f - a), vector_float3 { lhs.x, lhs.y, lhs.z }, lhs.a);
+    float aOut = lerp(lerp(rhs.a, 1.0f, lhs.a), lhs.a, a);
+    return vector_float4 { rgb.x, rgb.y, rgb.z, aOut };
+  }
+}
 
 
 kernel void CopyTextureSampleNearest(

@@ -379,6 +379,8 @@ namespace NanoGraph.VisualScripting {
   public class ReadTexture : NodeOfType<ReadTextureNode> {}
   [Alias(typeof(MathAliasProvider))]
   public class Math : NodeOfType<MathNode> {}
+  [Alias(typeof(MixAliasProvider))]
+  public class Mix : NodeOfType<MixNode> {}
   public class MakeArray : NodeOfType<MakeArrayNode>{}
   [Alias(typeof(FillArrayAliasProvider))]
   public class FillArray : NodeOfType<FillArrayNode>{}
@@ -428,6 +430,19 @@ namespace NanoGraph.VisualScripting {
         string name = names[i];
         StandardOperatorType value = values[i];
         yield return (name, null, unit => ((unit as BaseNode).Node as MathNode).Operator = value);
+      }
+    }
+  }
+
+  public class MixAliasProvider : IAliasProvider {
+    public IEnumerable<string> GetAliases() => null;
+    public IEnumerable<(string label, string[] aliases, Action<IUnit> configurer)> GetAlternatives() {
+      string[] names = Enum.GetNames(typeof(StandardMixType));
+      StandardMixType[] values = Enum.GetValues(typeof(StandardMixType)).Cast<StandardMixType>().ToArray();
+      for (int i = 0; i < names.Length; ++i) {
+        string name = $"{names[i]}Mix";
+        StandardMixType value = values[i];
+        yield return (name, null, unit => ((unit as BaseNode).Node as MixNode).MixType = value);
       }
     }
   }

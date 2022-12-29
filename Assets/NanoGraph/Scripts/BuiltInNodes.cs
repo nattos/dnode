@@ -110,6 +110,108 @@ namespace NanoGraph {
     }
   }
 
+  public class MixNode : DataNode, ICodeNode, IAutoTypeNode {
+    [EditableAttribute]
+    public AutoType OutType = AutoType.Auto;
+    public TypeSpec InternalElementType = TypeSpec.MakePrimitive(PrimitiveType.Float4);
+    [EditableAttribute]
+    public bool UseAlpha = true;
+
+    public TypeSpec ElementType => AutoTypeUtils.GetAutoType(OutType, InternalElementType);
+    public bool IsArrayInput => ElementType.IsArray;
+
+    public void UpdateTypesFromInputs() {
+      AutoTypeUtils.UpdateAutoType(Graph.GetInputEdges(this), ref InternalElementType);
+    }
+
+    [EditableAttribute]
+    public StandardMixType MixType = StandardMixType.Blend;
+    public StandardMixer Operator => StandardMixers.Get(MixType);
+
+    public int MultiInputCount = 2;
+
+    public override IReadOnlyList<EditableAttribute> EditableAttributes {
+      get {
+        var baseAttribs = base.EditableAttributes;
+        return baseAttribs.Concat(new[] {
+          new EditableAttribute {
+            Name = nameof(MultiInputCount),
+            Type = MultiInputCount.GetType(),
+            Getter = node => MultiInputCount,
+            Setter = (node, value) => MultiInputCount = Math.Max(1, value as int? ?? 2),
+          },
+        }).ToArray();
+      }
+    }
+
+    public override DataSpec InputSpec {
+      get {
+        var op = Operator;
+        TypeSpec elementType = ElementType;
+        int inputCount = MultiInputCount;
+        DataField[] fields = new DataField[inputCount * 2];
+        for (int i = 0; i < inputCount; ++i) {
+          fields[(inputCount - i - 1) * 2 + 0] = DataField.MakeType(i.ToString(), elementType);
+          fields[(inputCount - i - 1) * 2 + 1] = DataField.MakePrimitive($"{i} α", PrimitiveType.Float);
+        }
+        return DataSpec.FromFields(fields);
+      }
+    }
+
+    public override DataSpec OutputSpec {
+      get {
+        TypeSpec outputElementType = OutputElementType;
+        bool isArray = IsArrayInput;
+        TypeSpec outputType = isArray ? TypeSpec.MakeArray(outputElementType) : outputElementType;
+        return DataSpec.FromFields(DataField.MakeType("Out", outputType));
+      }
+    }
+
+    public TypeSpec OutputElementType {
+      get {
+        var op = Operator;
+        TypeSpec elementType = ElementType;
+        elementType.IsArray = false;
+        return elementType;
+      }
+    }
+
+    public void EmitCode(CodeContext context) {
+      var op = Operator;
+      TypeSpec elementType = ElementType;
+      TypeSpec outputElementType = OutputElementType;
+      string outputIdentifier = context.OutputLocals[0].Identifier;
+      StandardMixOptions options = new StandardMixOptions { UseAlpha = UseAlpha };
+      int inputCount = MultiInputCount;
+      if (IsArrayInput) {
+        string outputLengthLocal = context.Function.AllocLocal("Length");
+        string lengthExpr = StandardOperators.Get(StandardOperatorType.Max).EmitExpressionCode(context, context.InputLocals.Select(input => $"GetLength({input.Identifier})").ToArray());
+        context.Function.AddStatement($"{NanoProgram.IntIdentifier} {outputLengthLocal} = {lengthExpr};");
+        context.Function.AddStatement($"{context.Function.GetArrayTypeIdentifier(outputElementType)} {outputIdentifier}(NanoTypedBuffer<{context.Function.GetTypeIdentifier(outputElementType)}>::Allocate({outputLengthLocal}));");
+        string indexLocal = context.Function.AllocLocal("Index");
+        context.Function.AddStatement($"for ({NanoProgram.IntIdentifier} {indexLocal} = 0; {indexLocal} < {outputLengthLocal}; ++{indexLocal}) {{");
+
+        (string, string)[] readInputExprs = new (string, string)[inputCount];
+        for (int i = 0; i < inputCount; ++i) {
+          string sampleInputExpr = context.Function.Context.EmitSampleBuffer(context.InputLocals[(inputCount - i - 1) * 2 + 0].Identifier, indexLocal);
+          readInputExprs[i] = (sampleInputExpr, context.InputLocals[(inputCount - i - 1) * 2 + 1].Identifier);
+        }
+        string resultExpr = op.EmitExpressionCode(context, readInputExprs, options);
+        string writeBufferExpr = context.Function.Context.EmitWriteBuffer(outputIdentifier, indexLocal, resultExpr);
+        context.Function.AddStatement($"  {writeBufferExpr};");
+
+        context.Function.AddStatement($"}}");
+      } else {
+        (string, string)[] inputs = new (string, string)[inputCount];
+        for (int i = 0; i < inputCount; ++i) {
+          inputs[i] = (context.InputLocals[(inputCount - i - 1) * 2 + 0].Identifier, context.InputLocals[(inputCount - i - 1) * 2 + 1].Identifier);
+        }
+        string resultExpr = op.EmitExpressionCode(context, inputs, options);
+        context.Function.AddStatement($"{context.Function.GetTypeIdentifier(outputElementType)} {outputIdentifier} = {resultExpr};");
+      }
+    }
+  }
+
   public class MakeArrayNode : DataNode, ICodeNode, IAutoTypeNode {
     [EditableAttribute]
     public AutoType OutType = AutoType.Auto;

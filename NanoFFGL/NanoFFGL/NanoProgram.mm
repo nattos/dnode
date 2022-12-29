@@ -605,6 +605,22 @@ protected:
   template<typename T> static inline ValueAndBool<T> less_than_op(const T& lhs, const T& rhs) { return ValueAndBool<T> { rhs, (lhs < rhs) }; }
   template<typename T> static inline ValueAndBool<T> greater_or_equal_op(const T& lhs, const T& rhs) { return ValueAndBool<T> { rhs, (lhs >= rhs) }; }
   template<typename T> static inline ValueAndBool<T> less_or_equal_op(const T& lhs, const T& rhs) { return ValueAndBool<T> { rhs, (lhs <= rhs) }; }
+  
+  template<bool useAlpha, typename T> static inline T blend_mix(T rhs, float t) { return rhs * t; }
+  template<bool useAlpha, typename T> static inline T blend_mix(T rhs, T lhs, float t) { return lerp(rhs, lhs, t); }
+  template<> inline vector_float4 blend_mix<true, vector_float4>(vector_float4 rhs, vector_float4 lhs, float t) {
+    if (t < 0.5f) {
+      float a = lhs.a * t * 2.0f;
+      vector_float3 rgb = lerp(vector_float3 { rhs.x, rhs.y, rhs.z }, vector_float3 { lhs.x, lhs.y, lhs.z }, a);
+      float aOut = lerp(rhs.a, 1.0f, a);
+      return vector_float4 { rgb.x, rgb.y, rgb.z, aOut };
+    } else {
+      float a = t * 2.0f - 1.0f;
+      vector_float3 rgb = lerp(vector_float3 { rhs.x, rhs.y, rhs.z } * (1.0f - a), vector_float3 { lhs.x, lhs.y, lhs.z }, lhs.a);
+      float aOut = lerp(lerp(rhs.a, 1.0f, lhs.a), lhs.a, a);
+      return vector_float4 { rgb.x, rgb.y, rgb.z, aOut };
+    }
+  }
 
   template<typename T> static T random_next();
   template<> float random_next<float>() { return std::rand() / (float) RAND_MAX; } // TODO: Re-evaluate random function.
