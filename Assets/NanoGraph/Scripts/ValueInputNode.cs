@@ -14,6 +14,7 @@ namespace NanoGraph {
 
     [EditableAttribute]
     public InputType Type = InputType.Float;
+    protected override string ShortNamePart => $"{Type}In";
 
     [EditableAttribute]
     public double DefaultValue = 0.0;

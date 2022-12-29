@@ -376,20 +376,143 @@ namespace NanoGraph.VisualScripting {
   public class TextureCompute : NodeOfType<TextureComputeNode> {}
   public class Read : NodeOfType<ReadNode> {}
   public class ReadTexture : NodeOfType<ReadTextureNode> {}
+  [Alias(typeof(MathAliasProvider))]
   public class Math : NodeOfType<MathNode> {}
   public class MakeArray : NodeOfType<MakeArrayNode>{}
+  [Alias(typeof(FillArrayAliasProvider))]
   public class FillArray : NodeOfType<FillArrayNode>{}
+  [Alias(typeof(ReduceArrayAliasProvider))]
   public class ReduceArray : NodeOfType<ReduceArrayNode>{}
   public class Concat : NodeOfType<ConcatNode>{}
+  [Alias(typeof(VectorIndexAliasProvider))]
   public class VectorIndex : NodeOfType<VectorIndexNode>{}
+  [Alias(typeof(PackAliasProvider))]
   public class Pack : NodeOfType<PackNode>{}
   public class Unpack : NodeOfType<UnpackNode>{}
   public class Switch : NodeOfType<SwitchNode>{}
+  [Alias(typeof(LiteralAliasProvider))]
   public class Literal : NodeOfType<LiteralNode>{}
+  [Alias(typeof(GenerateValueAliasProvider))]
   public class GenerateValue : NodeOfType<GenerateValueNode>{}
   public class Latch : NodeOfType<LatchNode>{}
+  [Alias(typeof(ValueInAliasProvider))]
   public class ValueIn : NodeOfType<ValueInputNode>{}
   public class TextureIn : NodeOfType<TextureInputNode>{}
 
   public class TypeDecl : NodeOfType<TypeDeclNode>{}
+
+  public class MathAliasProvider : IAliasProvider {
+    public IEnumerable<string> GetAliases() => null;
+    public IEnumerable<(string label, string[] aliases, Action<IUnit> configurer)> GetAlternatives() {
+      string[] names = Enum.GetNames(typeof(StandardOperatorType));
+      StandardOperatorType[] values = Enum.GetValues(typeof(StandardOperatorType)).Cast<StandardOperatorType>().ToArray();
+      for (int i = 0; i < names.Length; ++i) {
+        string name = names[i];
+        StandardOperatorType value = values[i];
+        yield return (name, null, unit => ((unit as BaseNode).Node as MathNode).Operator = value);
+      }
+    }
+  }
+
+  public class FillArrayAliasProvider : IAliasProvider {
+    public IEnumerable<string> GetAliases() => null;
+    public IEnumerable<(string label, string[] aliases, Action<IUnit> configurer)> GetAlternatives() {
+      string[] names = Enum.GetNames(typeof(ValueProviderType));
+      ValueProviderType[] values = Enum.GetValues(typeof(ValueProviderType)).Cast<ValueProviderType>().ToArray();
+      for (int i = 0; i < names.Length; ++i) {
+        string name = $"Fill{names[i]}";
+        ValueProviderType value = values[i];
+        yield return (name, null, unit => ((unit as BaseNode).Node as FillArrayNode).Source = value);
+      }
+    }
+  }
+
+  public class ReduceArrayAliasProvider : IAliasProvider {
+    public IEnumerable<string> GetAliases() => null;
+    public IEnumerable<(string label, string[] aliases, Action<IUnit> configurer)> GetAlternatives() {
+      string[] names = Enum.GetNames(typeof(ReduceOperatorType));
+      ReduceOperatorType[] values = Enum.GetValues(typeof(ReduceOperatorType)).Cast<ReduceOperatorType>().ToArray();
+      for (int i = 0; i < names.Length; ++i) {
+        string name = $"Array{names[i]}";
+        ReduceOperatorType value = values[i];
+        yield return (name, null, unit => ((unit as BaseNode).Node as ReduceArrayNode).Operation = value);
+      }
+    }
+  }
+
+  public class GenerateValueAliasProvider : IAliasProvider {
+    public IEnumerable<string> GetAliases() => null;
+    public IEnumerable<(string label, string[] aliases, Action<IUnit> configurer)> GetAlternatives() {
+      string[] names = Enum.GetNames(typeof(ValueProviderType));
+      ValueProviderType[] values = Enum.GetValues(typeof(ValueProviderType)).Cast<ValueProviderType>().ToArray();
+      for (int i = 0; i < names.Length; ++i) {
+        string name = $"Generate{names[i]}";
+        ValueProviderType value = values[i];
+        if (value == ValueProviderType.Value) {
+          continue;
+        }
+        yield return (name, null, unit => ((unit as BaseNode).Node as GenerateValueNode).Source = value);
+      }
+    }
+  }
+
+  public class PackAliasProvider : IAliasProvider {
+    public IEnumerable<string> GetAliases() => null;
+    public IEnumerable<(string label, string[] aliases, Action<IUnit> configurer)> GetAlternatives() {
+      string[] names = Enum.GetNames(typeof(PackableType));
+      PackableType[] values = Enum.GetValues(typeof(PackableType)).Cast<PackableType>().ToArray();
+      for (int i = 0; i < names.Length; ++i) {
+        string name = $"Pack{names[i]}";
+        PackableType value = values[i];
+        if (value == PackableType.Custom) {
+          continue;
+        }
+        yield return (name, null, unit => ((unit as BaseNode).Node as PackNode).Type = value);
+      }
+    }
+  }
+
+  public class LiteralAliasProvider : IAliasProvider {
+    public IEnumerable<string> GetAliases() => null;
+    public IEnumerable<(string label, string[] aliases, Action<IUnit> configurer)> GetAlternatives() {
+      string[] names = Enum.GetNames(typeof(PrimitiveType));
+      PrimitiveType[] values = Enum.GetValues(typeof(PrimitiveType)).Cast<PrimitiveType>().ToArray();
+      for (int i = 0; i < names.Length; ++i) {
+        string name = $"{names[i]}Literal";
+        PrimitiveType value = values[i];
+        if (value == PrimitiveType.Texture ||
+            value == PrimitiveType.TypeDecl ||
+            value == PrimitiveType.Vertices) {
+          continue;
+        }
+        yield return (name, null, unit => ((unit as BaseNode).Node as LiteralNode).Type = value);
+      }
+    }
+  }
+
+  public class ValueInAliasProvider : IAliasProvider {
+    public IEnumerable<string> GetAliases() => null;
+    public IEnumerable<(string label, string[] aliases, Action<IUnit> configurer)> GetAlternatives() {
+      string[] names = Enum.GetNames(typeof(ValueInputNode.InputType));
+      ValueInputNode.InputType[] values = Enum.GetValues(typeof(ValueInputNode.InputType)).Cast<ValueInputNode.InputType>().ToArray();
+      for (int i = 0; i < names.Length; ++i) {
+        string name = $"{names[i]}In";
+        ValueInputNode.InputType value = values[i];
+        yield return (name, null, unit => ((unit as BaseNode).Node as ValueInputNode).Type = value);
+      }
+    }
+  }
+
+  public class VectorIndexAliasProvider : IAliasProvider {
+    public IEnumerable<string> GetAliases() => null;
+    public IEnumerable<(string label, string[] aliases, Action<IUnit> configurer)> GetAlternatives() {
+      string[] names = Enum.GetNames(typeof(VectorIndexNode.DimensionType));
+      VectorIndexNode.DimensionType[] values = Enum.GetValues(typeof(VectorIndexNode.DimensionType)).Cast<VectorIndexNode.DimensionType>().ToArray();
+      for (int i = 0; i < names.Length; ++i) {
+        string name = $"{names[i]}Index";
+        VectorIndexNode.DimensionType value = values[i];
+        yield return (name, null, unit => ((unit as BaseNode).Node as VectorIndexNode).Dimensions = value);
+      }
+    }
+  }
 }

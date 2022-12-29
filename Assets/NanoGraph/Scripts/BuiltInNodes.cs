@@ -418,6 +418,7 @@ namespace NanoGraph {
 
     [EditableAttribute]
     public DimensionType Dimensions = DimensionType.Linear;
+    protected override string ShortNamePart => $"{Dimensions}Index";
 
     public override DataSpec InputSpec => DataSpec.Empty;
 

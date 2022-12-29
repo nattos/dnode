@@ -158,8 +158,8 @@ namespace NanoGraph.VisualScripting {
       GUI.changed = true;
     }
 
-    private UnitOptionTree GetNewUnitOptions(UnitOptionFilter filter) {
-      var options = new UnitOptionTree(new GUIContent("Node"));
+    private NanoGraphUnitOptionTree GetNewUnitOptions(UnitOptionFilter filter) {
+      var options = new NanoGraphUnitOptionTree(new GUIContent("Node"));
 
       options.filter = filter;
       options.reference = reference;
@@ -173,13 +173,14 @@ namespace NanoGraph.VisualScripting {
 
     private void NewUnit(Vector2 position) {
       var filter = UnitOptionFilter.Any;
+      filter.Variables = false;
       filter.GraphHashCode = graph.GetHashCode();
       NewUnit(position, GetNewUnitOptions(filter));
     }
 
-    private void NewUnit(Vector2 unitPosition, UnitOptionTree options, Action<IUnit> then = null) {
+    private void NewUnit(Vector2 unitPosition, NanoGraphUnitOptionTree options, Action<IUnit> then = null) {
       delayCall += () => {
-        var activatorPosition = new Rect(e.mousePosition, new Vector2(200, 1));
+        var activatorPosition = new Rect(e.mousePosition, new Vector2(270, 1));
 
         var context = this.context;
 
@@ -194,6 +195,7 @@ namespace NanoGraph.VisualScripting {
                   var option = (IUnitOption)_option;
                   var unit = option.InstantiateUnit();
                   AddUnit(unit, unitPosition);
+                  Debug.Log(option);
                   option.PreconfigureUnit(unit);
                   then?.Invoke(unit);
                   GUI.changed = true;
