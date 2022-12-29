@@ -41,6 +41,7 @@ namespace NanoGraph {
 
     [EditableAttribute]
     public BasicOutputType OutputType = BasicOutputType.Custom;
+    protected override string ShortNamePart => $"{OutputType}ScalarCompute";
 
     protected override PrimitiveType? SingleFieldModeType => OutputType.ToPrimitiveTypeOrNull();
 
@@ -61,20 +62,54 @@ namespace NanoGraph {
       public override void EmitFunctionReturn(out CodeCachedResult? result) {
         string returnLocal = func.AllocLocal("Return");
         func.AddStatement($"{func.GetTypeIdentifier(resultType)} {returnLocal};");
-        foreach (var field in computeOutputSpec.Fields) {
-          if (field.IsCompileTimeOnly) {
-            continue;
+        TypeField[] outputFields = Node.OutputTypeFields;
+        foreach (var field in outputFields) {
+          string inputExpr;
+          switch (Node.InputPortsMode) {
+            case FieldPortsMode.Combined: {
+              var edge = graph.GetEdgeToDestinationOrNull(computeNode, "Out");
+              if (edge == null) {
+                continue;
+              }
+              CodeLocal? inputLocal = resultLocalMap.GetOrNull(edge.Source);
+              if (inputLocal == null) {
+                errors.Add($"Input {field.Name} for {computeNode} is not defined.");
+                continue;
+              }
+              inputExpr = $"{inputLocal.Value.Identifier}.{program.GetProgramType(inputLocal.Value.Type).GetField(field.Name)}";
+              break;
+            }
+            default:
+            case FieldPortsMode.Individual: {
+              var edge = graph.GetEdgeToDestinationOrNull(computeNode, field.Name);
+              if (edge == null) {
+                continue;
+              }
+              CodeLocal? inputLocal = resultLocalMap.GetOrNull(edge.Source);
+              if (inputLocal == null) {
+                errors.Add($"Input {field.Name} for {computeNode} is not defined.");
+                continue;
+              }
+              inputExpr = inputLocal.Value.Identifier;
+              break;
+            }
           }
-          var edge = graph.GetEdgeToDestinationOrNull(computeNode, field.Name);
-          if (edge == null) {
-            continue;
+
+          string outputExpr;
+          switch (Node.OutputPortsMode) {
+            case FieldPortsMode.Combined: {
+              TypeSpec combinedOutType = computeOutputSpec.Fields.First(node => node.Name == "Out").Type;
+              NanoProgramType programOutType = program.GetProgramType(combinedOutType);
+              outputExpr = $"{returnLocal}.{resultType.GetField("Out")}.{programOutType.GetField(field.Name)}";
+              break;
+            }
+            default:
+            case FieldPortsMode.Individual:
+              outputExpr = $"{returnLocal}.{resultType.GetField(field.Name)}";
+              break;
           }
-          CodeLocal? inputLocal = resultLocalMap.GetOrNull(edge.Source);
-          if (inputLocal == null) {
-            errors.Add($"Input {field.Name} for {computeNode} is not defined.");
-            continue;
-          }
-          func.AddStatement($"{returnLocal}.{resultType.GetField(field.Name)} = {inputLocal?.Identifier};");
+
+          func.AddStatement($"{outputExpr} = {inputExpr};");
         }
         func.AddStatement($"return {returnLocal};");
         result = new CodeCachedResult { ResultType = resultType, Result = new CodeLocal { Identifier = cachedResult.Identifier, Type = resultTypeSpec } };

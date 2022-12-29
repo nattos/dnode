@@ -254,7 +254,6 @@ namespace NanoGraph {
         if (!descendantInputs.TryGetValue(descendant, out var inputs)) {
           return;
         }
-        // TODO: Make this conditional!!
         EmitExecuteFunctionCode(context.Function, ExecuteFunctionContextType.OnDemand);
 
         int index = 0;

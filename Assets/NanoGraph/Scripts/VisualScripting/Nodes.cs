@@ -370,6 +370,7 @@ namespace NanoGraph.VisualScripting {
 
 
   public class VectorCompute : NodeOfType<VectorComputeNode> {}
+  [Alias(typeof(ScalarComputeAliasProvider))]
   public class ScalarCompute : NodeOfType<ScalarComputeNode> {}
   public class VertexCompute : NodeOfType<VertexShaderComputeNode> {}
   public class FragmentCompute : NodeOfType<FragmentShaderComputeNode> {}
@@ -400,6 +401,23 @@ namespace NanoGraph.VisualScripting {
   public class TextureIn : NodeOfType<TextureInputNode>{}
 
   public class TypeDecl : NodeOfType<TypeDeclNode>{}
+
+  public class ScalarComputeAliasProvider : IAliasProvider {
+    public IEnumerable<string> GetAliases() => null;
+    public IEnumerable<(string label, string[] aliases, Action<IUnit> configurer)> GetAlternatives() {
+      string[] names = Enum.GetNames(typeof(BasicOutputType));
+      BasicOutputType[] values = Enum.GetValues(typeof(BasicOutputType)).Cast<BasicOutputType>().ToArray();
+      for (int i = 0; i < names.Length; ++i) {
+        string name = $"{names[i]}ScalarCompute";
+        BasicOutputType value = values[i];
+        if (value == BasicOutputType.Custom ||
+            value == BasicOutputType.Texture) {
+          continue;
+        }
+        yield return (name, null, unit => ((unit as BaseNode).Node as ScalarComputeNode).OutputType = value);
+      }
+    }
+  }
 
   public class MathAliasProvider : IAliasProvider {
     public IEnumerable<string> GetAliases() => null;

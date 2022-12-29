@@ -155,9 +155,71 @@ namespace NanoGraph {
           func.AddStatement($"if (debugOutputNodeIndex >= 0) {{");
           func.AddStatement($"  switch (debugOutputNodeIndex) {{");
           int resultIndex = 0;
+
+          string[] GetExtractDebugValueExprs(string inputExpr, TypeSpec type, int limit) {
+            if (type.IsArray) {
+              List<string> resultExprs = new List<string>();
+              int arrayIndex = 0;
+              while (resultExprs.Count < limit) {
+                string elementInputExpr = func.Context.EmitSampleBuffer(inputExpr, func.EmitLiteral(arrayIndex));
+                string[] elementExprs = GetExtractDebugValueExprs(elementInputExpr, type.ElementSpec, limit);
+                if (elementExprs.Length == 0) {
+                  break;
+                }
+                foreach (string elementExpr in elementExprs) {
+                  resultExprs.Add($"({arrayIndex} < GetLength({inputExpr}) ? ({elementExpr}) : (0.0))");
+                }
+                ++arrayIndex;
+              }
+              return resultExprs.ToArray();
+            }
+            if (type.Primitive != null) {
+              switch (type.Primitive.Value) {
+                case PrimitiveType.Bool:
+                  return new[] { $"(({inputExpr}) ? 1.0 : 0.0)" };
+                case PrimitiveType.Int:
+                  return new[] { $"((float)({inputExpr}))" };
+                case PrimitiveType.Uint:
+                  return new[] { $"((float)({inputExpr}))" };
+                case PrimitiveType.Uint2:
+                  return new[] { $"((float)(({inputExpr}).x))", $"((float)(({inputExpr}).y))" };
+                case PrimitiveType.Double:
+                  return new[] { $"((float)({inputExpr}))" };
+                case PrimitiveType.Float:
+                  return new[] { $"((float)({inputExpr}))" };
+                case PrimitiveType.Float2:
+                  return new[] { $"((float)(({inputExpr}).x))", $"((float)(({inputExpr}).y))" };
+                case PrimitiveType.Float3:
+                  return new[] { $"((float)(({inputExpr}).x))", $"((float)(({inputExpr}).y))", $"((float)(({inputExpr}).z))" };
+                case PrimitiveType.Float4:
+                  return new[] { $"((float)(({inputExpr}).x))", $"((float)(({inputExpr}).y))", $"((float)(({inputExpr}).z))", $"((float)(({inputExpr}).w))" };
+                default:
+                  return Array.Empty<string>();
+              }
+            }
+            if (type.Type != null) {
+              NanoProgramType programType = program.GetProgramType(TypeSpec.MakeType(type.Type));
+              return type.Type.Fields.SelectMany(field => {
+                string fieldInputExpr = $"{inputExpr}.{programType.GetField(field.Name)}";
+                return GetExtractDebugValueExprs(fieldInputExpr, field.Type, limit);
+              }).ToArray();
+            }
+            return Array.Empty<string>();
+          }
+
           foreach ((DataPlug dataPlug, CodeLocal resultLocal) in SortedResutLocalMap.Values) {
+            string extractDebugValueExpr;
+            string[] valueExprs = GetExtractDebugValueExprs(resultLocal.Identifier, resultLocal.Type, limit: 4);
+            if (valueExprs.Length == 1) {
+              extractDebugValueExpr = $"vector_float4 {{ {valueExprs[0]}, {valueExprs[0]}, {valueExprs[0]}, 1.0 }}";
+            } else if (valueExprs.Length > 0) {
+              extractDebugValueExpr = $"vector_float4 {{ {string.Join(", ", valueExprs.Take(4))} }}";
+            } else {
+              extractDebugValueExpr = $"0.0";
+            }
+
             func.AddStatement($"    case {func.EmitLiteral(resultIndex)}:");
-            func.AddStatement($"      {debugOutLocal} = {func.EmitConvert(resultLocal.Type, TypeSpec.MakePrimitive(PrimitiveType.Float4), resultLocal.Identifier)};");
+            func.AddStatement($"      {debugOutLocal} = {extractDebugValueExpr};");
             func.AddStatement($"      break;");
             ++resultIndex;
           }

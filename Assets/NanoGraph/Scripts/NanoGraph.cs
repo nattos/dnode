@@ -1105,8 +1105,9 @@ namespace NanoGraph {
                   }
                 }
                 if (type.Type != null) {
+                  NanoProgramType programType = program.GetProgramType(TypeSpec.MakeType(type.Type));
                   return type.Type.Fields.SelectMany(field => {
-                    string fieldInputExpr = $"{inputExpr}.{program.GetProgramType(field.Type).GetField(field.Name)}";
+                    string fieldInputExpr = $"{inputExpr}.{programType.GetField(field.Name)}";
                     return GetExtractDebugValueExprs(fieldInputExpr, field.Type, limit);
                   }).ToArray();
                 }
