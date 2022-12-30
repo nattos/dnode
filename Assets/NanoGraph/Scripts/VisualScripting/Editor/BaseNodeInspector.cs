@@ -10,8 +10,9 @@ namespace NanoGraph.VisualScripting {
   [Inspector(typeof(BaseNode))]
   public class BaseNodeInspector : UnitInspector {
     public const float _previewHeight = 100.0f;
-    public Texture2D _captureTexture = Texture2D.redTexture;
-    public bool _previewAlphaChannel;
+    private Texture2D _captureTexture = Texture2D.redTexture;
+    private bool _previewAlphaChannel;
+    private float _attributesHeight = 0.0f;
 
     public BaseNodeInspector(Metadata metadata) : base(metadata) {
       // TODO: HACKY.
@@ -19,9 +20,8 @@ namespace NanoGraph.VisualScripting {
     }
 
     protected override float GetHeight(float width, GUIContent label) {
-      int editableAttributeCount = ((metadata.value as BaseNode)?.Node as IEditableAttributeProvider)?.EditableAttributes?.Count() ?? 0;
-      editableAttributeCount += 2;
-      return base.GetHeight(width, label) + EditorGUIUtility.singleLineHeight * editableAttributeCount + _previewHeight;
+      _attributesHeight = EditableAttributesInspector.GetHeight(width, (metadata.value as BaseNode)?.Node as IEditableAttributeProvider);
+      return base.GetHeight(width, label) + _attributesHeight + _previewHeight;
     }
 
     protected override void OnGUI(Rect position, GUIContent label) {
@@ -31,33 +31,17 @@ namespace NanoGraph.VisualScripting {
       }
 
       Rect rect = position;
-      rect.height = EditorGUIUtility.singleLineHeight;
+      using (var check = new EditorGUI.ChangeCheckScope()) {
+        rect.height = _attributesHeight;
+        EditableAttributesInspector.OnGUI(rect, node.Node as IEditableAttributeProvider);
+        rect.y += rect.height;
 
-      IEditableAttributeProvider attributesProvider = node.Node as IEditableAttributeProvider;
-      IReadOnlyList<EditableAttribute> editableAttributes = attributesProvider?.EditableAttributes ?? Array.Empty<EditableAttribute>();
-      foreach (var attrib in editableAttributes) {
-        object resultValue = null;
-        using (var check = new EditorGUI.ChangeCheckScope()) {
-          if (attrib.Type == typeof(string)) {
-            resultValue = EditorGUI.TextField(rect, attrib.Name, attrib.Getter.Invoke(attributesProvider) as string ?? "");
-          } else if (attrib.Type == typeof(int)) {
-            resultValue = EditorGUI.IntField(rect, attrib.Name, attrib.Getter.Invoke(attributesProvider) as int? ?? 0);
-          } else if (attrib.Type == typeof(float)) {
-            resultValue = EditorGUI.FloatField(rect, attrib.Name, attrib.Getter.Invoke(attributesProvider) as float? ?? 0.0f);
-          } else if (attrib.Type == typeof(double)) {
-            resultValue = (double)EditorGUI.FloatField(rect, attrib.Name, (float)(attrib.Getter.Invoke(attributesProvider) as double? ?? 0.0));
-          } else if (attrib.Type == typeof(bool)) {
-            resultValue = EditorGUI.Toggle(rect, attrib.Name, attrib.Getter.Invoke(attributesProvider) as bool? ?? false);
-          } else if (attrib.Type.IsEnum) {
-            resultValue = EditorGUI.EnumPopup(rect, attrib.Name, attrib.Getter.Invoke(attributesProvider) as Enum);
-          }
-          if (check.changed) {
-            attrib.Setter.Invoke(attributesProvider, resultValue);
-            node.PortsChanged();
-          }
+        if (check.changed) {
+          node.PortsChanged();
         }
-        rect.y += EditorGUIUtility.singleLineHeight;
       }
+
+      rect.height = EditorGUIUtility.singleLineHeight;
       if (GUI.Button(rect, "Dump Debug Info")) {
         EditorApplication.delayCall += () => {
           Debug.Log((node.Node as DataNode)?.DebugInfoDump);

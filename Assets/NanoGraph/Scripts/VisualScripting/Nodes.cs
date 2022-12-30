@@ -398,6 +398,8 @@ namespace NanoGraph.VisualScripting {
   [Alias(typeof(GenerateValueAliasProvider))]
   public class GenerateValue : NodeOfType<GenerateValueNode>{}
   public class Latch : NodeOfType<LatchNode>{}
+  [Alias(typeof(ExpressionAliasProvider))]
+  public class Expression : NodeOfType<ExpressionNode>{}
   [Alias(typeof(ValueInAliasProvider))]
   public class ValueIn : NodeOfType<ValueInputNode>{}
   public class TextureIn : NodeOfType<TextureInputNode>{}
@@ -519,6 +521,27 @@ namespace NanoGraph.VisualScripting {
           continue;
         }
         yield return (name, null, unit => ((unit as BaseNode).Node as LiteralNode).Type = value);
+      }
+    }
+  }
+
+  public class ExpressionAliasProvider : IAliasProvider {
+    public IEnumerable<string> GetAliases() => null;
+    public IEnumerable<(string label, string[] aliases, Action<IUnit> configurer)> GetAlternatives() {
+      {
+        void Configure(ExpressionNode node) {
+          node.InputFields.Fields.Add(TypeDeclBuilderField.Make("x", PrimitiveType.Float));
+          node.OutputFields.Fields.Add(TypeDeclBuilderField.Make("out", PrimitiveType.Float));
+        }
+        yield return ("UnaryExpression", null, unit => Configure((unit as BaseNode).Node as ExpressionNode));
+      }
+      {
+        void Configure(ExpressionNode node) {
+          node.InputFields.Fields.Add(TypeDeclBuilderField.Make("x", PrimitiveType.Float));
+          node.InputFields.Fields.Add(TypeDeclBuilderField.Make("y", PrimitiveType.Float));
+          node.OutputFields.Fields.Add(TypeDeclBuilderField.Make("out", PrimitiveType.Float));
+        }
+        yield return ("BinaryExpression", null, unit => Configure((unit as BaseNode).Node as ExpressionNode));
       }
     }
   }

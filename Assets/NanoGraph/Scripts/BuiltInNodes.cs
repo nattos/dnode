@@ -116,6 +116,7 @@ namespace NanoGraph {
     public TypeSpec InternalElementType = TypeSpec.MakePrimitive(PrimitiveType.Float4);
     [EditableAttribute]
     public bool UseAlpha = true;
+    protected override string ShortNamePart => $"{MixType}Mix";
 
     public TypeSpec ElementType => AutoTypeUtils.GetAutoType(OutType, InternalElementType);
     public bool IsArrayInput => ElementType.IsArray;
@@ -999,87 +1000,6 @@ namespace NanoGraph {
       IValueProvider provider = ValueProvider;
       var elementType = ElementType;
       context.Function.AddStatement($"{context.Function.GetTypeIdentifier(elementType)} {context.OutputLocals[0].Identifier} = {provider.EmitCode(this, context, inputsIndexOffset: 0, context.Function.EmitLiteral(0), context.Function.EmitLiteral(1), elementType)};");
-    }
-  }
-
-  public class TypeDeclNode : DataNode, ICompileTimeOnlyNode {
-    public class Field {
-      public string Name = "";
-      public PrimitiveType Primitive = PrimitiveType.Float;
-      public bool IsArray = false;
-    }
-
-    [EditableAttribute]
-    public bool IsArray;
-
-    [EditableAttribute]
-    public bool HasVertexPosition;
-
-    public List<Field> EditableFields = new List<Field>();
-    public TypeDecl Type => new TypeDecl(AllTypeFields.ToArray());
-
-    public override DataSpec InputSpec => DataSpec.Empty;
-    public override DataSpec OutputSpec =>
-        IsArray ? DataSpec.FromFields(DataField.MakeType("Out", TypeSpec.MakeArray(TypeSpec.MakeType(Type))))
-                : DataSpec.FromFields(DataField.MakeType("Out", TypeSpec.MakeType(Type)));
-
-    public IEnumerable<TypeField> EditableTypeFields => EditableFields.Select(field => new TypeField { Name = field.Name, Type = field.IsArray ? TypeSpec.MakeArray(TypeSpec.MakePrimitive(field.Primitive)) : TypeSpec.MakePrimitive(field.Primitive) });
-    public IEnumerable<TypeField> AllTypeFields {
-      get {
-        IEnumerable<TypeField> fields = EditableTypeFields;
-        if (HasVertexPosition) {
-          fields = new[] { new TypeField { Name = "Position", Type = TypeSpec.MakePrimitive(PrimitiveType.Float4), Attributes = new[] { "[[position]]" } } }.Concat(fields);
-        }
-        return fields;
-      }
-    }
-
-    public override IReadOnlyList<EditableAttribute> EditableAttributes {
-      get {
-        var baseAttributes = base.EditableAttributes;
-
-        List<EditableAttribute> attribs = new List<EditableAttribute>();
-
-        attribs.Add(new EditableAttribute {
-          Name = $"Field Count",
-          Type = typeof(int),
-          Getter = node => EditableFields.Count,
-          Setter = (node, value) => {
-            int count = Math.Max(0, value as int? ?? 0);
-            while (EditableFields.Count > count) {
-              EditableFields.RemoveAt(EditableFields.Count - 1);
-            }
-            while (EditableFields.Count < count) {
-              EditableFields.Add(new Field { Name = $"{EditableFields.Count}" });
-            }
-          },
-        });
-
-        int fieldIndex = 0;
-        foreach (Field field in EditableFields) {
-          attribs.Add(new EditableAttribute {
-            Name = $"{fieldIndex} Name",
-            Type = typeof(string),
-            Getter = node => field.Name,
-            Setter = (node, value) => field.Name = value as string ?? "",
-          });
-          attribs.Add(new EditableAttribute {
-            Name = $"{fieldIndex} Type",
-            Type = typeof(PrimitiveType),
-            Getter = node => field.Primitive,
-            Setter = (node, value) => field.Primitive = value as PrimitiveType? ?? PrimitiveType.Float,
-          });
-          attribs.Add(new EditableAttribute {
-            Name = $"{fieldIndex} IsArray",
-            Type = typeof(bool),
-            Getter = node => field.IsArray,
-            Setter = (node, value) => field.IsArray = value as bool? ?? false,
-          });
-          fieldIndex++;
-        }
-
-        return baseAttributes.Concat(attribs).ToArray();
-      }
     }
   }
 }

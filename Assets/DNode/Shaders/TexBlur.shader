@@ -88,8 +88,8 @@ Shader "Hidden/TexBlur"
 
                   float offset;
                   offset = step * stageOffset * (stage + 0.5);
-                  [unroll]
                   float4 stageAcc = 0;
+                  [unroll]
                   for (int i = 0; i < weightCount; ++i) {
                     float2 uv = center;
                     if (isY) {
