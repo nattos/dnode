@@ -23,6 +23,9 @@ namespace NanoGraph {
 
     public void OnGUI() {
       int inputCount = PluginService.Instance.TextureInputCount;
+      if (TestWindow.Instance) {
+        TestWindow.Instance.SelectedInputs = TestWindow.Instance.SelectedInputs ?? new List<TestWindow.SelectedInput>();
+      }
       if (SelectedInputs == null) {
         return;
       }

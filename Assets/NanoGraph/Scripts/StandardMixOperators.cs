@@ -7,6 +7,7 @@ using UnityEngine;
 
 namespace NanoGraph {
   public enum StandardMixType {
+    Lerp,
     Blend,
     Add,
     Subtract,
@@ -59,6 +60,7 @@ namespace NanoGraph {
 
     static StandardMixers() {
       All = new[] {
+          new StandardMixer(StandardMixType.Lerp, codeEmitter: StandardMixCodeEmitter.MakeChainedFunction("lerp_mix")),
           new StandardMixer(StandardMixType.Blend, codeEmitter: StandardMixCodeEmitter.MakeChainedFunction("blend_mix")),
           new StandardMixer(StandardMixType.Add, codeEmitter: StandardMixCodeEmitter.MakeChainedFunction("add_mix")),
           new StandardMixer(StandardMixType.Subtract, codeEmitter: StandardMixCodeEmitter.MakeChainedFunction("subtract_mix")),

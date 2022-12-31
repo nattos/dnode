@@ -299,7 +299,7 @@ namespace NanoGraph {
     public string EmitCode(ICodeNode node, CodeContext context, int inputsIndexOffset, string indexExpr, string lengthExpr, TypeSpec elementType) {
       string minIdentifier = context.InputLocals[inputsIndexOffset + 0].Identifier;
       string maxIdentifier = context.InputLocals[inputsIndexOffset + 1].Identifier;
-      return $"lerp({minIdentifier}, {maxIdentifier}, ({indexExpr}) / ({context.Function.GetTypeIdentifier(PrimitiveType.Float)})({lengthExpr}))";
+      return $"lerp_op({minIdentifier}, {maxIdentifier}, ({indexExpr}) / ({context.Function.GetTypeIdentifier(PrimitiveType.Float)})({lengthExpr}))";
     }
   }
 
@@ -829,7 +829,7 @@ namespace NanoGraph {
     }
   }
 
-  public class SwitchNode : DataNode, ICodeNode, IConditionalNode {
+  public class SwitchNode : DataNode, ICodeNode, IConditionalNode, IAutoTypeNode {
     [EditableAttribute]
     public AutoType OutType = AutoType.Auto;
     public TypeSpec InternalInputType = TypeSpec.MakePrimitive(PrimitiveType.Float);

@@ -478,10 +478,10 @@ protected:
   static inline vector_float3 min(vector_float3 a, vector_float3 b) { return vector_float3 { std::min(a.x, b.x), std::min(a.y, b.y), std::min(a.z, b.z) }; }
   static inline vector_float4 min(vector_float4 a, vector_float4 b) { return vector_float4 { std::min(a.x, b.x), std::min(a.y, b.y), std::min(a.z, b.z), std::min(a.w, b.w) }; }
 
-  static inline float lerp(float a, float b, float t) { return a * (1.0f - t) + b * t; }
-  static inline vector_float2 lerp(vector_float2 a, vector_float2 b, float t) { return vector_float2 { lerp(a.x, b.x, t), lerp(a.y, b.y, t) }; }
-  static inline vector_float3 lerp(vector_float3 a, vector_float3 b, float t) { return vector_float3 { lerp(a.x, b.x, t), lerp(a.y, b.y, t), lerp(a.z, b.z, t) }; }
-  static inline vector_float4 lerp(vector_float4 a, vector_float4 b, float t) { return vector_float4 { lerp(a.x, b.x, t), lerp(a.y, b.y, t), lerp(a.z, b.z, t), lerp(a.w, b.w, t) }; }
+  static inline float lerp_op(float a, float b, float t) { return a * (1.0f - t) + b * t; }
+  static inline vector_float2 lerp_op(vector_float2 a, vector_float2 b, float t) { return vector_float2 { lerp_op(a.x, b.x, t), lerp_op(a.y, b.y, t) }; }
+  static inline vector_float3 lerp_op(vector_float3 a, vector_float3 b, float t) { return vector_float3 { lerp_op(a.x, b.x, t), lerp_op(a.y, b.y, t), lerp_op(a.z, b.z, t) }; }
+  static inline vector_float4 lerp_op(vector_float4 a, vector_float4 b, float t) { return vector_float4 { lerp_op(a.x, b.x, t), lerp_op(a.y, b.y, t), lerp_op(a.z, b.z, t), lerp_op(a.w, b.w, t) }; }
 
   static inline float pow(float a, float b) { return std::pow(a, b); }
   static inline vector_float2 pow(vector_float2 a, vector_float2 b) { return vector_float2 { std::pow(a.x, b.x), std::pow(a.y, b.y) }; }
@@ -605,19 +605,22 @@ protected:
   template<typename T> static inline ValueAndBool<T> less_than_op(const T& lhs, const T& rhs) { return ValueAndBool<T> { rhs, (lhs < rhs) }; }
   template<typename T> static inline ValueAndBool<T> greater_or_equal_op(const T& lhs, const T& rhs) { return ValueAndBool<T> { rhs, (lhs >= rhs) }; }
   template<typename T> static inline ValueAndBool<T> less_or_equal_op(const T& lhs, const T& rhs) { return ValueAndBool<T> { rhs, (lhs <= rhs) }; }
+
+  template<bool useAlpha, typename T> static inline T lerp_mix(T rhs, float t) { return rhs * t; }
+  template<bool useAlpha, typename T> static inline T lerp_mix(T rhs, T lhs, float t) { return lerp_op(rhs, lhs, t); }
   
   template<bool useAlpha, typename T> static inline T blend_mix(T rhs, float t) { return rhs * t; }
-  template<bool useAlpha, typename T> static inline T blend_mix(T rhs, T lhs, float t) { return lerp(rhs, lhs, t); }
+  template<bool useAlpha, typename T> static inline T blend_mix(T rhs, T lhs, float t) { return lerp_op(rhs, lhs, t); }
   template<> inline vector_float4 blend_mix<true, vector_float4>(vector_float4 rhs, vector_float4 lhs, float t) {
     if (t < 0.5f) {
       float a = lhs.a * t * 2.0f;
-      vector_float3 rgb = lerp(vector_float3 { rhs.x, rhs.y, rhs.z }, vector_float3 { lhs.x, lhs.y, lhs.z }, a);
-      float aOut = lerp(rhs.a, 1.0f, a);
+      vector_float3 rgb = lerp_op(vector_float3 { rhs.x, rhs.y, rhs.z }, vector_float3 { lhs.x, lhs.y, lhs.z }, a);
+      float aOut = lerp_op(rhs.a, 1.0f, a);
       return vector_float4 { rgb.x, rgb.y, rgb.z, aOut };
     } else {
       float a = t * 2.0f - 1.0f;
-      vector_float3 rgb = lerp(vector_float3 { rhs.x, rhs.y, rhs.z } * (1.0f - a), vector_float3 { lhs.x, lhs.y, lhs.z }, lhs.a);
-      float aOut = lerp(lerp(rhs.a, 1.0f, lhs.a), lhs.a, a);
+      vector_float3 rgb = lerp_op(vector_float3 { rhs.x, rhs.y, rhs.z } * (1.0f - a), vector_float3 { lhs.x, lhs.y, lhs.z }, lhs.a);
+      float aOut = lerp_op(lerp_op(rhs.a, 1.0f, lhs.a), lhs.a, a);
       return vector_float4 { rgb.x, rgb.y, rgb.z, aOut };
     }
   }

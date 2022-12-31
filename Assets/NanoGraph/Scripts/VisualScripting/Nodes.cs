@@ -68,6 +68,7 @@ namespace NanoGraph.VisualScripting {
 
     protected override void Definition() {
       EnsureNode();
+      Node.DebugId = this.guid.ToString();
 
       _fieldNameToCustomInspectorData.Clear();
       DataSpec inputSpec = Node.InputSpec;
@@ -209,7 +210,7 @@ namespace NanoGraph.VisualScripting {
           if (relinkNode) {
             bool isArray = field?.Type.IsArray ?? false;
             Func<DValue> valueProvider = () => defaultValues.GetValueOrDefault(inputPort.key) as DValue? ?? default;
-            literalNode = new LiteralNode { SerializedName = "Value", Type = fieldPrimitiveType, ValueSource = InputSource.Internal, InternalValueProvider = valueProvider };
+            literalNode = new LiteralNode { Name = "Value", Type = fieldPrimitiveType, ValueSource = InputSource.Internal, InternalValueProvider = valueProvider };
             _fieldNameToLiteralNodes[inputPort.key] = literalNode;
 
             graph.AddNode(literalNode);
@@ -431,7 +432,17 @@ namespace NanoGraph.VisualScripting {
       for (int i = 0; i < names.Length; ++i) {
         string name = names[i];
         StandardOperatorType value = values[i];
-        yield return (name, null, unit => ((unit as BaseNode).Node as MathNode).Operator = value);
+        string[] aliases = null;
+        if (value == StandardOperatorType.Subtract) {
+          aliases = new[] { "Minus", "-" };
+        } else if (value == StandardOperatorType.Negate) {
+          aliases = new[] { "-" };
+        } else if (value == StandardOperatorType.OneMinus) {
+          aliases = new[] { "1 -" };
+        } else if (value == StandardOperatorType.Invert) {
+          aliases = new[] { "1 /" };
+        }
+        yield return (name, aliases, unit => ((unit as BaseNode).Node as MathNode).Operator = value);
       }
     }
   }

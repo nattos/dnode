@@ -49,6 +49,7 @@ namespace NanoGraph {
 
     protected virtual PrimitiveType? SingleFieldModeType => null;
     public bool IsSingleFieldMode => SingleFieldModeType != null;
+    protected virtual bool RequiresTypeDeclInput => !IsSingleFieldMode;
 
     public virtual DataSpec ComputeInputSpec => DataSpec.ExtendWithFields(TypeDeclFields, GetInputOutputDataSpec(FieldPortsMode.Combined, InputTypeFields));
     public virtual DataSpec ComputeOutputSpec => OutputSpec;
@@ -65,7 +66,7 @@ namespace NanoGraph {
       }
     }
 
-    protected DataField[] TypeDeclFields => IsSingleFieldMode ? Array.Empty<DataField>() : new[] { new DataField { Name = "TypeDecl", IsCompileTimeOnly = true, Type = TypeSpec.MakePrimitive(PrimitiveType.TypeDecl) } };
+    protected DataField[] TypeDeclFields => !RequiresTypeDeclInput ? Array.Empty<DataField>() : new[] { new DataField { Name = "TypeDecl", IsCompileTimeOnly = true, Type = TypeSpec.MakePrimitive(PrimitiveType.TypeDecl) } };
 
     public virtual TypeField[] InputTypeFields => InputOutputTypeFields;
     public virtual TypeField[] OutputTypeFields => InputOutputTypeFields;

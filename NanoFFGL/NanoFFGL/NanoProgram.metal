@@ -102,10 +102,10 @@ static inline vector_float2 modulo_op(vector_float2 a, vector_float2 b) { return
 static inline vector_float3 modulo_op(vector_float3 a, vector_float3 b) { return vector_float3 { modulo_op(a.x, b.x), modulo_op(a.y, b.y), modulo_op(a.z, b.z) }; }
 static inline vector_float4 modulo_op(vector_float4 a, vector_float4 b) { return vector_float4 { modulo_op(a.x, b.x), modulo_op(a.y, b.y), modulo_op(a.z, b.z), modulo_op(a.w, b.w) }; }
 
-static inline float lerp(float a, float b, float t) { return a * (1.0f - t) + b * t; }
-static inline vector_float2 lerp(vector_float2 a, vector_float2 b, float t) { return vector_float2 { lerp(a.x, b.x, t), lerp(a.y, b.y, t) }; }
-static inline vector_float3 lerp(vector_float3 a, vector_float3 b, float t) { return vector_float3 { lerp(a.x, b.x, t), lerp(a.y, b.y, t), lerp(a.z, b.z, t) }; }
-static inline vector_float4 lerp(vector_float4 a, vector_float4 b, float t) { return vector_float4 { lerp(a.x, b.x, t), lerp(a.y, b.y, t), lerp(a.z, b.z, t), lerp(a.w, b.w, t) }; }
+static inline float lerp_op(float a, float b, float t) { return mix(a, b, t); }
+static inline vector_float2 lerp_op(vector_float2 a, vector_float2 b, float t) { return mix(a, b, t); }
+static inline vector_float3 lerp_op(vector_float3 a, vector_float3 b, float t) { return mix(a, b, t); }
+static inline vector_float4 lerp_op(vector_float4 a, vector_float4 b, float t) { return mix(a, b, t); }
 
 static inline float log(float a, float b) { return log(a) / log(b); }
 static inline vector_float2 log(vector_float2 a, vector_float2 b) { return vector_float2 { log(a.x, b.x), log(a.y, b.y) }; }
@@ -157,18 +157,21 @@ static inline vector_float2 logE(vector_float2 a) { return vector_float2 { log(a
 static inline vector_float3 logE(vector_float3 a) { return vector_float3 { log(a.x), log(a.y), log(a.z) }; }
 static inline vector_float4 logE(vector_float4 a) { return vector_float4 { log(a.x), log(a.y), log(a.z), log(a.w) }; }
   
+template<bool useAlpha, typename T> static inline T lerp_mix(T rhs, float t) { return rhs * t; }
+template<bool useAlpha, typename T> static inline T lerp_mix(T rhs, T lhs, float t) { return mix(rhs, lhs, t); }
+
 template<bool useAlpha, typename T> static inline T blend_mix(T rhs, float t) { return rhs * t; }
-template<bool useAlpha, typename T> static inline T blend_mix(T rhs, T lhs, float t) { return lerp(rhs, lhs, t); }
+template<bool useAlpha, typename T> static inline T blend_mix(T rhs, T lhs, float t) { return mix(rhs, lhs, t); }
 template<> inline vector_float4 blend_mix<true, vector_float4>(vector_float4 rhs, vector_float4 lhs, float t) {
   if (t < 0.5f) {
     float a = lhs.a * t * 2.0f;
-    vector_float3 rgb = lerp(vector_float3 { rhs.x, rhs.y, rhs.z }, vector_float3 { lhs.x, lhs.y, lhs.z }, a);
-    float aOut = lerp(rhs.a, 1.0f, a);
+    vector_float3 rgb = mix(vector_float3 { rhs.x, rhs.y, rhs.z }, vector_float3 { lhs.x, lhs.y, lhs.z }, a);
+    float aOut = mix(rhs.a, 1.0f, a);
     return vector_float4 { rgb.x, rgb.y, rgb.z, aOut };
   } else {
     float a = t * 2.0f - 1.0f;
-    vector_float3 rgb = lerp(vector_float3 { rhs.x, rhs.y, rhs.z } * (1.0f - a), vector_float3 { lhs.x, lhs.y, lhs.z }, lhs.a);
-    float aOut = lerp(lerp(rhs.a, 1.0f, lhs.a), lhs.a, a);
+    vector_float3 rgb = mix(vector_float3 { rhs.x, rhs.y, rhs.z } * (1.0f - a), vector_float3 { lhs.x, lhs.y, lhs.z }, lhs.a);
+    float aOut = mix(mix(rhs.a, 1.0f, lhs.a), lhs.a, a);
     return vector_float4 { rgb.x, rgb.y, rgb.z, aOut };
   }
 }

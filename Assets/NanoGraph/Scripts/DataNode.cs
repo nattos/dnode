@@ -10,10 +10,10 @@ namespace NanoGraph {
   [Serializable]
   public abstract class DataNode : IDataNode, IEditableAttributeProvider {
     [EditableAttribute]
-    public string SerializedName = "#";
+    public string Name = "#";
     public string ComputedName {
       get {
-        string name = SerializedName?.Trim();
+        string name = Name?.Trim();
         if (string.IsNullOrEmpty(name)) {
           return ShortNamePart ?? _typeShortName.Value;
         }

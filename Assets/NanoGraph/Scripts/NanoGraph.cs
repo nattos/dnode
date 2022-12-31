@@ -578,7 +578,10 @@ namespace NanoGraph {
     private static IEnumerable<T> DepthFirstTraversal<T>(T root, Func<T, IEnumerable<T>> getChildrenFunc) {
       HashSet<T> visited = new HashSet<T>();
       Stack<IEnumerator<T>> stack = new Stack<IEnumerator<T>>();
-      stack.Push(getChildrenFunc.Invoke(root).GetEnumerator());
+      var rootIt = getChildrenFunc.Invoke(root)?.GetEnumerator();
+      if (rootIt != null) {
+        stack.Push(rootIt);
+      }
       while (stack.Count > 0) {
         IEnumerator<T> it = stack.Peek();
         if (it.MoveNext()) {
@@ -587,6 +590,10 @@ namespace NanoGraph {
             var nextIt = getChildrenFunc.Invoke(next)?.GetEnumerator();
             if (nextIt != null) {
               stack.Push(nextIt);
+            } else {
+              if (visited.Add(next)) {
+                yield return next;
+              }
             }
           }
         } else {
@@ -642,16 +649,41 @@ namespace NanoGraph {
       inputMap[(root, false)] = rootInputs;
 
       while (currentCondition != null) {
+        HashSet<IDataNode> conditionPreambleInputNodes = new HashSet<IDataNode>();
+        {
+          if (currentCondition is IConditionalNode conditionalNode) {
+            DataSpec nextConditionInputSpec = conditionalNode.InputSpec;
+            bool[] inputsAreConditional = new bool[nextConditionInputSpec.Fields.Count];
+            conditionalNode.GetInputsAreConditional(inputsAreConditional);
+            for (int i = 0; i < nextConditionInputSpec.Fields.Count; ++i) {
+              var field = nextConditionInputSpec.Fields[i];
+              if (inputsAreConditional[i]) {
+                continue;
+              }
+              var inputPlug = _edgesByDest.GetOrDefault(new DataPlug { Node = currentCondition, FieldName = field.Name });
+              var inputNodes = DepthFirstTraversal(inputPlug.Source.Node, node => {
+                if (node is IComputeNode) {
+                  return Array.Empty<IDataNode>();
+                }
+                return _inputEdgesForNode.GetOrDefault(node)?.Select(edge => edge.Source.Node);
+              });
+              conditionPreambleInputNodes.UnionWith(inputNodes);
+            }
+          }
+        }
+
         while (toVisitQueue.TryDequeue(out IDataNode node)) {
           bool isPreamble;
-          currentConditionNodes.Add(node);
           if (!conditionedOnMap.TryGetValue(node, out List<IConditionalNode> conditionedOn)) {
             conditionedOn = new List<IConditionalNode>();
             conditionedOnMap[node] = conditionedOn;
           }
-          if (currentCondition is IConditionalNode currentConditionalNode) {
-            if (!conditionedOn.Contains(currentConditionalNode)) {
-              conditionedOn.Add(currentConditionalNode);
+          if (!conditionPreambleInputNodes.Contains(node)) {
+            currentConditionNodes.Add(node);
+            if (currentCondition is IConditionalNode currentConditionalNode) {
+              if (!conditionedOn.Contains(currentConditionalNode)) {
+                conditionedOn.Add(currentConditionalNode);
+              }
             }
           }
 
@@ -796,7 +828,7 @@ namespace NanoGraph {
               if (edge == null) {
                 return Array.Empty<IDataNode>();
               }
-              return new[] { edge.Source.Node };
+              return new[] { edge.Source.Node }.Where(node => groupNodes.Contains(node));
             } else {
               IEnumerable<IDataNode> inputsA = inputMap.GetOrDefault((node, false)) ?? Enumerable.Empty<IDataNode>();
               IEnumerable<IDataNode> inputsB = inputMap.GetOrDefault((node, true)) ?? Enumerable.Empty<IDataNode>();
@@ -896,9 +928,7 @@ namespace NanoGraph {
       var computeNodeResults = new Dictionary<IComputeNode, (CodeCachedResult? result, IComputeNodeEmitCodeOperation op)>();
       Queue<IComputeNode> queuedCalcNodes = new Queue<IComputeNode>();
       HashSet<IComputeNode> wasQueuedCalcNode = new HashSet<IComputeNode>();
-      List<IComputeNode> computeNodeSeenOrder = new List<IComputeNode>();
       void QueueComputeNode(IComputeNode node) {
-        computeNodeSeenOrder.Add(node);
         if (!wasQueuedCalcNode.Add(node)) {
           return;
         }
@@ -935,7 +965,7 @@ namespace NanoGraph {
 
       // List out plans in dependency order.
       List<ComputePlan> computePlans = new List<ComputePlan>();
-      computeNodeSeenOrder.Reverse();
+      IComputeNode[] computeNodeSeenOrder = outputNodes.SelectMany(outputNode => DepthFirstTraversal(outputNode, node => computePlanMap[node].DependentComputeNodes.Select(generator => generator.Node))).ToArray();
       HashSet<IComputeNode> computePlanAdded = new HashSet<IComputeNode>();
       foreach (IComputeNode computeNode in computeNodeSeenOrder) {
         if (computePlanAdded.Add(computeNode)) {

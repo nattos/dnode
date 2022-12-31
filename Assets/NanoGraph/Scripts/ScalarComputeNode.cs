@@ -6,6 +6,7 @@ using System.Linq;
 namespace NanoGraph {
   public enum BasicOutputType {
     Custom,
+    Fields,
     Bool,
     Int,
     Uint,
@@ -43,7 +44,20 @@ namespace NanoGraph {
     public BasicOutputType OutputType = BasicOutputType.Custom;
     protected override string ShortNamePart => $"{OutputType}ScalarCompute";
 
+    [EditableAttribute]
+    public TypeDeclBuilder Fields = new TypeDeclBuilder();
+
     protected override PrimitiveType? SingleFieldModeType => OutputType.ToPrimitiveTypeOrNull();
+    protected override bool RequiresTypeDeclInput => OutputType == BasicOutputType.Fields ? false : base.RequiresTypeDeclInput;
+
+    public override TypeField[] InputOutputTypeFields {
+      get {
+        if (OutputType == BasicOutputType.Fields) {
+          return Fields?.AsTypeFields() ?? Array.Empty<TypeField>();
+        }
+        return base.InputOutputTypeFields;
+      }
+    }
 
     public override IComputeNodeEmitCodeOperation CreateEmitCodeOperation(ComputeNodeEmitCodeOperationContext context) => new EmitterCpu(this, context);
 

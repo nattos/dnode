@@ -74,9 +74,9 @@ namespace NanoGraph {
         case TextureFilterMode.Nearest:
           return "filter::nearest";
         case TextureFilterMode.Linear:
-          return "filter::nearest";
+          return "filter::linear";
         case TextureFilterMode.Bicubic:
-          return "filter::nearest";
+          return "filter::bicubic";
       }
     }
 
