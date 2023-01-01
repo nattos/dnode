@@ -22,7 +22,15 @@ namespace NanoGraph {
   }
 
   public static class AutoTypeUtils {
-    public static TypeSpec GetAutoType(AutoType type, TypeSpec internalSpec) {
+    public static TypeSpec GetAutoType(AutoType type, TypeSpec internalSpec, bool? forceIsArray = null) {
+      TypeSpec typeSpec = GetAutoTypeInternal(type, internalSpec);
+      if (forceIsArray != null) {
+        return TypeSpec.ToArray(typeSpec, forceIsArray.Value);
+      }
+      return typeSpec;
+    }
+
+    private static TypeSpec GetAutoTypeInternal(AutoType type, TypeSpec internalSpec, bool? forceIsArray = null) {
       switch (type) {
         case AutoType.Bool:
           return TypeSpec.MakePrimitive(PrimitiveType.Bool);
@@ -53,6 +61,7 @@ namespace NanoGraph {
 
     public static void UpdateAutoType(IReadOnlyList<DataEdge> inputs, ref TypeSpec internalType, bool? forceIsArray = null) {
       PrimitiveType? fallbackType = null;
+      bool anyIsArray = inputs.Any(edge => edge.SourceFieldOrNull?.Type.IsArray == true);
       foreach (DataEdge edge in inputs) {
         TypeSpec? sourceType = edge.SourceFieldOrNull?.Type;
         if (sourceType == null) {
@@ -68,7 +77,7 @@ namespace NanoGraph {
         internalType.Primitive = sourceType.Value.Primitive;
         internalType.Type = sourceType.Value.Type;
         if (forceIsArray == null) {
-          internalType.IsArray = sourceType.Value.IsArray;
+          internalType.IsArray = sourceType.Value.IsArray || anyIsArray;
         } else {
           internalType.IsArray = forceIsArray.Value;
         }

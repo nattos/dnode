@@ -16,13 +16,15 @@ namespace NanoGraph {
   public abstract class BaseMathNode : DataNode, ICodeNode, IAutoTypeNode {
     [EditableAttribute]
     public AutoType OutType = AutoType.Auto;
+    [EditableAttribute]
+    public bool ForceIsArray = false;
     public TypeSpec InternalElementType = TypeSpec.MakePrimitive(PrimitiveType.Float);
 
-    public TypeSpec ElementType => AutoTypeUtils.GetAutoType(OutType, InternalElementType);
+    public TypeSpec ElementType => AutoTypeUtils.GetAutoType(OutType, InternalElementType, forceIsArray: ForceIsArray ? true : null);
     public bool IsArrayInput => ElementType.IsArray;
 
     public void UpdateTypesFromInputs() {
-      AutoTypeUtils.UpdateAutoType(Graph.GetInputEdges(this), ref InternalElementType);
+      AutoTypeUtils.UpdateAutoType(Graph.GetInputEdges(this), ref InternalElementType, forceIsArray: ForceIsArray ? true : null);
     }
 
     public abstract StandardOperatorType OperatorType { get; }
@@ -299,7 +301,7 @@ namespace NanoGraph {
     public string EmitCode(ICodeNode node, CodeContext context, int inputsIndexOffset, string indexExpr, string lengthExpr, TypeSpec elementType) {
       string minIdentifier = context.InputLocals[inputsIndexOffset + 0].Identifier;
       string maxIdentifier = context.InputLocals[inputsIndexOffset + 1].Identifier;
-      return $"lerp_op({minIdentifier}, {maxIdentifier}, ({indexExpr}) / ({context.Function.GetTypeIdentifier(PrimitiveType.Float)})({lengthExpr}))";
+      return $"lerp_op({minIdentifier}, {maxIdentifier}, ({indexExpr}) / ({context.Function.GetTypeIdentifier(PrimitiveType.Float)})(({lengthExpr}) - 1))";
     }
   }
 
@@ -415,6 +417,34 @@ namespace NanoGraph {
 
   public enum ReduceOperatorType {
     Length,
+    Sum,
+  }
+
+  public class ReduceOperator {
+    public readonly ReduceOperatorType Type;
+    public readonly string FunctionIdentifier;
+    public readonly PrimitiveType? ForcedResultType;
+
+    public ReduceOperator(ReduceOperatorType type, string functionIdentifier, PrimitiveType? forcedResultType = null) {
+      Type = type;
+      FunctionIdentifier = functionIdentifier;
+      ForcedResultType = forcedResultType;
+    }
+  }
+
+  public static class ReduceOperators {
+    public static readonly IReadOnlyList<ReduceOperator> All;
+    public static readonly IReadOnlyDictionary<ReduceOperatorType, ReduceOperator> ByType;
+
+    public static ReduceOperator Get(ReduceOperatorType type) => ByType[type];
+
+    static ReduceOperators() {
+      All = new[] {
+          new ReduceOperator(ReduceOperatorType.Length, "GetLength", forcedResultType: PrimitiveType.Int),
+          new ReduceOperator(ReduceOperatorType.Sum, "ArraySum"),
+      };
+      ByType = All.ToDictionary(op => op.Type, op => op);
+    }
   }
 
   public class ReduceArrayNode : DataNode, ICodeNode, IAutoTypeNode {
@@ -422,23 +452,25 @@ namespace NanoGraph {
     public ReduceOperatorType Operation = ReduceOperatorType.Length;
     protected override string ShortNamePart => Operation.ToString();
 
+    public ReduceOperator Operator => ReduceOperators.Get(Operation);
+
     [EditableAttribute]
     public AutoType OutType = AutoType.Auto;
     public TypeSpec InternalElementType = TypeSpec.MakePrimitive(PrimitiveType.Float);
 
-    public TypeSpec ElementType => AutoTypeUtils.GetAutoType(OutType, InternalElementType);
-    public TypeSpec ReducedType => TypeSpec.MakePrimitive(PrimitiveType.Int);
+    public TypeSpec ElementType => TypeSpec.ToArray(AutoTypeUtils.GetAutoType(OutType, InternalElementType), false);
+    public TypeSpec ReducedType => Operator.ForcedResultType != null ? TypeSpec.MakePrimitive(Operator.ForcedResultType.Value) : InternalElementType;
 
     public void UpdateTypesFromInputs() {
       AutoTypeUtils.UpdateAutoType(Graph.GetEdgeToDestinationOrNull(this, "In"), ref InternalElementType, forceIsArray: false);
     }
 
     public override DataSpec InputSpec => DataSpec.FromFields(DataField.MakeType("In", TypeSpec.MakeArray(ElementType)));
-
     public override DataSpec OutputSpec => DataSpec.FromFields(DataField.MakeType("Out", ReducedType));
 
     public void EmitCode(CodeContext context) {
-      context.Function.AddStatement($"{context.Function.GetTypeIdentifier(ReducedType)} {context.OutputLocals[0].Identifier} = GetLength({context.InputLocals[0].Identifier});");
+      string funcName = Operator.FunctionIdentifier;
+      context.Function.AddStatement($"{context.Function.GetTypeIdentifier(ReducedType)} {context.OutputLocals[0].Identifier} = {funcName}({context.InputLocals[0].Identifier});");
     }
   }
 
@@ -633,7 +665,6 @@ namespace NanoGraph {
     }
   }
 
-  // TODO: Pack primitives (ie. float4).
   public class PackNode : DataNode, ICodeNode, IAutoTypeNode {
     [EditableAttribute]
     public PackableType Type = PackableType.Custom;
@@ -708,18 +739,39 @@ namespace NanoGraph {
       List<string> initializerParts = new List<string>();
       var resultType = context.Function.Program.GetProgramType(PackToType, this.ToString());
       var fields = PackFromFields;
-      for (int i = 0; i < fields.Count; ++i) {
-        var field = fields[i];
-        string fieldAssignment = resultType.IsBuiltIn ? "" : $".{resultType.GetField(field.Name)} = ";
-        string inputIdentifier = context.InputLocals[i].Identifier;
-        initializerParts.Add($"{fieldAssignment}({context.Function.EmitConvert(context.InputLocals[i].Type, field.Type, inputIdentifier)}),");
+      if (IsArray) {
+        string outputLocalIdentifier = context.OutputLocals[0].Identifier;
+        var elementType = context.Function.Program.GetProgramType(PackToTypeElement, this.ToString());
+        string lengthExpr = StandardOperators.Get(StandardOperatorType.Max).EmitExpressionCode(context, context.InputLocals.Select(input => $"GetLength({input.Identifier})").ToArray());
+        string inputLengthLocal = context.Function.AllocLocal("Length");
+        context.Function.AddStatement($"{NanoProgram.IntIdentifier} {inputLengthLocal} = {lengthExpr};");
+
+        context.Function.AddStatement($"{context.Function.GetTypeIdentifier(resultType)} {outputLocalIdentifier}(NanoTypedBuffer<{context.Function.GetTypeIdentifier(elementType)}>::Allocate({inputLengthLocal}));");
+        string indexLocal = context.Function.AllocLocal("Index");
+        context.Function.AddStatement($"for ({NanoProgram.IntIdentifier} {indexLocal} = 0; {indexLocal} < {inputLengthLocal}; ++{indexLocal}) {{");
+        for (int i = 0; i < fields.Count; ++i) {
+          var field = fields[i];
+          string fieldAssignment = elementType.IsBuiltIn ? "" : $".{elementType.GetField(field.Name)} = ";
+          string inputExpr = context.Function.Context.EmitSampleBuffer(context.InputLocals[i].Identifier, indexLocal);
+          initializerParts.Add($"{fieldAssignment}({context.Function.EmitConvert(context.InputLocals[i].Type, field.Type, inputExpr)}),");
+        }
+        string initializerStr = string.Join("\n", initializerParts);
+        string constructElementExpr = $"{context.Function.GetTypeIdentifier(elementType)} {{ {initializerStr} }}";
+        context.Function.AddStatement($"  {context.Function.Context.EmitWriteBuffer(outputLocalIdentifier, indexLocal, constructElementExpr)};");;
+        context.Function.AddStatement($"}}");
+      } else {
+        for (int i = 0; i < fields.Count; ++i) {
+          var field = fields[i];
+          string fieldAssignment = resultType.IsBuiltIn ? "" : $".{resultType.GetField(field.Name)} = ";
+          string inputIdentifier = context.InputLocals[i].Identifier;
+          initializerParts.Add($"{fieldAssignment}({context.Function.EmitConvert(context.InputLocals[i].Type, field.Type, inputIdentifier)}),");
+        }
+        string initializerStr = string.Join("\n", initializerParts);
+        context.Function.AddStatement($"{context.Function.GetTypeIdentifier(resultType)} {context.OutputLocals[0].Identifier} = {{ {initializerStr} }};");
       }
-      string initializerStr = string.Join("\n", initializerParts);
-      context.Function.AddStatement($"{context.Function.GetTypeIdentifier(resultType)} {context.OutputLocals[0].Identifier} = {{ {initializerStr} }};");
     }
   }
 
-  // TODO: Unpack primitives (ie. float4).
   public class UnpackNode : DataNode, ICodeNode, IAutoTypeNode {
     public TypeDeclMode TypeDeclMode = TypeDeclMode.External;
     public TypeSpec InternalType;
@@ -812,7 +864,7 @@ namespace NanoGraph {
         context.Function.AddStatement($"for ({NanoProgram.IntIdentifier} {indexLocal} = 0; {indexLocal} < {inputLengthLocal}; ++{indexLocal}) {{");
         foreach (var field in typeFields) {
           CodeLocal outputLocal = context.OutputLocals[index++];
-          string inputField = inputType.IsBuiltIn ? field.Name : inputType.GetField(field.Name);
+          string inputField = field.Type.Primitive != null ? field.Name : inputType.GetField(field.Name);
           string inputExpr = $"{context.Function.Context.EmitSampleBuffer(inputLocal.Identifier, indexLocal)}.{inputField}";
           context.Function.AddStatement($"  {context.Function.Context.EmitWriteBuffer(outputLocal.Identifier, indexLocal, inputExpr)};");
         }
@@ -822,7 +874,7 @@ namespace NanoGraph {
         foreach (var field in typeFields) {
           CodeLocal outputLocal = context.OutputLocals[index++];
           string outputTypeIdentifier = context.Function.GetTypeIdentifier(field.Type);
-          string inputField = inputType.IsBuiltIn ? field.Name : inputType.GetField(field.Name);
+          string inputField = field.Type.Primitive != null ? field.Name : inputType.GetField(field.Name);
           context.Function.AddStatement($"{outputTypeIdentifier} {outputLocal.Identifier} = {inputLocal.Identifier}.{inputField};");
         }
       }
@@ -833,6 +885,8 @@ namespace NanoGraph {
     [EditableAttribute]
     public AutoType OutType = AutoType.Auto;
     public TypeSpec InternalInputType = TypeSpec.MakePrimitive(PrimitiveType.Float);
+    [EditableAttribute]
+    public bool ForceIsArray = false;
 
     [EditableAttribute]
     public int InputCount = 2;
@@ -840,10 +894,10 @@ namespace NanoGraph {
     public override DataSpec InputSpec => DataSpec.FromFields(new [] { DataField.MakePrimitive("Case", PrimitiveType.Int) }.Concat(Enumerable.Range(0, InputCount).Select(i => DataField.MakeType(i.ToString(), InputType))).ToArray());
     public override DataSpec OutputSpec => DataSpec.FromFields(DataField.MakeType("Out", InputType));
 
-    public TypeSpec InputType => AutoTypeUtils.GetAutoType(OutType, InternalInputType);
+    public TypeSpec InputType => AutoTypeUtils.GetAutoType(OutType, InternalInputType, forceIsArray: ForceIsArray ? true : null);
 
     public void UpdateTypesFromInputs() {
-      AutoTypeUtils.UpdateAutoType(Graph.GetInputEdges(this).Where(edge => edge.Destination.FieldName != "Case").ToArray(), ref InternalInputType, forceIsArray: false);
+      AutoTypeUtils.UpdateAutoType(Graph.GetInputEdges(this).Where(edge => edge.Destination.FieldName != "Case").ToArray(), ref InternalInputType, forceIsArray: ForceIsArray ? true : null);
     }
 
     public void EmitCode(CodeContext context) {

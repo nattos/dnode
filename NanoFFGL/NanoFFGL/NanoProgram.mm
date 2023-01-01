@@ -301,6 +301,7 @@ public:
   template<typename T> T SampleBuffer(const std::shared_ptr<NanoTypedBuffer<T>>& buffer, int index) { return (*buffer)[index]; }
   template<typename T> void WriteBuffer(const std::shared_ptr<NanoTypedBuffer<T>>& buffer, int index, T value) { (*buffer)[index] = value; }
   template<typename T> int GetLength(const std::shared_ptr<NanoTypedBuffer<T>>& buffer) { return buffer->GetElementCount(); }
+  template<typename T> int GetDebugLength(const std::shared_ptr<NanoTypedBuffer<T>>& buffer) { return !buffer ? 0 : buffer->GetElementCount(); }
 
   vector_int2 GetTextureSize(id<MTLTexture> texture) const { return vector_int2 { (int)texture.width, (int)texture.height }; }
   vector_float2 GetTextureSizeFloat(id<MTLTexture> texture) const { return Convert<vector_int2, vector_float2>(GetTextureSize(texture)); }
@@ -468,11 +469,13 @@ protected:
   static inline vector_float3 modulo_op(vector_float3 a, vector_float3 b) { return vector_float3 { modulo_op(a.x, b.x), modulo_op(a.y, b.y), modulo_op(a.z, b.z) }; }
   static inline vector_float4 modulo_op(vector_float4 a, vector_float4 b) { return vector_float4 { modulo_op(a.x, b.x), modulo_op(a.y, b.y), modulo_op(a.z, b.z), modulo_op(a.w, b.w) }; }
 
+  static inline float max(float a) { return a; }
   static inline float max(float a, float b) { return std::max(a, b); }
   static inline vector_float2 max(vector_float2 a, vector_float2 b) { return vector_float2 { std::max(a.x, b.x), std::max(a.y, b.y) }; }
   static inline vector_float3 max(vector_float3 a, vector_float3 b) { return vector_float3 { std::max(a.x, b.x), std::max(a.y, b.y), std::max(a.z, b.z) }; }
   static inline vector_float4 max(vector_float4 a, vector_float4 b) { return vector_float4 { std::max(a.x, b.x), std::max(a.y, b.y), std::max(a.z, b.z), std::max(a.w, b.w) }; }
 
+  static inline float min(float a) { return a; }
   static inline float min(float a, float b) { return std::min(a, b); }
   static inline vector_float2 min(vector_float2 a, vector_float2 b) { return vector_float2 { std::min(a.x, b.x), std::min(a.y, b.y) }; }
   static inline vector_float3 min(vector_float3 a, vector_float3 b) { return vector_float3 { std::min(a.x, b.x), std::min(a.y, b.y), std::min(a.z, b.z) }; }
@@ -630,6 +633,15 @@ protected:
   template<> vector_float2 random_next<vector_float2>() { return vector_float2 { random_next<float>(), random_next<float>() }; }
   template<> vector_float3 random_next<vector_float3>() { return vector_float3 { random_next<float>(), random_next<float>(), random_next<float>() }; }
   template<> vector_float4 random_next<vector_float4>() { return vector_float4 { random_next<float>(), random_next<float>(), random_next<float>(), random_next<float>() }; }
+
+  template<typename T> T ArraySum(const std::shared_ptr<NanoTypedBuffer<T>>& buffer) {
+    T acc = 0;
+    int length = GetLength(buffer);
+    for (int i = 0; i < length; ++i) {
+      acc += SampleBuffer(buffer, i);
+    }
+    return acc;
+  }
 
 public:
   struct BlitOutputTextureResources {

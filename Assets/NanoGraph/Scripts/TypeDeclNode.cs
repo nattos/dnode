@@ -10,6 +10,8 @@ namespace NanoGraph {
     public PrimitiveType Primitive = PrimitiveType.Float;
     public bool IsArray = false;
 
+    public TypeSpec AsTypeSpec() => TypeSpec.ToArray(TypeSpec.MakePrimitive(Primitive), IsArray);
+
     public static TypeDeclBuilderField Make(string name, PrimitiveType type) => new TypeDeclBuilderField { Name = name, Primitive = type };
   }
 

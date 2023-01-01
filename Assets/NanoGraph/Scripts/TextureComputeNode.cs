@@ -158,6 +158,9 @@ namespace NanoGraph {
 
           string[] GetExtractDebugValueExprs(string inputExpr, TypeSpec type, int limit) {
             if (type.IsArray) {
+              if (func.Context is NanoGpuContext) {
+                return Array.Empty<string>();
+              }
               List<string> resultExprs = new List<string>();
               int arrayIndex = 0;
               while (resultExprs.Count < limit) {

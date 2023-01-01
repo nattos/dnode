@@ -616,6 +616,7 @@ namespace NanoGraph {
 
     private List<(ICodeGenerator, bool)> GenerateComputePlan(IComputeNode root, List<CodeGeneratorFromComputeNode> dependentComputeNodes, List<DataPlug> dependentComputeInputs) {
       Dictionary<IDataNode, List<IConditionalNode>> conditionedOnMap = new Dictionary<IDataNode, List<IConditionalNode>>();
+      HashSet<IDataNode> conditionedOnRootNode = new HashSet<IDataNode>();
       Dictionary<IConditionalNode, List<IDataNode>> conditionGroups = new Dictionary<IConditionalNode, List<IDataNode>>();
       Dictionary<(IDataNode, bool), List<IDataNode>> inputMap = new Dictionary<(IDataNode, bool), List<IDataNode>>();
 
@@ -686,6 +687,8 @@ namespace NanoGraph {
               if (!conditionedOn.Contains(currentConditionalNode)) {
                 conditionedOn.Add(currentConditionalNode);
               }
+            } else {
+              conditionedOnRootNode.Add(node);
             }
           }
 
@@ -777,7 +780,10 @@ namespace NanoGraph {
 
       string rawOrderStr = string.Join("\n", rawOrder.Select(node => {
         string conditionStr = "";
-        var conditions = conditionedOnMap[node.Item1].Where(cond => cond != root).ToList();
+        List<IDataNode> conditions = conditionedOnMap[node.Item1].Where(cond => cond != root).Cast<IDataNode>().ToList();
+        if (conditionedOnRootNode.Contains(node.Item1)) {
+          conditions = conditions.Append(root).ToList();
+        }
         if (conditions.Count > 0) {
           conditionStr = $" ? [ {string.Join(", ", conditions)} ]";
         }
@@ -856,7 +862,7 @@ namespace NanoGraph {
       foreach (var entry in generators) {
         IDataNode node = entry.Key;
         ICodeGenerator generator = entry.Value;
-        var conditions = conditionedOnInputsMap.GetOrDefault(node);
+        var conditions = conditionedOnRootNode.Contains(node) ? null : conditionedOnInputsMap.GetOrDefault(node);
         generator.Conditions = conditions?.Select(cond => (generators[cond.condition], cond.inputIndex))?.ToArray() ?? Array.Empty<(ICodeGenerator, int)>();
       }
 
@@ -1148,7 +1154,9 @@ namespace NanoGraph {
                           break;
                         }
                         foreach (string elementExpr in elementExprs) {
-                          resultExprs.Add($"({arrayIndex} < GetLength({inputExpr}) ? ({elementExpr}) : (0.0))");
+                          if (!(func.Context is NanoGpuContext)) {
+                            resultExprs.Add($"({arrayIndex} < GetDebugLength({inputExpr}) ? ({elementExpr}) : (0.0))");
+                          }
                         }
                         ++arrayIndex;
                       }

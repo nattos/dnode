@@ -54,7 +54,7 @@ namespace NanoGraph {
       for (int i = 0; i < inputCount; ++i) {
         var inputLocal = context.InputLocals[i];
         var inputField = InputFields.Fields[i];
-        context.Function.AddStatement($"  {context.Function.GetTypeIdentifier(inputField.Primitive)} {NanoProgram.SanitizeIdentifierFragment(inputField.Name)} = {inputLocal.Identifier};");
+        context.Function.AddStatement($"  {context.Function.GetTypeIdentifier(inputField.AsTypeSpec())} {NanoProgram.SanitizeIdentifierFragment(inputField.Name)} = {inputLocal.Identifier};");
       }
       if (Source == ExpressionSource.InlineExpression) {
         if (outputCount != 1) {
@@ -65,7 +65,7 @@ namespace NanoGraph {
       } else {
         for (int i = 0; i < outputCount; ++i) {
           var outputField = OutputFields.Fields[i];
-          context.Function.AddStatement($"  {context.Function.GetTypeIdentifier(outputField.Primitive)} {NanoProgram.SanitizeIdentifierFragment(outputField.Name)};");
+          context.Function.AddStatement($"  {context.Function.GetTypeIdentifier(outputField.AsTypeSpec())} {NanoProgram.SanitizeIdentifierFragment(outputField.Name)};");
         }
         context.Function.AddStatement(SourceExpr ?? "");
         for (int i = 0; i < outputCount; ++i) {
