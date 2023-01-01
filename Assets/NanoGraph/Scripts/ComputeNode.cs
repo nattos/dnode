@@ -97,7 +97,6 @@ namespace NanoGraph {
     public abstract class EmitterBase : IComputeNodeEmitCodeOperation {
       public EmitterBase(ComputeNode node, ComputeNodeEmitCodeOperationContext context) {
         computeNode = node;
-        errors = context.errors;
         graph = context.graph;
         program = context.program;
         debugState = context.debugState;
@@ -107,7 +106,6 @@ namespace NanoGraph {
       }
 
       // TODO: Rename all!!
-      public readonly List<string> errors;
       public readonly ComputeNode computeNode;
       public readonly NanoGraph graph;
       public readonly NanoProgram program;
@@ -299,14 +297,14 @@ namespace NanoGraph {
         foreach (DataPlug input in inputs) {
           var resultOrNull = dependentComputeNodes.FirstOrNull(dependency => dependency.Node == input.Node);
           if (resultOrNull == null) {
-            errors.Add($"Dependency {input.Node} for {computeNode} not yet ready.");
+            NanoGraph.CurrentGenerateState.AddError($"Dependency {input.Node} for {computeNode} not yet ready.");
             continue;
           }
           ComputeNodeResultEntry result = resultOrNull.Value;
           string resultIdentifier = result.Result?.Result.Identifier;
           DataField? outputFieldOrNull = result.Node.ComputeOutputSpec.Fields.FirstOrNull(field => field.Name == input.FieldName);
           if (outputFieldOrNull == null) {
-            errors.Add($"Dependency {input.Node} for {computeNode} does not have output field {input.FieldName}.");
+            NanoGraph.CurrentGenerateState.AddError($"Dependency {input.Node} for {computeNode} does not have output field {input.FieldName}.");
             continue;
           }
 

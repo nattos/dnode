@@ -9,10 +9,10 @@ using UnityEngine;
 namespace NanoGraph.VisualScripting {
   [Inspector(typeof(BaseNode))]
   public class BaseNodeInspector : UnitInspector {
-    public const float _previewHeight = 100.0f;
-    private Texture2D _captureTexture = Texture2D.redTexture;
-    private bool _previewAlphaChannel;
+    public const float _messagesHeight = 300.0f;
     private float _attributesHeight = 0.0f;
+
+    private static Lazy<Styles> _styles = new Lazy<Styles>(() => new Styles());
 
     public BaseNodeInspector(Metadata metadata) : base(metadata) {
       // TODO: HACKY.
@@ -21,7 +21,7 @@ namespace NanoGraph.VisualScripting {
 
     protected override float GetHeight(float width, GUIContent label) {
       _attributesHeight = EditableAttributesInspector.GetHeight(width, (metadata.value as BaseNode)?.Node as IEditableAttributeProvider);
-      return base.GetHeight(width, label) + _attributesHeight + _previewHeight;
+      return base.GetHeight(width, label) + _attributesHeight + _messagesHeight + EditorGUIUtility.singleLineHeight * 2;
     }
 
     protected override void OnGUI(Rect position, GUIContent label) {
@@ -66,39 +66,28 @@ namespace NanoGraph.VisualScripting {
       rect.y += EditorGUIUtility.singleLineHeight;
 
       Rect innerRect = position;
-      innerRect.height -= _previewHeight;
+      innerRect.height -= _messagesHeight;
       Rect lowerRect = position;
       lowerRect.y = innerRect.yMax;
-      lowerRect.height = _previewHeight;
+      lowerRect.height = _messagesHeight;
       base.OnGUI(innerRect, label);
-      OnPreviewGui(lowerRect);
+      DrawMessages(lowerRect);
     }
 
-    private void OnPreviewGui(Rect rect) {
-      float topPadding = EditorGUIUtility.singleLineHeight;
-      float yPadding = 1.0f;
-      float yPos = rect.yMin + topPadding;
-      Rect descRect = rect;
-      descRect.y = yPos;
-      descRect.height = EditorGUIUtility.singleLineHeight;
-      yPos = descRect.yMax + yPadding;
-      Rect previewAlphaRect = rect;
-      previewAlphaRect.y = yPos;
-      previewAlphaRect.height = EditorGUIUtility.singleLineHeight;
-      yPos = previewAlphaRect.yMax + yPadding;
-      Rect previewRect = rect;
-      previewRect.y = yPos;
-      previewRect.height = rect.yMax - yPos;
+    private void DrawMessages(Rect rect) {
+      IReadOnlyList<string> messages = (metadata.value as BaseNode)?.Node?.Messages ?? Array.Empty<string>();
+      EditorGUI.TextArea(rect, string.Join("\n\n", messages) + "\n", _styles.Value.WrappedTextArea);
+    }
 
-      EditorGUI.LabelField(descRect, $"Texture: {_captureTexture.width}x{_captureTexture.height}");
-      _previewAlphaChannel = EditorGUI.ToggleLeft(previewAlphaRect, "Alpha channel", _previewAlphaChannel);
-      if (_previewAlphaChannel) {
-        EditorGUI.DrawTextureAlpha(previewRect, _captureTexture, scaleMode: ScaleMode.ScaleToFit);
-      } else {
-        EditorGUI.DrawPreviewTexture(previewRect, _captureTexture, mat: null, scaleMode: ScaleMode.ScaleToFit);
+
+    private new class Styles {
+      public Styles() {
+        WrappedTextArea = new GUIStyle(EditorStyles.textArea);
+        WrappedTextArea.wordWrap = true;
       }
-    }
 
+      public readonly GUIStyle WrappedTextArea;
+    }
 
 
 

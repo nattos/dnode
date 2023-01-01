@@ -107,7 +107,7 @@ namespace NanoGraph {
               }
             }
             if (autoSizeModeInput == null) {
-              errors.Add($"Node {Node} is using auto-size mode but does not have a texture input.");
+              NanoGraph.CurrentGenerateState.AddError($"Node {Node} is using auto-size mode but does not have a texture input.");
             }
             break;
           }
@@ -141,7 +141,7 @@ namespace NanoGraph {
         var outputColorSourceEdge = graph.GetEdgeToDestinationOrNull(new DataPlug { Node = Node, FieldName = "Color" });
         if (outputColorSourceEdge == null ||
             !resultLocalMap.TryGetValue(outputColorSourceEdge.Source, out CodeLocal outputColorLocal)) {
-          errors.Add($"Output color for {Node} is not set.");
+          NanoGraph.CurrentGenerateState.AddError($"Output color for {Node} is not set.");
           result = null;
           return;
         }
@@ -240,12 +240,12 @@ namespace NanoGraph {
           return null;
         }
         if (!(edge.Source.Node is IComputeNode sourceComputeNode)) {
-          errors.Add($"Node {computeNode} depends on an output that is not a compute node ({edge.Source.Node}).");
+          NanoGraph.CurrentGenerateState.AddError($"Node {computeNode} depends on an output that is not a compute node ({edge.Source.Node}).");
           return null;
         }
         CodeCachedResult? sourceCachedResult = dependentComputeNodes.FirstOrNull(dependency => dependency.Node == sourceComputeNode)?.Result;
         if (sourceCachedResult == null) {
-          errors.Add($"Node {computeNode} depends on a compute node that is not yet ready ({edge.Source.Node}).");
+          NanoGraph.CurrentGenerateState.AddError($"Node {computeNode} depends on a compute node that is not yet ready ({edge.Source.Node}).");
           return null;
         }
 

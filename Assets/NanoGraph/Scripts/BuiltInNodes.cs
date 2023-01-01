@@ -321,7 +321,7 @@ namespace NanoGraph {
     public string EmitCode(ICodeNode node, CodeContext context, int inputsIndexOffset, string indexExpr, string lengthExpr, TypeSpec elementType) {
       // Note: Only works in CPU context.
       if (!(context.Function.Context is NanoCpuContext)) {
-        context.Errors.Add($"Random source only works in CPU contexts (for node {node}).");
+        NanoGraph.CurrentGenerateState.AddError($"Random source only works in CPU contexts (for node {node}).");
       }
       NanoProgramType programType = context.Function.Program.GetProgramType(elementType);
       return $"random_next<{programType.Identifier}>()";
@@ -335,7 +335,7 @@ namespace NanoGraph {
     public string EmitCode(ICodeNode node, CodeContext context, int inputsIndexOffset, string indexExpr, string lengthExpr, TypeSpec elementType) {
       // Note: Only works in CPU context.
       if (!(context.Function.Context is NanoCpuContext)) {
-        context.Errors.Add($"Frame number source only works in CPU contexts (for node {node}).");
+        NanoGraph.CurrentGenerateState.AddError($"Frame number source only works in CPU contexts (for node {node}).");
       }
       return context.Function.EmitConvert(TypeSpec.MakePrimitive(PrimitiveType.Int), elementType, "GetFrameNumber()");
     }
@@ -348,7 +348,7 @@ namespace NanoGraph {
     public string EmitCode(ICodeNode node, CodeContext context, int inputsIndexOffset, string indexExpr, string lengthExpr, TypeSpec elementType) {
       // Note: Only works in CPU context.
       if (!(context.Function.Context is NanoCpuContext)) {
-        context.Errors.Add($"Time source only works in CPU contexts (for node {node}).");
+        NanoGraph.CurrentGenerateState.AddError($"Time source only works in CPU contexts (for node {node}).");
       }
       return context.Function.EmitConvert(TypeSpec.MakePrimitive(PrimitiveType.Double), elementType, "GetFrameTime()");
     }

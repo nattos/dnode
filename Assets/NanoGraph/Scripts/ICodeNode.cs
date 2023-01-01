@@ -23,7 +23,6 @@ namespace NanoGraph {
     public IReadOnlyList<CodeLocal> InputLocals;
     public IReadOnlyList<CodeLocal> OutputLocals;
     public DebugState DebugState;
-    public List<string> Errors;
   }
 
   public struct CodeCachedResult {
@@ -47,7 +46,6 @@ namespace NanoGraph {
   }
 
   public struct ComputeNodeEmitCodeOperationContext {
-    public List<string> errors;
     public NanoGraph graph;
     public NanoProgram program;
     public DebugState debugState;

@@ -58,7 +58,7 @@ namespace NanoGraph {
       }
       if (Source == ExpressionSource.InlineExpression) {
         if (outputCount != 1) {
-          context.Errors.Add($"When using {ExpressionSource.InlineExpression} the expression must have exactly one output.");
+          NanoGraph.CurrentGenerateState.AddError($"When using {ExpressionSource.InlineExpression} the expression must have exactly one output.");
         } else {
           context.Function.AddStatement($"  {context.OutputLocals[0].Identifier} = {SourceExpr ?? ""};");
         }

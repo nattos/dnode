@@ -55,6 +55,7 @@ namespace NanoGraph.Plugin {
     public bool HasCompileError => _pluginBuilder.IsError;
     public bool IsReloading => _pluginWatcher.IsReloading || _isServerStarting;
     public int CompileEpoch => _pluginBuilder.CompileEpoch;
+    public IReadOnlyList<string> CompileErrors => _pluginBuilder.CompileErrors;
 
     private Int32 _debugOutputTextureSurfaceId = 0;
     private SharedTexture _debugOutputTexture;

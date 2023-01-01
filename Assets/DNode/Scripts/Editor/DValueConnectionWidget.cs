@@ -2,6 +2,7 @@
 using UnityEditor;
 using UnityEngine;
 using Unity.VisualScripting;
+using System.Linq;
 
 namespace DNode {
   [Widget(typeof(ValueConnection))]
@@ -39,7 +40,8 @@ namespace DNode {
           EditorGUIUtility.SetIconSize(new Vector2(IconSize.Small, IconSize.Small));
 
           object value = null;
-          string debugId = (connection.source?.unit as NanoGraph.VisualScripting.BaseNode)?.Node?.DebugId;
+          var sourceNode = NanoGraph.VisualScripting.BaseNode.GetSourceBaseNodeOrNull(connection.source?.unit, connection.source?.key, out _);
+          string debugId = sourceNode?.Node?.DebugId;
           if (debugId != null) {
             string debugKey = $"{debugId}.{connection.source.key}";
             double[] values = NanoGraph.Plugin.PluginService.Instance.GetDebugValues(debugKey);
@@ -70,12 +72,25 @@ namespace DNode {
 
           var label = new GUIContent(labelShortString, Icons.Type(typeForIcon)?[IconSize.Small]);
           var labelSize = Styles.prediction.CalcSize(label);
-          var labelPosition = new Rect(position.position - labelSize / 2, labelSize);
 
           BeginDim();
-
-          GUI.Label(labelPosition, label, Styles.prediction);
-
+          const float SourceInfrontOfDestinationThreshold = 5.0f;
+          const float MergedLabelDistanceThreshold = 300.0f;
+          const float MergedLabelDistanceThresholdSqr = MergedLabelDistanceThreshold * MergedLabelDistanceThreshold;
+          if ((sourceHandleEdgeCenter.x - destinationHandleEdgeCenter.x) < SourceInfrontOfDestinationThreshold &&
+              (sourceHandleEdgeCenter - destinationHandleEdgeCenter).sqrMagnitude < MergedLabelDistanceThresholdSqr) {
+            var labelPosition = new Rect(position.position - labelSize / 2, labelSize);
+            GUI.Label(labelPosition, label, Styles.prediction);
+          } else {
+            Vector2 anchor1 = new Vector2(0.0f, 0.5f);
+            Vector2 bias1 = new Vector2(10.0f, 0.0f);
+            var labelPosition1 = new Rect(sourceHandleEdgeCenter - labelSize.ElementMul(anchor1) + bias1, labelSize);
+            Vector2 anchor2 = new Vector2(1.0f, 0.5f);
+            Vector2 bias2 = new Vector2(-10.0f, 0.0f);
+            var labelPosition2 = new Rect(destinationHandleEdgeCenter - labelSize.ElementMul(anchor2) + bias2, labelSize);
+            GUI.Label(labelPosition1, label, Styles.prediction);
+            GUI.Label(labelPosition2, label, Styles.prediction);
+          }
           EndDim();
 
           EditorGUIUtility.SetIconSize(previousIconSize);

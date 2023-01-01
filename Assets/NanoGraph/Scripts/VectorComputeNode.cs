@@ -90,7 +90,7 @@ namespace NanoGraph {
           }
           CodeLocal? inputLocal = resultLocalMap.GetOrNull(edge.Source);
           if (inputLocal == null) {
-            errors.Add($"Input {field.Name} for {computeNode} is not defined.");
+            NanoGraph.CurrentGenerateState.AddError($"Input {field.Name} for {computeNode} is not defined.");
             continue;
           }
           if (field.Type.IsArray) {
@@ -109,12 +109,12 @@ namespace NanoGraph {
           return null;
         }
         if (!(edge.Source.Node is IComputeNode sourceComputeNode)) {
-          errors.Add($"Node {computeNode} depends on an output that is not a compute node ({edge.Source.Node}).");
+          NanoGraph.CurrentGenerateState.AddError($"Node {computeNode} depends on an output that is not a compute node ({edge.Source.Node}).");
           return null;
         }
         CodeCachedResult? sourceCachedResult = dependentComputeNodes.FirstOrNull(dependency => dependency.Node == sourceComputeNode)?.Result;
         if (sourceCachedResult == null) {
-          errors.Add($"Node {computeNode} depends on a compute node that is not yet ready ({edge.Source.Node}).");
+          NanoGraph.CurrentGenerateState.AddError($"Node {computeNode} depends on a compute node that is not yet ready ({edge.Source.Node}).");
           return null;
         }
 

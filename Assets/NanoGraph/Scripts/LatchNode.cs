@@ -48,12 +48,12 @@ namespace NanoGraph {
       public void EmitLateUpdateCode(IComputeNode fromNode, CodeContext context) {
         if (Node.IsGpuContext) {
           if (!descendantInputs.TryGetValue(fromNode, out var inputs) || inputs.Count == 0) {
-            context.Errors.Add($"Node {Node} cannot update because input from {fromNode} is not ready.");
+            NanoGraph.CurrentGenerateState.AddError($"Node {Node} cannot update because input from {fromNode} is not ready.");
             return;
           }
           int? inputIndex = inputs.FirstOrNull(field => field.field.Name == "Out")?.inputIndex;
           if (inputIndex == null) {
-            context.Errors.Add($"Node {Node} cannot update because input from {fromNode} is not ready.");
+            NanoGraph.CurrentGenerateState.AddError($"Node {Node} cannot update because input from {fromNode} is not ready.");
             return;
           }
           context.Function.AddStatement($"{context.Function.Context.EmitWriteBuffer($"input{inputIndex}", "gid", context.InputLocals[0].Identifier)};");

@@ -56,7 +56,7 @@ namespace NanoGraph {
           }
           CodeLocal? inputLocal = resultLocalMap.GetOrNull(edge.Source);
           if (inputLocal == null) {
-            errors.Add($"Input {field.Name} for {computeNode} is not defined.");
+            NanoGraph.CurrentGenerateState.AddError($"Input {field.Name} for {computeNode} is not defined.");
             continue;
           }
           func.AddStatement($"{returnLocal}.{resultType.GetField(field.Name)} = {func.EmitConvert(inputLocal.Value.Type, field.Type, inputLocal?.Identifier)};");

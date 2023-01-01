@@ -38,6 +38,9 @@ namespace NanoGraph {
     }
 
     [DoNotSerialize]
+    public IReadOnlyList<string> Messages { get; set; }
+
+    [DoNotSerialize]
     public NanoGraph Graph { get; set; }
     [DoNotSerialize]
     public abstract DataSpec InputSpec { get; }

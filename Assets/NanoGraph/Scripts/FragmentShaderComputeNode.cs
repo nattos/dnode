@@ -62,17 +62,17 @@ namespace NanoGraph {
         // Identify which vertex shader is the input.
         this.vertexNode = graph.GetEdgeToDestinationOrNull(computeNode, "Verts")?.Source.Node as VertexShaderComputeNode;
         if (vertexNode == null) {
-          errors.Add($"Fragment shader {computeNode} is not connected to a vertex shader.");
+          NanoGraph.CurrentGenerateState.AddError($"Fragment shader {computeNode} is not connected to a vertex shader.");
           return;
         }
         this.vertexOp = dependentComputeNodes.FirstOrNull(dependency => dependency.Node == vertexNode)?.Operation as VertexShaderComputeNode.EmitterGpu;
         if (vertexNode == null) {
-          errors.Add($"Vertex shader {vertexNode} for fragment shader {computeNode} is not ready.");
+          NanoGraph.CurrentGenerateState.AddError($"Vertex shader {vertexNode} for fragment shader {computeNode} is not ready.");
           return;
         }
         this.vertexType = vertexOp.resultTypeSpec.Type;
         if (vertexType == null) {
-          errors.Add($"Vertex shader {vertexNode} for fragment shader {computeNode} must output a struct.");
+          NanoGraph.CurrentGenerateState.AddError($"Vertex shader {vertexNode} for fragment shader {computeNode} must output a struct.");
           return;
         }
         this.vertexProgramType = vertexOp.resultType;
@@ -98,12 +98,12 @@ namespace NanoGraph {
         result = default;
         var edge = graph.GetEdgeToDestinationOrNull(computeNode, "Color");
         if (edge == null) {
-          errors.Add($"The Color input for {computeNode} is not connected.");
+          NanoGraph.CurrentGenerateState.AddError($"The Color input for {computeNode} is not connected.");
           return;
         }
         CodeLocal? inputLocal = resultLocalMap.GetOrNull(edge.Source);
         if (inputLocal == null) {
-          errors.Add($"Input Color for {computeNode} is not defined.");
+          NanoGraph.CurrentGenerateState.AddError($"Input Color for {computeNode} is not defined.");
           return;
         }
         func.AddStatement($"return {inputLocal?.Identifier};");
@@ -116,12 +116,12 @@ namespace NanoGraph {
           return null;
         }
         if (!(edge.Source.Node is IComputeNode sourceComputeNode)) {
-          errors.Add($"Node {computeNode} depends on an output that is not a compute node ({edge.Source.Node}).");
+          NanoGraph.CurrentGenerateState.AddError($"Node {computeNode} depends on an output that is not a compute node ({edge.Source.Node}).");
           return null;
         }
         CodeCachedResult? sourceCachedResult = dependentComputeNodes.FirstOrNull(dependency => dependency.Node == sourceComputeNode)?.Result;
         if (sourceCachedResult == null) {
-          errors.Add($"Node {computeNode} depends on a compute node that is not yet ready ({edge.Source.Node}).");
+          NanoGraph.CurrentGenerateState.AddError($"Node {computeNode} depends on a compute node that is not yet ready ({edge.Source.Node}).");
           return null;
         }
 
@@ -200,7 +200,7 @@ namespace NanoGraph {
         // TODO: Support other vertex count methods. For now just look at the first buffer input of the vertex shader.
         NanoGpuBufferRef primaryVertexBuffer = gpuVertexInputBuffers.FirstOrDefault(buffer => buffer.Type.IsArray);
         if (primaryVertexBuffer.Expression == null) {
-          errors.Add($"Cannot determine the number of vertices for {fragmentNode}. Its vertex shader should have an array input.");
+          NanoGraph.CurrentGenerateState.AddError($"Cannot determine the number of vertices for {fragmentNode}. Its vertex shader should have an array input.");
           return;
         }
         vertexCountExpr = $"GetLength({primaryVertexBuffer.Expression})";

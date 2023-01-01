@@ -182,6 +182,11 @@ namespace NanoGraph.VisualScripting {
 
     public override void CachePosition() {
       // Width
+      // private bool IsError => (this.unit as BaseNode)?.Node?.Messages?.Count > 0;
+
+      // private static readonly EditorTexture[] ErrorIconArray = new[] { BoltCore.Icons.errorState };
+      // private EditorTexture[] DescriptionIcons => IsError ? ErrorIconArray : Array.Empty<EditorTexture>();
+
 
       // var inputsWidth = 0f;
       // var outputsWidth = 0f;
@@ -586,7 +591,7 @@ namespace NanoGraph.VisualScripting {
     protected virtual bool showTitle => true; // !string.IsNullOrEmpty(description.shortTitle);
     protected virtual bool showSurtitle => !string.IsNullOrEmpty(description.surtitle);
     protected virtual bool showSubtitle => !string.IsNullOrEmpty(description.subtitle);
-    protected virtual bool showIcons => false;//description.icons.Length > 0;
+    protected virtual bool showIcons => description.icons.Length > 0;
     protected virtual bool showSettings => settingNames.Count > 0;
     protected virtual bool showHeaderAddon => false;
     protected virtual bool showPorts => ports.Count > 0;

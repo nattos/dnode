@@ -13,6 +13,9 @@ namespace NanoGraph {
     public string EffectName = "Program";
     public bool DebugEnabled = true;
     public GlobalTextureBitDepth GlobalBitDepth;
+
+    public IReadOnlyList<string> Messages { get; private set; }
+
     private readonly List<IDataNode> _nodes = new List<IDataNode>();
     private readonly HashSet<IDataNode> _dirtyNodes = new HashSet<IDataNode>();
 
@@ -528,7 +531,6 @@ namespace NanoGraph {
             Function = func,
             InputLocals = inputsUsedInputLocals,
             OutputLocals = inputsUsedOutputLocals,
-            Errors = context.Errors,
           });
         }
       }
@@ -563,7 +565,7 @@ namespace NanoGraph {
       public void EmitPreambleCode(CodeContext context) {}
       public void EmitCode(CodeContext context) {
         if (InputResult == null) {
-          context.Errors.Add($"Dependent node {Node} has not been defined yet.");
+          CurrentGenerateState.AddError($"Dependent node {Node} has not been defined yet.");
           return;
         }
 
@@ -612,7 +614,7 @@ namespace NanoGraph {
       yield return root;
     }
 
-    private List<(ICodeGenerator, bool)> GenerateComputePlan(IComputeNode root, List<CodeGeneratorFromComputeNode> dependentComputeNodes, List<DataPlug> dependentComputeInputs, List<string> errors) {
+    private List<(ICodeGenerator, bool)> GenerateComputePlan(IComputeNode root, List<CodeGeneratorFromComputeNode> dependentComputeNodes, List<DataPlug> dependentComputeInputs) {
       Dictionary<IDataNode, List<IConditionalNode>> conditionedOnMap = new Dictionary<IDataNode, List<IConditionalNode>>();
       Dictionary<IConditionalNode, List<IDataNode>> conditionGroups = new Dictionary<IConditionalNode, List<IDataNode>>();
       Dictionary<(IDataNode, bool), List<IDataNode>> inputMap = new Dictionary<(IDataNode, bool), List<IDataNode>>();
@@ -799,7 +801,7 @@ namespace NanoGraph {
         } else if (node is ICompileTimeOnlyNode) {
           generator = null;
         } else {
-          errors.Add($"Node {node} is not an ICodeNode.");
+          CurrentGenerateState.AddError($"Node {node} is not an ICodeNode.");
           generator = null;
         }
         if (generator != null) {
@@ -885,11 +887,46 @@ namespace NanoGraph {
       }
     }
 
+    public class GenerateState {
+      public void AddError(string message) {
+        Errors.Add((CurrentNode, message));
+      }
+
+      public IDataNode CurrentNode;
+      public List<(IDataNode node, string message)> Errors = new List<(IDataNode node, string message)>();
+    }
+
+    [ThreadStatic]
+    private static GenerateState _currentGenerateState = null;
+    public static GenerateState CurrentGenerateState => _currentGenerateState;
+
     public void GenerateProgram(IReadOnlyList<IComputeNode> outputNodes) {
-      // TODO: Generate plan and scopes.
-      // TODO: Deal with conditional scopes.
-      // TODO: Deal with nodes in multiple compute contexts.
-      List<string> errors = new List<string>();
+      GenerateState state = new GenerateState();
+      _currentGenerateState = state;
+      try {
+        GenerateProgramInner(outputNodes, state);
+      } catch (Exception e) {
+        Debug.LogError(e);
+        state.AddError(e.ToString());
+      } finally {
+        EditorUtils.DelayCall += () => {
+          PushGenerateErrors(state);
+        };
+        _currentGenerateState = null;
+      }
+    }
+
+    private void GenerateProgramInner(IReadOnlyList<IComputeNode> outputNodes, GenerateState generateState) {
+      Stack<IDataNode> generateNodeStack = new Stack<IDataNode>();
+      void PushGenerateNode(IDataNode node) {
+        generateNodeStack.Push(node);
+        generateState.CurrentNode = node;
+      }
+      void PopGenerateNode() {
+        generateNodeStack.Pop();
+        generateNodeStack.TryPeek(out IDataNode top);
+        generateState.CurrentNode = top;
+      }
 
       var program = new NanoProgram(EffectName);
       var executeFunction = program.AddOverrideFunction("Execute", NanoProgram.CpuContext, program.VoidType);
@@ -943,23 +980,28 @@ namespace NanoGraph {
       // Traverse graph of compute nodes and generate a plan for each.
       Dictionary<IComputeNode, ComputePlan> computePlanMap = new Dictionary<IComputeNode, ComputePlan>();
       while (queuedCalcNodes.TryDequeue(out IComputeNode node)) {
-        List<CodeGeneratorFromComputeNode> dependentComputeNodes = new List<CodeGeneratorFromComputeNode>();
-        List<DataPlug> dependentComputeInputs = new List<DataPlug>();
-        List<(ICodeGenerator, bool)> computePlan = GenerateComputePlan(node, dependentComputeNodes, dependentComputeInputs, errors);
-        if (node is ISplitComputeNode) {
-          if (dependentComputeNodes.Count > 1) {
-            errors.Add($"Node {node} is in multiple compute nodes. It must depend on exactly one node.");
-            continue;
+        PushGenerateNode(node);
+        try {
+          List<CodeGeneratorFromComputeNode> dependentComputeNodes = new List<CodeGeneratorFromComputeNode>();
+          List<DataPlug> dependentComputeInputs = new List<DataPlug>();
+          List<(ICodeGenerator, bool)> computePlan = GenerateComputePlan(node, dependentComputeNodes, dependentComputeInputs);
+          if (node is ISplitComputeNode) {
+            if (dependentComputeNodes.Count > 1) {
+              CurrentGenerateState.AddError($"Node {node} is in multiple compute nodes. It must depend on exactly one node.");
+              continue;
+            }
+            // TODO: Verify that the dependee is actually the same as the dependency.
+            // Do not actually compute anything for this node.
+            computePlan.Clear();
+            dependentComputeNodes.Clear();
+            dependentComputeInputs.Clear();
           }
-          // TODO: Verify that the dependee is actually the same as the dependency.
-          // Do not actually compute anything for this node.
-          computePlan.Clear();
-          dependentComputeNodes.Clear();
-          dependentComputeInputs.Clear();
-        }
-        computePlanMap[node] = new ComputePlan(node, computePlan, dependentComputeNodes, dependentComputeInputs);
-        foreach (var dependency in dependentComputeNodes) {
-          QueueComputeNode(dependency.Node);
+          computePlanMap[node] = new ComputePlan(node, computePlan, dependentComputeNodes, dependentComputeInputs);
+          foreach (var dependency in dependentComputeNodes) {
+            QueueComputeNode(dependency.Node);
+          }
+        } finally {
+          PopGenerateNode();
         }
       }
 
@@ -979,261 +1021,278 @@ namespace NanoGraph {
         var computePlan = plan.Generators;
         var dependentComputeNodes = plan.DependentComputeNodes;
         var dependentComputeInputs = plan.DependentComputeInputs;
-        // Read inputs.
-        var dependentComputeNodeResults = new List<ComputeNodeResultEntry>();
-        foreach (var dependency in dependentComputeNodes) {
-          if (!computeNodeResults.TryGetValue(dependency.Node, out var result)) {
-            errors.Add($"Dependency {dependency.Node} for {computeNode} not yet ready.");
-            continue;
-          }
-          dependency.SetInput(result.result ?? default, result.op);
-          dependentComputeNodeResults.Add(new ComputeNodeResultEntry { Node = dependency.Node, Result = result.result, Operation = result.op });
-        }
-
-        var emitContext = new ComputeNodeEmitCodeOperationContext {
-            errors = errors,
-            graph = this,
-            program = program,
-            debugState = debugState,
-            createPipelinesFunction = createPipelinesFunction,
-            dependentComputeNodes = dependentComputeNodeResults,
-            dependentComputeInputs = dependentComputeInputs,
-        };
-        var emitOp = computeNode.CreateEmitCodeOperation(emitContext);
-
-        emitOp.EmitFunctionSignature();
-        emitOp.EmitFunctionPreamble(out NanoFunction func);
-        emitOp.EmitLoadFunctionInputs();
-
-        Dictionary<DataPlug, CodeLocal> resultLocalMap = new Dictionary<DataPlug, CodeLocal>();
-        CodeLocal[] GetInputLocals(IDataNode sourceNode, DataSpec inputSpec, IReadOnlyList<CodeLocal> cached = null) {
-          var inputSpecFields = inputSpec.Fields.Where(field => !field.IsCompileTimeOnly).ToArray();
-
-          CodeLocal[] inputLocals = new CodeLocal[inputSpecFields.Length];
-          for (int i = 0; i < inputSpecFields.Length; ++i) {
-            if (cached != null && cached[i].Identifier != null) {
-              inputLocals[i] = cached[i];
+        PushGenerateNode(computeNode);
+        try {
+          // Read inputs.
+          var dependentComputeNodeResults = new List<ComputeNodeResultEntry>();
+          foreach (var dependency in dependentComputeNodes) {
+            if (!computeNodeResults.TryGetValue(dependency.Node, out var result)) {
+              CurrentGenerateState.AddError($"Dependency {dependency.Node} for {computeNode} not yet ready.");
               continue;
             }
-
-            var field = inputSpecFields[i];
-            if (field.IsCompileTimeOnly) {
-              continue;
-            }
-            var edge = _edgesByDest.GetOrDefault(new DataPlug { Node = sourceNode, FieldName = field.Name });
-            if (edge == null) {
-              // Input is not connected. This may or may not be desired.
-              continue;
-            }
-            CodeLocal? inputLocal = resultLocalMap.GetOrNull(edge.Source);
-            if (inputLocal == null) {
-              // TODO: Make error more precise for conditionals.
-              errors.Add($"Input {field.Name} for {sourceNode} is not defined.");
-              continue;
-            }
-
-            TypeSpec inputType = inputLocal?.Type ?? default;
-            TypeSpec desiredType = field.Type;
-            var inputProgramType = program.GetProgramType(inputType);
-            var desiredProgramType = program.GetProgramType(desiredType);
-
-            string actualInputLocal = inputLocal?.Identifier;
-            TypeSpec actualType = inputType;
-            if (inputProgramType != desiredProgramType) {
-              actualInputLocal = func.AllocLocal("Converted");
-              func.AddStatement($"{func.GetTypeIdentifier(desiredProgramType)} {actualInputLocal} = {func.EmitConvert(inputProgramType, desiredProgramType, inputLocal?.Identifier)};");
-              actualType = desiredType;
-            }
-
-            inputLocals[i] = new CodeLocal { Identifier = actualInputLocal, Type = actualType };
-          }
-          return inputLocals;
-        }
-
-        // Emit the meat of the function.
-        Dictionary<ICodeGenerator, CodeLocal[]> cachedNodePreambleInputLocals = new Dictionary<ICodeGenerator, CodeLocal[]>();
-        foreach ((ICodeGenerator codeGenerator, bool isPreamble) in computePlan) {
-          DataSpec inputSpec = codeGenerator.InputSpec;
-          var cachedPreambleInputLocals = cachedNodePreambleInputLocals.GetOrDefault(codeGenerator);
-          CodeLocal[] inputLocals = GetInputLocals(codeGenerator.SourceNode, inputSpec, cachedPreambleInputLocals);
-          if (isPreamble) {
-            cachedNodePreambleInputLocals[codeGenerator] = inputLocals;
+            dependency.SetInput(result.result ?? default, result.op);
+            dependentComputeNodeResults.Add(new ComputeNodeResultEntry { Node = dependency.Node, Result = result.result, Operation = result.op });
           }
 
-          List<string> outputFieldNames = new List<string>();
-          List<CodeLocal> outputLocals =  new List<CodeLocal>();
-          if (!isPreamble) {
-            var outputSpec = codeGenerator.OutputSpec;
-            foreach (var field in outputSpec.Fields) {
+          var emitContext = new ComputeNodeEmitCodeOperationContext {
+              graph = this,
+              program = program,
+              debugState = debugState,
+              createPipelinesFunction = createPipelinesFunction,
+              dependentComputeNodes = dependentComputeNodeResults,
+              dependentComputeInputs = dependentComputeInputs,
+          };
+          var emitOp = computeNode.CreateEmitCodeOperation(emitContext);
+
+          emitOp.EmitFunctionSignature();
+          emitOp.EmitFunctionPreamble(out NanoFunction func);
+          emitOp.EmitLoadFunctionInputs();
+
+          Dictionary<DataPlug, CodeLocal> resultLocalMap = new Dictionary<DataPlug, CodeLocal>();
+          CodeLocal[] GetInputLocals(IDataNode sourceNode, DataSpec inputSpec, IReadOnlyList<CodeLocal> cached = null) {
+            var inputSpecFields = inputSpec.Fields.Where(field => !field.IsCompileTimeOnly).ToArray();
+
+            CodeLocal[] inputLocals = new CodeLocal[inputSpecFields.Length];
+            for (int i = 0; i < inputSpecFields.Length; ++i) {
+              if (cached != null && cached[i].Identifier != null) {
+                inputLocals[i] = cached[i];
+                continue;
+              }
+
+              var field = inputSpecFields[i];
               if (field.IsCompileTimeOnly) {
                 continue;
               }
-              string outputLocal = func.AllocLocal($"{codeGenerator.SourceNode.ShortName}_{field.Name}");
-              resultLocalMap[new DataPlug { Node = codeGenerator.SourceNode, FieldName = field.Name }] = new CodeLocal { Identifier = outputLocal, Type = field.Type };
-              outputLocals.Add(new CodeLocal { Identifier = outputLocal, Type = field.Type });
-              outputFieldNames.Add(field.Name);
-            }
-          }
-
-          var context = new CodeContext {
-            Function = func,
-            DebugState = debugState,
-            InputLocals = inputLocals,
-            OutputLocals = outputLocals,
-            Errors = errors,
-          };
-          if (isPreamble) {
-            codeGenerator.EmitPreambleCode(context);
-          } else {
-            codeGenerator.EmitCode(context);
-          }
-          if (DebugEnabled && !(func.Context is NanoGpuContext)) {
-            string debugId = codeGenerator.SourceNode.DebugId;
-            for (int i = 0; i < outputLocals.Count; ++i) {
-              string fieldName = outputFieldNames[i];
-              CodeLocal outputLocal = outputLocals[i];
-
-              string[] GetExtractDebugValueExprs(string inputExpr, TypeSpec type, int limit) {
-                if (type.IsArray) {
-                  List<string> resultExprs = new List<string>();
-                  int arrayIndex = 0;
-                  while (resultExprs.Count < limit) {
-                    string elementInputExpr = func.Context.EmitSampleBuffer(inputExpr, func.EmitLiteral(arrayIndex));
-                    string[] elementExprs = GetExtractDebugValueExprs(elementInputExpr, type.ElementSpec, limit);
-                    if (elementExprs.Length == 0) {
-                      break;
-                    }
-                    foreach (string elementExpr in elementExprs) {
-                      resultExprs.Add($"({arrayIndex} < GetLength({inputExpr}) ? ({elementExpr}) : (0.0))");
-                    }
-                    ++arrayIndex;
-                  }
-                  return resultExprs.ToArray();
-                }
-                if (type.Primitive != null) {
-                  switch (type.Primitive.Value) {
-                    case PrimitiveType.Bool:
-                      return new[] { $"(({inputExpr}) ? 1.0 : 0.0)" };
-                    case PrimitiveType.Int:
-                      return new[] { $"((double)({inputExpr}))" };
-                    case PrimitiveType.Uint:
-                      return new[] { $"((double)({inputExpr}))" };
-                    case PrimitiveType.Uint2:
-                      return new[] { $"((double)(({inputExpr}).x))", $"((double)(({inputExpr}).y))" };
-                    case PrimitiveType.Double:
-                      return new[] { $"((double)({inputExpr}))" };
-                    case PrimitiveType.Float:
-                      return new[] { $"((double)({inputExpr}))" };
-                    case PrimitiveType.Float2:
-                      return new[] { $"((double)(({inputExpr}).x))", $"((double)(({inputExpr}).y))" };
-                    case PrimitiveType.Float3:
-                      return new[] { $"((double)(({inputExpr}).x))", $"((double)(({inputExpr}).y))", $"((double)(({inputExpr}).z))" };
-                    case PrimitiveType.Float4:
-                      return new[] { $"((double)(({inputExpr}).x))", $"((double)(({inputExpr}).y))", $"((double)(({inputExpr}).z))", $"((double)(({inputExpr}).w))" };
-                    default:
-                      return Array.Empty<string>();
-                  }
-                }
-                if (type.Type != null) {
-                  NanoProgramType programType = program.GetProgramType(TypeSpec.MakeType(type.Type));
-                  return type.Type.Fields.SelectMany(field => {
-                    string fieldInputExpr = $"{inputExpr}.{programType.GetField(field.Name)}";
-                    return GetExtractDebugValueExprs(fieldInputExpr, field.Type, limit);
-                  }).ToArray();
-                }
-                return Array.Empty<string>();
-              }
-
-              string extractDebugValueExpr = null;
-              string valueLengthExpr = null;
-              string[] valueExprs = GetExtractDebugValueExprs(outputLocal.Identifier, outputLocal.Type, limit: 4);
-              if (valueExprs.Length > 0) {
-                extractDebugValueExpr = $"vector_double4 {{ {string.Join(", ", valueExprs.Take(4))} }}";
-                valueLengthExpr = getDebugValuesFunction.EmitLiteral(Math.Min(4, valueExprs.Length));
-              }
-
-              if (extractDebugValueExpr == null) {
+              var edge = _edgesByDest.GetOrDefault(new DataPlug { Node = sourceNode, FieldName = field.Name });
+              if (edge == null) {
+                // Input is not connected. This may or may not be desired.
                 continue;
               }
-              string debugValueKey = $"{debugId}.{fieldName}";
-              string debugIdentifier = program.AddInstanceField(program.Double4Type, debugValueKey);
-              func.AddStatement($"{debugIdentifier} = {extractDebugValueExpr};");
-              getDebugValuesFunction.AddStatement($"debugValues.push_back(DebugValue {{ .Key = {getDebugValuesFunction.EmitLiteral(debugValueKey)}, .Length = {valueLengthExpr}, .Value = {debugIdentifier} }});");
+              CodeLocal? inputLocal = resultLocalMap.GetOrNull(edge.Source);
+              if (inputLocal == null) {
+                // TODO: Make error more precise for conditionals.
+                CurrentGenerateState.AddError($"Input {field.Name} for {sourceNode} is not defined.");
+                continue;
+              }
+
+              TypeSpec inputType = inputLocal?.Type ?? default;
+              TypeSpec desiredType = field.Type;
+              var inputProgramType = program.GetProgramType(inputType);
+              var desiredProgramType = program.GetProgramType(desiredType);
+
+              string actualInputLocal = inputLocal?.Identifier;
+              TypeSpec actualType = inputType;
+              if (inputProgramType != desiredProgramType) {
+                actualInputLocal = func.AllocLocal("Converted");
+                func.AddStatement($"{func.GetTypeIdentifier(desiredProgramType)} {actualInputLocal} = {func.EmitConvert(inputProgramType, desiredProgramType, inputLocal?.Identifier)};");
+                actualType = desiredType;
+              }
+
+              inputLocals[i] = new CodeLocal { Identifier = actualInputLocal, Type = actualType };
+            }
+            return inputLocals;
+          }
+
+          // Emit the meat of the function.
+          Dictionary<ICodeGenerator, CodeLocal[]> cachedNodePreambleInputLocals = new Dictionary<ICodeGenerator, CodeLocal[]>();
+          foreach ((ICodeGenerator codeGenerator, bool isPreamble) in computePlan) {
+            PushGenerateNode(codeGenerator.SourceNode);
+            try {
+              DataSpec inputSpec = codeGenerator.InputSpec;
+              var cachedPreambleInputLocals = cachedNodePreambleInputLocals.GetOrDefault(codeGenerator);
+              CodeLocal[] inputLocals = GetInputLocals(codeGenerator.SourceNode, inputSpec, cachedPreambleInputLocals);
+              if (isPreamble) {
+                cachedNodePreambleInputLocals[codeGenerator] = inputLocals;
+              }
+
+              List<string> outputFieldNames = new List<string>();
+              List<CodeLocal> outputLocals =  new List<CodeLocal>();
+              if (!isPreamble) {
+                var outputSpec = codeGenerator.OutputSpec;
+                foreach (var field in outputSpec.Fields) {
+                  if (field.IsCompileTimeOnly) {
+                    continue;
+                  }
+                  string outputLocal = func.AllocLocal($"{codeGenerator.SourceNode.ShortName}_{field.Name}");
+                  resultLocalMap[new DataPlug { Node = codeGenerator.SourceNode, FieldName = field.Name }] = new CodeLocal { Identifier = outputLocal, Type = field.Type };
+                  outputLocals.Add(new CodeLocal { Identifier = outputLocal, Type = field.Type });
+                  outputFieldNames.Add(field.Name);
+                }
+              }
+
+              var context = new CodeContext {
+                Function = func,
+                DebugState = debugState,
+                InputLocals = inputLocals,
+                OutputLocals = outputLocals,
+              };
+              if (isPreamble) {
+                codeGenerator.EmitPreambleCode(context);
+              } else {
+                codeGenerator.EmitCode(context);
+              }
+              if (DebugEnabled && !(func.Context is NanoGpuContext)) {
+                string debugId = codeGenerator.SourceNode.DebugId;
+                for (int i = 0; i < outputLocals.Count; ++i) {
+                  string fieldName = outputFieldNames[i];
+                  CodeLocal outputLocal = outputLocals[i];
+
+                  string[] GetExtractDebugValueExprs(string inputExpr, TypeSpec type, int limit) {
+                    if (type.IsArray) {
+                      List<string> resultExprs = new List<string>();
+                      int arrayIndex = 0;
+                      while (resultExprs.Count < limit) {
+                        string elementInputExpr = func.Context.EmitSampleBuffer(inputExpr, func.EmitLiteral(arrayIndex));
+                        string[] elementExprs = GetExtractDebugValueExprs(elementInputExpr, type.ElementSpec, limit);
+                        if (elementExprs.Length == 0) {
+                          break;
+                        }
+                        foreach (string elementExpr in elementExprs) {
+                          resultExprs.Add($"({arrayIndex} < GetLength({inputExpr}) ? ({elementExpr}) : (0.0))");
+                        }
+                        ++arrayIndex;
+                      }
+                      return resultExprs.ToArray();
+                    }
+                    if (type.Primitive != null) {
+                      switch (type.Primitive.Value) {
+                        case PrimitiveType.Bool:
+                          return new[] { $"(({inputExpr}) ? 1.0 : 0.0)" };
+                        case PrimitiveType.Int:
+                          return new[] { $"((double)({inputExpr}))" };
+                        case PrimitiveType.Uint:
+                          return new[] { $"((double)({inputExpr}))" };
+                        case PrimitiveType.Uint2:
+                          return new[] { $"((double)(({inputExpr}).x))", $"((double)(({inputExpr}).y))" };
+                        case PrimitiveType.Double:
+                          return new[] { $"((double)({inputExpr}))" };
+                        case PrimitiveType.Float:
+                          return new[] { $"((double)({inputExpr}))" };
+                        case PrimitiveType.Float2:
+                          return new[] { $"((double)(({inputExpr}).x))", $"((double)(({inputExpr}).y))" };
+                        case PrimitiveType.Float3:
+                          return new[] { $"((double)(({inputExpr}).x))", $"((double)(({inputExpr}).y))", $"((double)(({inputExpr}).z))" };
+                        case PrimitiveType.Float4:
+                          return new[] { $"((double)(({inputExpr}).x))", $"((double)(({inputExpr}).y))", $"((double)(({inputExpr}).z))", $"((double)(({inputExpr}).w))" };
+                        default:
+                          return Array.Empty<string>();
+                      }
+                    }
+                    if (type.Type != null) {
+                      NanoProgramType programType = program.GetProgramType(TypeSpec.MakeType(type.Type));
+                      return type.Type.Fields.SelectMany(field => {
+                        string fieldInputExpr = $"{inputExpr}.{programType.GetField(field.Name)}";
+                        return GetExtractDebugValueExprs(fieldInputExpr, field.Type, limit);
+                      }).ToArray();
+                    }
+                    return Array.Empty<string>();
+                  }
+
+                  string extractDebugValueExpr = null;
+                  string valueLengthExpr = null;
+                  string[] valueExprs = GetExtractDebugValueExprs(outputLocal.Identifier, outputLocal.Type, limit: 4);
+                  if (valueExprs.Length > 0) {
+                    extractDebugValueExpr = $"vector_double4 {{ {string.Join(", ", valueExprs.Take(4))} }}";
+                    valueLengthExpr = getDebugValuesFunction.EmitLiteral(Math.Min(4, valueExprs.Length));
+                  }
+
+                  if (extractDebugValueExpr == null) {
+                    continue;
+                  }
+                  string debugValueKey = $"{debugId}.{fieldName}";
+                  string debugIdentifier = program.AddInstanceField(program.Double4Type, debugValueKey);
+                  func.AddStatement($"{debugIdentifier} = {extractDebugValueExpr};");
+                  getDebugValuesFunction.AddStatement($"debugValues.push_back(DebugValue {{ .Key = {getDebugValuesFunction.EmitLiteral(debugValueKey)}, .Length = {valueLengthExpr}, .Value = {debugIdentifier} }});");
+                }
+              }
+            } finally {
+              PopGenerateNode();
             }
           }
-        }
 
-        var splitComputeDependencies = dependentComputeNodes.Where(dependency => dependency.SourceNode is ISplitComputeNode).ToArray();
-        foreach (var dependency in splitComputeDependencies) {
-          ISplitComputeNode splitComputeNode = dependency.SourceNode as ISplitComputeNode;
-          if (dependency.Operation == null) {
-            errors.Add($"Node {splitComputeNode} is not ready.");
-            continue;
+          var splitComputeDependencies = dependentComputeNodes.Where(dependency => dependency.SourceNode is ISplitComputeNode).ToArray();
+          foreach (var dependency in splitComputeDependencies) {
+            ISplitComputeNode splitComputeNode = dependency.SourceNode as ISplitComputeNode;
+            PushGenerateNode(splitComputeNode);
+            try {
+              if (dependency.Operation == null) {
+                CurrentGenerateState.AddError($"Node {splitComputeNode} is not ready.");
+                continue;
+              }
+              if (!(dependency.Operation is ISplitComputeNodeEmitCodeOperation op)) {
+                CurrentGenerateState.AddError($"Node {splitComputeNode} does not implement {nameof(ISplitComputeNodeEmitCodeOperation)}.");
+                continue;
+              }
+
+              CodeLocal[] inputLocals = GetInputLocals(splitComputeNode, splitComputeNode.InputSpec);
+              op.EmitLateUpdateCode(computeNode, new CodeContext {
+                Function = func,
+                InputLocals = inputLocals,
+                OutputLocals = Array.Empty<CodeLocal>(),
+              });
+            } finally {
+              PopGenerateNode();
+            }
           }
-          if (!(dependency.Operation is ISplitComputeNodeEmitCodeOperation op)) {
-            errors.Add($"Node {splitComputeNode} does not implement {nameof(ISplitComputeNodeEmitCodeOperation)}.");
-            continue;
+
+          emitOp.ConsumeFunctionBodyResult(resultLocalMap);
+          emitOp.EmitFunctionReturn(out CodeCachedResult? codeCachedResult);
+
+          NanoFunction validateCacheFunction = program.AddFunction($"Update_{computeNode.ShortName}", NanoProgram.CpuContext, program.VoidType);
+          foreach ((ICodeGenerator codeGenerator, bool isPreamble) in computePlan) {
+            if (isPreamble) {
+              continue;
+            }
+            codeGenerator.EmitValidateCacheCode(validateCacheFunction, func);
           }
+          emitOp.EmitValidateCacheFunction(validateCacheFunction);
+          emitOp.EmitExecuteFunctionCode(executeFunction, ExecuteFunctionContextType.GlobalFrameStep);
 
-          CodeLocal[] inputLocals = GetInputLocals(splitComputeNode, splitComputeNode.InputSpec);
-          op.EmitLateUpdateCode(computeNode, new CodeContext {
-            Function = func,
-            InputLocals = inputLocals,
-            OutputLocals = Array.Empty<CodeLocal>(),
-            Errors = errors,
-          });
+          computeNodeResults[computeNode] = (codeCachedResult, emitOp);
+        } finally {
+          PopGenerateNode();
         }
-
-        emitOp.ConsumeFunctionBodyResult(resultLocalMap);
-        emitOp.EmitFunctionReturn(out CodeCachedResult? codeCachedResult);
-
-        NanoFunction validateCacheFunction = program.AddFunction($"Update_{computeNode.ShortName}", NanoProgram.CpuContext, program.VoidType);
-        foreach ((ICodeGenerator codeGenerator, bool isPreamble) in computePlan) {
-          if (isPreamble) {
-            continue;
-          }
-          codeGenerator.EmitValidateCacheCode(validateCacheFunction, func);
-        }
-        emitOp.EmitValidateCacheFunction(validateCacheFunction);
-        emitOp.EmitExecuteFunctionCode(executeFunction, ExecuteFunctionContextType.GlobalFrameStep);
-
-        computeNodeResults[computeNode] = (codeCachedResult, emitOp);
       }
 
       // Store final outputs.
       int finalOutputIndex = 0;
       foreach (var outputNode in outputNodes) {
-        var outputSpec = outputNode.OutputSpec;
-        if (!computeNodeResults.TryGetValue(outputNode, out var cachedResult) || cachedResult.result == null) {
-          errors.Add($"Missing result for output node {outputNode}");
-          continue;
-        }
-        cachedResult.op.EmitExecuteFunctionCode(executeFunction, ExecuteFunctionContextType.OnDemand);
-        foreach (var field in outputSpec.Fields) {
-          if (field.IsCompileTimeOnly) {
+        PushGenerateNode(outputNode);
+        try {
+          var outputSpec = outputNode.OutputSpec;
+          if (!computeNodeResults.TryGetValue(outputNode, out var cachedResult) || cachedResult.result == null) {
+            CurrentGenerateState.AddError($"Missing result for output node {outputNode}");
             continue;
           }
-          string fieldIdentifier = cachedResult.result?.ResultType.GetField(field.Name);
-          var getOutputFunc = program.AddOverrideFunction($"GetOutput{finalOutputIndex}", NanoProgram.CpuContext, program.GetProgramType(field.Type));
-          getOutputFunc.AddStatement($"return {cachedResult.result?.Result.Identifier}.{fieldIdentifier};");
-          finalOutputIndex++;
-        }
+          cachedResult.op.EmitExecuteFunctionCode(executeFunction, ExecuteFunctionContextType.OnDemand);
+          foreach (var field in outputSpec.Fields) {
+            if (field.IsCompileTimeOnly) {
+              continue;
+            }
+            string fieldIdentifier = cachedResult.result?.ResultType.GetField(field.Name);
+            var getOutputFunc = program.AddOverrideFunction($"GetOutput{finalOutputIndex}", NanoProgram.CpuContext, program.GetProgramType(field.Type));
+            getOutputFunc.AddStatement($"return {cachedResult.result?.Result.Identifier}.{fieldIdentifier};");
+            finalOutputIndex++;
+          }
 
-        var getTextureInputCountFunc = program.AddOverrideFunction($"GetTextureInputCount", NanoProgram.CpuContext, program.IntType, modifiers: new[] { "virtual" });
-        getTextureInputCountFunc.AddStatement($"return {getTextureInputCountFunc.EmitLiteral(program.TextureInputCount)};");
+          var getTextureInputCountFunc = program.AddOverrideFunction($"GetTextureInputCount", NanoProgram.CpuContext, program.IntType, modifiers: new[] { "virtual" });
+          getTextureInputCountFunc.AddStatement($"return {getTextureInputCountFunc.EmitLiteral(program.TextureInputCount)};");
 
-        var getParamsFunc = program.AddOverrideFunction($"GetParameterDecls", NanoProgram.CpuContext, NanoProgramType.MakeBuiltIn(program, "std::vector<ParameterDecl>"), modifiers: new[] { "virtual" });
-        getParamsFunc.AddStatement("std::vector<ParameterDecl> parameters = {");
-        foreach (var valueInput in program.ValueInputs) {
-          getParamsFunc.AddStatement($"  ParameterDecl {{");
-          getParamsFunc.AddStatement($"    .Name = {getParamsFunc.EmitLiteral(valueInput.Name)},");
-          getParamsFunc.AddStatement($"    .DefaultValue = {getParamsFunc.EmitLiteral(valueInput.DefaultValue)},");
-          getParamsFunc.AddStatement($"    .MinValue = {getParamsFunc.EmitLiteral(valueInput.MinValue)},");
-          getParamsFunc.AddStatement($"    .MaxValue = {getParamsFunc.EmitLiteral(valueInput.MaxValue)},");
-          getParamsFunc.AddStatement($"  }},");
+          var getParamsFunc = program.AddOverrideFunction($"GetParameterDecls", NanoProgram.CpuContext, NanoProgramType.MakeBuiltIn(program, "std::vector<ParameterDecl>"), modifiers: new[] { "virtual" });
+          getParamsFunc.AddStatement("std::vector<ParameterDecl> parameters = {");
+          foreach (var valueInput in program.ValueInputs) {
+            getParamsFunc.AddStatement($"  ParameterDecl {{");
+            getParamsFunc.AddStatement($"    .Name = {getParamsFunc.EmitLiteral(valueInput.Name)},");
+            getParamsFunc.AddStatement($"    .DefaultValue = {getParamsFunc.EmitLiteral(valueInput.DefaultValue)},");
+            getParamsFunc.AddStatement($"    .MinValue = {getParamsFunc.EmitLiteral(valueInput.MinValue)},");
+            getParamsFunc.AddStatement($"    .MaxValue = {getParamsFunc.EmitLiteral(valueInput.MaxValue)},");
+            getParamsFunc.AddStatement($"  }},");
+          }
+          getParamsFunc.AddStatement("};");
+          getParamsFunc.AddStatement($"return parameters;");
+        } finally {
+          PopGenerateNode();
         }
-        getParamsFunc.AddStatement("};");
-        getParamsFunc.AddStatement($"return parameters;");
       }
       getDebugValuesFunction.AddStatement($"return debugValues;");
       getDebugSettableValuesFunction.AddStatement($"return debugValues;");
@@ -1255,10 +1314,19 @@ namespace NanoGraph {
           Debug.Log("Code applied.");
         }
       }
+    }
 
+    private void PushGenerateErrors(GenerateState state) {
+      var errors = state.Errors;
       if (errors.Count > 0) {
-        Debug.Log(string.Join("\n", errors));
+        Debug.Log(string.Join("\n", errors.Select(error => error.node == null ? error.message : $"({error.node}) => {error.message}")));
       }
+      Dictionary<object, string[]> errorsByNode = errors.GroupBy(entry => entry.node).ToDictionary(group => group.Key ?? (object)this, group => group.Select(entry => entry.message).ToArray());
+
+      foreach (IDataNode node in _nodes) {
+        node.Messages = errorsByNode.GetOrDefault(node);
+      }
+      Messages = errorsByNode.GetOrDefault(this);
     }
 
     private static bool SyncToFile(string path, string text) {

@@ -81,6 +81,7 @@ namespace NanoGraph {
     DataNodeCacheData CacheData { get; set; }
     string ShortName { get; }
     string DebugId { get; set; }
+    IReadOnlyList<string> Messages { get; set; }
 
     void Validate(List<Action> cleanupActions);
   }

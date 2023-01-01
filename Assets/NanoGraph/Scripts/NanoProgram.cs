@@ -288,7 +288,8 @@ namespace NanoGraph {
             return EmitLiteral(value.Vector4FromRow(0));
         }
       }
-      throw new NotSupportedException();
+      NanoGraph.CurrentGenerateState.AddError($"Cannot emit literal of type {type}.");
+      return "";
     }
 
     public string EmitCopy(string expr) {

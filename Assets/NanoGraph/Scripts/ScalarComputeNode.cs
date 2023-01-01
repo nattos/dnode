@@ -87,7 +87,7 @@ namespace NanoGraph {
               }
               CodeLocal? inputLocal = resultLocalMap.GetOrNull(edge.Source);
               if (inputLocal == null) {
-                errors.Add($"Input {field.Name} for {computeNode} is not defined.");
+                NanoGraph.CurrentGenerateState.AddError($"Input {field.Name} for {computeNode} is not defined.");
                 continue;
               }
               inputExpr = $"{inputLocal.Value.Identifier}.{program.GetProgramType(inputLocal.Value.Type).GetField(field.Name)}";
@@ -101,7 +101,7 @@ namespace NanoGraph {
               }
               CodeLocal? inputLocal = resultLocalMap.GetOrNull(edge.Source);
               if (inputLocal == null) {
-                errors.Add($"Input {field.Name} for {computeNode} is not defined.");
+                NanoGraph.CurrentGenerateState.AddError($"Input {field.Name} for {computeNode} is not defined.");
                 continue;
               }
               inputExpr = inputLocal.Value.Identifier;
@@ -133,7 +133,7 @@ namespace NanoGraph {
         // Treat buffers correctly.
         foreach (var dependency in dependentComputeNodes) {
           if (dependency.Result == null) {
-            errors.Add($"Dependency {dependency.Node} for {computeNode} not yet ready.");
+            NanoGraph.CurrentGenerateState.AddError($"Dependency {dependency.Node} for {computeNode} not yet ready.");
             continue;
           }
           string resultIdentifier = dependency.Result?.Result.Identifier;

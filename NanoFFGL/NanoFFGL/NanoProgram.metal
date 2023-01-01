@@ -195,6 +195,13 @@ kernel void CopyTextureSampleLinear(
   output.write(input.sample(sampler, gid_xy_norm), gid_xy_uint);
 }
 
+kernel void ClearTextureSolid(
+    constant const vector_float4& input [[buffer(0)]],
+    NanoWriteTexture output [[texture(1)]],
+    vector_uint2 gid_xy_uint [[thread_position_in_grid]]) {
+  output.write(half4(input), gid_xy_uint);
+}
+
 
 
 

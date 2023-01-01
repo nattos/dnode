@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.IO;
 using System.Diagnostics;
+using System.Text.RegularExpressions;
 
 namespace NanoGraph.Plugin {
   public class PluginBuilder {
@@ -17,6 +18,10 @@ namespace NanoGraph.Plugin {
     public bool IsError { get; private set; } = false;
     public bool IsCompiling => _isDirty || _isBuilding;
     public int CompileEpoch { get; private set; } = 0;
+
+    public IReadOnlyList<string> CompileErrors { get { lock(_compileErrorsLock) { return _compileErrors; } } }
+    private IReadOnlyList<string> _compileErrors = Array.Empty<string>();
+    private object _compileErrorsLock = new object();
 
     public void MarkDirty() {
       _isDirty = true;
@@ -42,6 +47,9 @@ namespace NanoGraph.Plugin {
         }
       };
     }
+    private static readonly Regex _errorLinePattern =  new Regex(@"^.*:[0-9]+:[0-9]+: error: .*$");
+    private static readonly Regex _warningLinePattern =  new Regex(@"^.*:[0-9]+:[0-9]+: warning: .*$");
+    private static readonly Regex _endOfErrorsLinePattern =  new Regex(@"[0-9]+ warnings and [0-9]+ errors generated.");
 
     private bool DoBuild() {
       UnityEngine.Debug.Log("Beginning build.");
@@ -71,6 +79,45 @@ namespace NanoGraph.Plugin {
       int resultCode = process.ExitCode;
 
       UnityEngine.Debug.Log($"Done build: Code {resultCode}\n{outputStr}\n{errorStr}");
+
+      string[] lines = outputStr.Split("\n");
+      List<string> currentSegment = new List<string>();
+      List<string> errors =  new List<string>();
+      bool isErrorSegment = false;
+      void PushErrorSegment() {
+        FinishPushSegment();
+        isErrorSegment = true;
+      }
+      void PushWarningSegment() {
+        FinishPushSegment();
+      }
+      void PushNullSegment() {
+        FinishPushSegment();
+      }
+      void FinishPushSegment() {
+        if (isErrorSegment) {
+          errors.Add(string.Join("\n", currentSegment));
+        }
+        isErrorSegment = false;
+        currentSegment.Clear();
+      }
+
+      for (int i = 0; i < lines.Length; ++i) {
+        string line = lines[i];
+        if (_errorLinePattern.IsMatch(line)) {
+          PushErrorSegment();
+        } else if (_warningLinePattern.IsMatch(line)) {
+          PushWarningSegment();
+        } else if (_endOfErrorsLinePattern.IsMatch(line)) {
+          PushNullSegment();
+        }
+        currentSegment.Add(line);
+      }
+      FinishPushSegment();
+      lock (_compileErrorsLock) {
+        _compileErrors = errors.ToArray();
+      }
+
       return resultCode == 0;
     }
   }
