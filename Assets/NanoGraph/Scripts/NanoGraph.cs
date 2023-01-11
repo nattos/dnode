@@ -245,6 +245,9 @@ namespace NanoGraph {
       _isCompileLaterInFlight = true;
       EditorUtils.InvokeLater(() => {
         _isCompileLaterInFlight = false;
+        if (Plugin.PluginService.Instance.IsCompiling) {
+          CompileLater();
+        }
         Compile();
       });
     }

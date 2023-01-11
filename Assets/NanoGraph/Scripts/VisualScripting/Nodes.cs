@@ -308,7 +308,7 @@ namespace NanoGraph.VisualScripting {
     public static BaseNode GetSourceBaseNodeOrNull(IUnit src, string key, out string actualKey) {
       actualKey = key;
       if (src is SubgraphUnit subgraphUnit) {
-        GraphOutput graphOutput = subgraphUnit.nest.graph.units.FirstOrDefault(unit => unit is GraphOutput) as GraphOutput;
+        GraphOutput graphOutput = subgraphUnit?.nest?.graph?.units?.FirstOrDefault(unit => unit is GraphOutput) as GraphOutput;
         if (graphOutput == null) {
           return null;
         }

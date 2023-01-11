@@ -153,10 +153,13 @@ namespace NanoGraph.Plugin {
 
         void PushResultsOnMainThread() {
           if (response.DebugOutputTexture != 0 && response.DebugOutputTexture != _debugOutputTextureSurfaceId) {
-            _debugOutputTextureSurfaceId = response.DebugOutputTexture;
+            _debugOutputTextureSurfaceId = 0;
             _debugOutputTexture?.Dispose();
             _debugOutputTexture = null;
             _debugOutputTexture = SharedTextureManager.Instance.CreateTextureFromSurfaceId(response.DebugOutputTexture);
+            if (_debugOutputTexture != null) {
+              _debugOutputTextureSurfaceId = response.DebugOutputTexture;
+            }
           }
 
           _debugValues.Clear();

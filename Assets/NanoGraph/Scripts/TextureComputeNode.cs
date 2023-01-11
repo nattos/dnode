@@ -333,7 +333,9 @@ namespace NanoGraph {
             validateCacheFunction.AddStatement($"}}");
           }
 
-          validateCacheFunction.AddStatement($"ResizeSharedTexture(_debugOutputTexture, GetDevice(), {gridSizeXExpr}, {gridSizeYExpr});");
+          validateCacheFunction.AddStatement($"if (debugOutputNodeIndex >= 0) {{");
+          validateCacheFunction.AddStatement($"  ResizeSharedTexture(_debugOutputTexture, GetDevice(), {gridSizeXExpr}, {gridSizeYExpr});");
+          validateCacheFunction.AddStatement($"}}");
           validateCacheFunction.AddStatement($"id<MTLTexture> debugOutputTexture = debugOutputNodeIndex >= 0 ? _debugOutputTexture->Texture : nullptr;");
         }
 
