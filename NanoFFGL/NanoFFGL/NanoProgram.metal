@@ -117,7 +117,7 @@ static inline vector_float2 negate(vector_float2 a) { return vector_float2 { neg
 static inline vector_float3 negate(vector_float3 a) { return vector_float3 { negate(a.x), negate(a.y), negate(a.z) }; }
 static inline vector_float4 negate(vector_float4 a) { return vector_float4 { negate(a.x), negate(a.y), negate(a.z), negate(a.w) }; }
 
-static inline float invert(float a) { return -a; }
+static inline float invert(float a) { return 1.0 / a; }
 static inline vector_float2 invert(vector_float2 a) { return vector_float2 { invert(a.x), invert(a.y) }; }
 static inline vector_float3 invert(vector_float3 a) { return vector_float3 { invert(a.x), invert(a.y), invert(a.z) }; }
 static inline vector_float4 invert(vector_float4 a) { return vector_float4 { invert(a.x), invert(a.y), invert(a.z), invert(a.w) }; }
@@ -141,6 +141,9 @@ static inline float round_op(float a) { return round(a); }
 static inline vector_float2 round_op(vector_float2 a) { return vector_float2 { round_op(a.x), round_op(a.y) }; }
 static inline vector_float3 round_op(vector_float3 a) { return vector_float3 { round_op(a.x), round_op(a.y), round_op(a.z) }; }
 static inline vector_float4 round_op(vector_float4 a) { return vector_float4 { round_op(a.x), round_op(a.y), round_op(a.z), round_op(a.w) }; }
+
+template<typename T> static inline float magnitude_op(T value) { return length(value); }
+template<typename T> static inline T normalize_op(T value) { return normalize(value); }
 
 static inline float pow2(float a) { return pow(2.0f, a); }
 static inline vector_float2 pow2(vector_float2 a) { return vector_float2 { pow2(a.x), pow2(a.y) }; }

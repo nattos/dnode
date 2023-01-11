@@ -90,7 +90,12 @@ namespace NanoGraph {
                 NanoGraph.CurrentGenerateState.AddError($"Input {field.Name} for {computeNode} is not defined.");
                 continue;
               }
-              inputExpr = $"{inputLocal.Value.Identifier}.{program.GetProgramType(inputLocal.Value.Type).GetField(field.Name)}";
+              NanoProgramType programInType = program.GetProgramType(inputLocal.Value.Type);
+              if (Node.IsArray) {
+                inputExpr = $"{inputLocal.Value.Identifier}";
+              } else {
+                inputExpr = $"{inputLocal.Value.Identifier}.{programInType.GetField(field.Name)}";
+              }
               break;
             }
             default:
@@ -114,7 +119,11 @@ namespace NanoGraph {
             case FieldPortsMode.Combined: {
               TypeSpec combinedOutType = computeOutputSpec.Fields.First(node => node.Name == "Out").Type;
               NanoProgramType programOutType = program.GetProgramType(combinedOutType);
-              outputExpr = $"{returnLocal}.{resultType.GetField("Out")}.{programOutType.GetField(field.Name)}";
+              if (Node.IsArray) {
+                outputExpr = $"{returnLocal}.{resultType.GetField("Out")}";
+              } else {
+                outputExpr = $"{returnLocal}.{resultType.GetField("Out")}.{programOutType.GetField(field.Name)}";
+              }
               break;
             }
             default:

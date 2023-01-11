@@ -308,6 +308,7 @@ namespace NanoGraph {
         string gridSizeYExpr = gridSizeYLocal;
         string totalThreadCountExpr = $"(({gridSizeXExpr}) * ({gridSizeYExpr}))";
 
+        AllocateGpuFuncOutputs(validateCacheFunction, computeOutputSpec.Fields, totalThreadCountExpr);
         if (graph.DebugEnabled) {
           validateCacheFunction.AddStatement($"const std::string& debugOutputTextureKey = DebugGetOutputTextureKey();");
           validateCacheFunction.AddStatement($"int debugOutputNodeIndex = -1;");

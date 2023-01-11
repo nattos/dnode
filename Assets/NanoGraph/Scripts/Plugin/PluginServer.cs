@@ -285,6 +285,8 @@ namespace NanoGraph.Plugin {
             return;
           }
         }
+      } catch (Exception e) {
+        UnityEngine.Debug.LogException(e);
       } finally {
         lock (_commandQueueLock)
         lock (_terminatedLock) {

@@ -231,7 +231,7 @@ namespace NanoGraph.VisualScripting {
           RemoveLiteralNode(entry);
           continue;
         }
-        bool isConnected = inputPort.connections.Any();
+        bool isConnected = inputPort.connections.Any(connection => GetSourceBaseNodeOrNull(connection.source.unit, connection.source.key, out _) != null);
         if (isConnected) {
           RemoveLiteralNode(entry);
           continue;
@@ -265,7 +265,9 @@ namespace NanoGraph.VisualScripting {
       foreach (var output in outputs) {
         foreach (var connection in output.connections) {
           if (connection.destination.unit is GraphOutput graphOutput) {
-            isOutputNode = true;
+            if (GetSubgraphUnit(graphOutput.graph) == null) {
+              isOutputNode = true;
+            }
             break;
           }
         }
@@ -347,17 +349,29 @@ namespace NanoGraph.VisualScripting {
 
     public static void MapSubgraphUnit(SubgraphUnit subgraphUnit) {
       FlowGraph graph = subgraphUnit.nest.graph;
+      bool hadEntry = false;
       bool sweepNulls = false;
       foreach ((WeakReference graphRef, SubgraphUnit unitEntry) in _weakNestedGraphs) {
         if (graphRef.Target is FlowGraph graphEntry) {
           if (graphEntry == graph) {
+            hadEntry = true;
             break;
           }
         } else {
           sweepNulls = true;
         }
       }
-      _weakNestedGraphs.Add((new WeakReference(graph), subgraphUnit));
+      if (!hadEntry) {
+        _weakNestedGraphs.Add((new WeakReference(graph), subgraphUnit));
+        foreach (IUnit unit in graph.units) {
+          if (unit is SubgraphUnit child) {
+            MapSubgraphUnit(child);
+          } else if (unit is BaseNode baseNode) {
+            baseNode.EnsureNode();
+            baseNode.SyncInputConnectionsToGraphEdges();
+          }
+        }
+      }
       if (sweepNulls) {
         _weakNestedGraphs.RemoveAll(entry => !entry.Item1.IsAlive);
       }

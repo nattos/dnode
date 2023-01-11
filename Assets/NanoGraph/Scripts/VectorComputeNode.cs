@@ -14,14 +14,34 @@ namespace NanoGraph {
     // TODO: Support multiple buffer modes.
     public override INanoCodeContext CodeContext => NanoProgram.GpuContext;
 
-    public override DataSpec ComputeInputSpec => base.ComputeInputSpec;
-    public override DataSpec InputSpec => DataSpec.ExtendWithFields(ThreadCountFields, base.InputSpec);
+    [EditableAttribute]
+    public BasicOutputType OutputType = BasicOutputType.Custom;
+    protected override string ShortNamePart => $"{OutputType}VectorCompute";
 
-    public override DataSpec OutputSpec {
+    [EditableAttribute]
+    public TypeDeclBuilder Fields = new TypeDeclBuilder();
+
+    protected override PrimitiveType? SingleFieldModeType => OutputType.ToPrimitiveTypeOrNull();
+    protected override bool RequiresTypeDeclInput => OutputType == BasicOutputType.Fields ? false : base.RequiresTypeDeclInput;
+
+    public override TypeField[] InputOutputTypeFields {
       get {
-        return DataSpec.FromFields(DataField.MakeType("Out", TypeSpec.MakeArray(TypeSpec.MakeType(new TypeDecl(OutputTypeFields.ToArray())))));
+        if (OutputType == BasicOutputType.Fields) {
+          return Fields?.AsTypeFields() ?? Array.Empty<TypeField>();
+        }
+        return base.InputOutputTypeFields;
       }
     }
+
+    public override DataSpec ComputeInputSpec => base.ComputeInputSpec;
+    public override DataSpec InputSpec => DataSpec.ExtendWithFields(ThreadCountFields, base.InputSpec);
+    protected override bool ForceOutputIsArray => true;
+
+    // public override DataSpec OutputSpec {
+    //   get {
+    //     return DataSpec.FromFields(DataField.MakeType("Out", TypeSpec.MakeArray(TypeSpec.MakeType(new TypeDecl(OutputTypeFields.ToArray())))));
+    //   }
+    // }
 
     public DataField[] ThreadCountFields {
       get {
@@ -77,29 +97,82 @@ namespace NanoGraph {
       public override void EmitFunctionReturn(out CodeCachedResult? result) {
         // Store results.
         this.codeCachedResult = new CodeCachedResult { ResultType = resultType, Result = new CodeLocal { Identifier = cachedResult.Identifier, Type = resultTypeSpec } };
+        result = codeCachedResult;
 
-        // TODO: Map inputs to outputs somehow.
-        for (int i = 0; i < computeOutputSpec.Fields.Count; ++i) {
-          var field = computeOutputSpec.Fields[i];
-          if (field.IsCompileTimeOnly) {
-            continue;
+        switch (Node.OutputPortsMode) {
+          case FieldPortsMode.Combined: {
+            DataField outField = computeOutputSpec.Fields.First(field => field.Name == "Out");
+            NanoProgramType outResultType = program.GetProgramType(outField.Type).ElementType;
+            string returnLocal = func.AllocLocal("Return");
+            func.AddStatement($"{func.GetTypeIdentifier(outResultType)} {returnLocal};");
+            TypeField[] outputFields = Node.OutputTypeFields;
+            foreach (var field in outputFields) {
+              string inputExpr;
+              switch (Node.InputPortsMode) {
+                case FieldPortsMode.Combined: {
+                  var edge = graph.GetEdgeToDestinationOrNull(computeNode, "Out");
+                  if (edge == null) {
+                    continue;
+                  }
+                  CodeLocal? inputLocal = resultLocalMap.GetOrNull(edge.Source);
+                  if (inputLocal == null) {
+                    NanoGraph.CurrentGenerateState.AddError($"Input {field.Name} for {computeNode} is not defined.");
+                    continue;
+                  }
+                  NanoProgramType programInType = program.GetProgramType(inputLocal.Value.Type);
+                  if (Node.IsArray) {
+                    inputExpr = $"{inputLocal.Value.Identifier}";
+                  } else {
+                    inputExpr = $"{inputLocal.Value.Identifier}.{programInType.GetField(field.Name)}";
+                  }
+                  break;
+                }
+                default:
+                case FieldPortsMode.Individual: {
+                  var edge = graph.GetEdgeToDestinationOrNull(computeNode, field.Name);
+                  if (edge == null) {
+                    continue;
+                  }
+                  CodeLocal? inputLocal = resultLocalMap.GetOrNull(edge.Source);
+                  if (inputLocal == null) {
+                    NanoGraph.CurrentGenerateState.AddError($"Input {field.Name} for {computeNode} is not defined.");
+                    continue;
+                  }
+                  inputExpr = inputLocal.Value.Identifier;
+                  break;
+                }
+              }
+              string outputExpr = $"{returnLocal}.{outResultType.GetField(field.Name)}";
+              func.AddStatement($"{outputExpr} = {inputExpr};");
+            }
+            func.AddStatement($"{func.Context.EmitWriteBuffer($"output{0}", func.Context.EmitThreadId(), returnLocal)};");
+            break;
           }
-          var edge = graph.GetEdgeToDestinationOrNull(computeNode, field.Name);
-          if (edge == null) {
-            continue;
-          }
-          CodeLocal? inputLocal = resultLocalMap.GetOrNull(edge.Source);
-          if (inputLocal == null) {
-            NanoGraph.CurrentGenerateState.AddError($"Input {field.Name} for {computeNode} is not defined.");
-            continue;
-          }
-          if (field.Type.IsArray) {
-            func.AddStatement($"{func.Context.EmitWriteBuffer($"output{i}", func.Context.EmitThreadId(), inputLocal?.Identifier)};");
-          } else {
-            func.AddStatement($"output{i} = {inputLocal?.Identifier};");
+          default:
+          case FieldPortsMode.Individual: {
+            for (int i = 0; i < computeOutputSpec.Fields.Count; ++i) {
+              var field = computeOutputSpec.Fields[i];
+              if (field.IsCompileTimeOnly) {
+                continue;
+              }
+              var edge = graph.GetEdgeToDestinationOrNull(computeNode, field.Name);
+              if (edge == null) {
+                continue;
+              }
+              CodeLocal? inputLocal = resultLocalMap.GetOrNull(edge.Source);
+              if (inputLocal == null) {
+                NanoGraph.CurrentGenerateState.AddError($"Input {field.Name} for {computeNode} is not defined.");
+                continue;
+              }
+              if (field.Type.IsArray) {
+                func.AddStatement($"{func.Context.EmitWriteBuffer($"output{i}", func.Context.EmitThreadId(), inputLocal?.Identifier)};");
+              } else {
+                func.AddStatement($"output{i} = {inputLocal?.Identifier};");
+              }
+            }
+            break;
           }
         }
-        result = codeCachedResult;
       }
 
       private string EmitThreadCountExpr() {
@@ -132,6 +205,10 @@ namespace NanoGraph {
         string pipelineStateIdentifier = program.AddInstanceField(program.MTLComputePipelineStateType, $"{computeNode.ShortName}_GpuPipeline");
 
         // Sync buffers to GPU.
+        string threadCountLocal = validateCacheFunction.AllocLocal("ThreadCount");
+        validateCacheFunction.AddStatement($"{NanoProgram.IntIdentifier} {threadCountLocal} = {EmitThreadCountExpr()};");
+        string threadCountExpr = threadCountLocal;
+        AllocateGpuFuncOutputs(validateCacheFunction, computeOutputSpec.Fields, threadCountExpr);
         EmitSyncBuffersToGpu(validateCacheFunction, cachedResult, gpuInputBuffers, gpuOutputBuffers);
         validateCacheFunction.AddStatement($"id<MTLComputeCommandEncoder> encoder = [GetCurrentCommandBuffer() computeCommandEncoder];");
         validateCacheFunction.AddStatement($"[encoder setComputePipelineState:{pipelineStateIdentifier}];");
@@ -139,7 +216,7 @@ namespace NanoGraph {
         EmitBindBuffers(validateCacheFunction, cachedResult, gpuInputBuffers, gpuOutputBuffers);
 
         // Run command queue.
-        validateCacheFunction.AddStatement($"MTLSize batchSize = {{ (NSUInteger)({EmitThreadCountExpr()}), 1, 1 }};");
+        validateCacheFunction.AddStatement($"MTLSize batchSize = {{ (NSUInteger)({threadCountExpr}), 1, 1 }};");
         validateCacheFunction.AddStatement($"MTLSize threadgroupSize = {{ {pipelineStateIdentifier}.maxTotalThreadsPerThreadgroup, 1, 1 }};");
         validateCacheFunction.AddStatement($"[encoder dispatchThreads:batchSize threadsPerThreadgroup:threadgroupSize];");
         validateCacheFunction.AddStatement($"[encoder endEncoding];");

@@ -864,7 +864,7 @@ namespace NanoGraph {
         context.Function.AddStatement($"for ({NanoProgram.IntIdentifier} {indexLocal} = 0; {indexLocal} < {inputLengthLocal}; ++{indexLocal}) {{");
         foreach (var field in typeFields) {
           CodeLocal outputLocal = context.OutputLocals[index++];
-          string inputField = field.Type.Primitive != null ? field.Name : inputType.GetField(field.Name);
+          string inputField = inputType.ElementType.IsBuiltIn ? field.Name : inputType.GetField(field.Name);
           string inputExpr = $"{context.Function.Context.EmitSampleBuffer(inputLocal.Identifier, indexLocal)}.{inputField}";
           context.Function.AddStatement($"  {context.Function.Context.EmitWriteBuffer(outputLocal.Identifier, indexLocal, inputExpr)};");
         }
@@ -874,7 +874,7 @@ namespace NanoGraph {
         foreach (var field in typeFields) {
           CodeLocal outputLocal = context.OutputLocals[index++];
           string outputTypeIdentifier = context.Function.GetTypeIdentifier(field.Type);
-          string inputField = field.Type.Primitive != null ? field.Name : inputType.GetField(field.Name);
+          string inputField = inputType.IsBuiltIn ? field.Name : inputType.GetField(field.Name);
           context.Function.AddStatement($"{outputTypeIdentifier} {outputLocal.Identifier} = {inputLocal.Identifier}.{inputField};");
         }
       }

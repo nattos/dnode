@@ -43,6 +43,8 @@ namespace NanoGraph {
     public FieldPortsMode InputPortsMode = FieldPortsMode.Individual;
     [EditableAttribute]
     public FieldPortsMode OutputPortsMode = FieldPortsMode.Individual;
+    [EditableAttribute]
+    public bool IsArray = false;
 
     public TypeDeclMode TypeDeclMode = TypeDeclMode.External;
     public TypeDecl InternalType;
@@ -54,16 +56,23 @@ namespace NanoGraph {
     public virtual DataSpec ComputeInputSpec => DataSpec.ExtendWithFields(TypeDeclFields, GetInputOutputDataSpec(FieldPortsMode.Combined, InputTypeFields));
     public virtual DataSpec ComputeOutputSpec => OutputSpec;
     public override DataSpec InputSpec => DataSpec.ExtendWithFields(TypeDeclFields, GetInputOutputDataSpec(InputPortsMode, InputTypeFields));
-    public override DataSpec OutputSpec => GetInputOutputDataSpec(OutputPortsMode, OutputTypeFields);
+    public override DataSpec OutputSpec => GetInputOutputDataSpec(OutputPortsMode, OutputTypeFields, ForceOutputIsArray);
+    protected virtual bool ForceOutputIsArray => false;
 
-    private DataSpec GetInputOutputDataSpec(FieldPortsMode fieldsMode, TypeField[] fields) {
+    private DataSpec GetInputOutputDataSpec(FieldPortsMode fieldsMode, TypeField[] fields, bool forceIsArray = false) {
       switch (fieldsMode) {
         case FieldPortsMode.Combined:
         default:
-          return DataSpec.FromFields(DataField.MakeType("Out", TypeSpec.MakeType(new TypeDecl(fields))));
+          return DataSpec.FromTypeFields(TypeFieldsToArray(new[] { TypeField.MakeType("Out", TypeSpec.MakeType(new TypeDecl(fields))) }, IsArray || forceIsArray));
         case FieldPortsMode.Individual:
-          return DataSpec.FromTypeFields(fields);
+          return DataSpec.FromTypeFields(TypeFieldsToArray(fields, IsArray || forceIsArray));
       }
+    }
+    private static TypeField[] TypeFieldsToArray(TypeField[] fields, bool isArray) {
+      if (isArray) {
+        fields = fields.Select(field => TypeField.ToArray(field, true)).ToArray();
+      }
+      return fields;
     }
 
     protected DataField[] TypeDeclFields => !RequiresTypeDeclInput ? Array.Empty<DataField>() : new[] { new DataField { Name = "TypeDecl", IsCompileTimeOnly = true, Type = TypeSpec.MakePrimitive(PrimitiveType.TypeDecl) } };
@@ -373,6 +382,22 @@ namespace NanoGraph {
         }
         func.AddParam(modifiers, fieldType, paramName, suffix, new NanoParameterOptions { IsConst = !isReadWrite, IsReference = isReference });
         bufferIndex++;
+      }
+
+      protected void AllocateGpuFuncOutputs(NanoFunction func, IEnumerable<DataField> fields, string lengthExpr) {
+        foreach (var field in fields) {
+          if (field.IsCompileTimeOnly) {
+            continue;
+          }
+          if (!field.Type.IsArray) {
+            continue;
+          }
+          func.AddStatement($"if (!{cachedResult.Identifier}.{resultType.GetField(field.Name)}) {{");
+          func.AddStatement($"  {cachedResult.Identifier}.{resultType.GetField(field.Name)}.reset(NanoTypedBuffer<{func.GetElementTypeIdentifier(field.Type)}>::Allocate({lengthExpr}));");
+          func.AddStatement($"}} else {{");
+          func.AddStatement($"  {cachedResult.Identifier}.{resultType.GetField(field.Name)}->Resize({lengthExpr});");
+          func.AddStatement($"}}");
+        }
       }
 
       protected static void AddGpuFuncOutputs(NanoFunction func, IEnumerable<DataField> fields, List<NanoGpuBufferRef> gpuOutputBuffers, ref int bufferIndex) {

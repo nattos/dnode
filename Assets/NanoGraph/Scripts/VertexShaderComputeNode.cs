@@ -5,10 +5,23 @@ using System.Linq;
 using UnityEngine;
 
 namespace NanoGraph {
+  public enum GeometryType {
+    Point,
+    Line,
+    LineStrip,
+    Triangle,
+    TriangleStrip,
+  }
+
   // A vertex shader requires exactly one input compute dependency, and it must be on an array input.
   // TODO: Allow vertex shaders to depend on other parameters (ie. as constants).
   public class VertexShaderComputeNode : ComputeNode {
     public override INanoCodeContext CodeContext => NanoProgram.GpuContext;
+
+    [EditableAttribute]
+    public GeometryType GeometryType = GeometryType.Triangle;
+    [EditableAttribute]
+    public int VertexMultiplier = 1;
 
     public override DataSpec OutputSpec {
       get {
@@ -46,26 +59,45 @@ namespace NanoGraph {
       public override void EmitFunctionReturn(out CodeCachedResult? result) {
         string returnLocal = func.AllocLocal("Return");
         func.AddStatement($"{func.GetTypeIdentifier(resultType)} {returnLocal};");
-        foreach (var field in computeOutputSpec.Fields) {
-          if (field.IsCompileTimeOnly) {
-            continue;
+        switch (Node.InputPortsMode) {
+          case FieldPortsMode.Combined: {
+            var edge = graph.GetEdgeToDestinationOrNull(computeNode, "Out");
+            if (edge == null) {
+              break;
+            }
+            CodeLocal? inputLocal = resultLocalMap.GetOrNull(edge.Source);
+            if (inputLocal == null) {
+              NanoGraph.CurrentGenerateState.AddError($"Input Out for {computeNode} is not defined.");
+              break;
+            }
+            func.AddStatement($"{returnLocal} = {inputLocal.Value.Identifier};");
+            break;
           }
-          var edge = graph.GetEdgeToDestinationOrNull(computeNode, field.Name);
-          if (edge == null) {
-            continue;
-          }
-          CodeLocal? inputLocal = resultLocalMap.GetOrNull(edge.Source);
-          if (inputLocal == null) {
-            NanoGraph.CurrentGenerateState.AddError($"Input {field.Name} for {computeNode} is not defined.");
-            continue;
-          }
-          func.AddStatement($"{returnLocal}.{resultType.GetField(field.Name)} = {func.EmitConvert(inputLocal.Value.Type, field.Type, inputLocal?.Identifier)};");
-          // For the output position, override the conversion logic to float4. For positions, the
-          // w component should default to 1.0 otherwise it can get culled.
-          if (field.Type.Primitive == PrimitiveType.Float4 &&
-              field.Attributes.Contains("[[position]]") &&
-              func.RequiresConvert(inputLocal.Value.Type, field.Type)) {
-            func.AddStatement($"{returnLocal}.{resultType.GetField(field.Name)}.w = {func.EmitLiteral(1.0f)};");
+          default:
+          case FieldPortsMode.Individual: {
+            foreach (var field in computeOutputSpec.Fields) {
+              if (field.IsCompileTimeOnly) {
+                continue;
+              }
+              var edge = graph.GetEdgeToDestinationOrNull(computeNode, field.Name);
+              if (edge == null) {
+                continue;
+              }
+              CodeLocal? inputLocal = resultLocalMap.GetOrNull(edge.Source);
+              if (inputLocal == null) {
+                NanoGraph.CurrentGenerateState.AddError($"Input {field.Name} for {computeNode} is not defined.");
+                continue;
+              }
+              func.AddStatement($"{returnLocal}.{resultType.GetField(field.Name)} = {func.EmitConvert(inputLocal.Value.Type, field.Type, inputLocal?.Identifier)};");
+              // For the output position, override the conversion logic to float4. For positions, the
+              // w component should default to 1.0 otherwise it can get culled.
+              if (field.Type.Primitive == PrimitiveType.Float4 &&
+                  field.Attributes.Contains("[[position]]") &&
+                  func.RequiresConvert(inputLocal.Value.Type, field.Type)) {
+                func.AddStatement($"{returnLocal}.{resultType.GetField(field.Name)}.w = {func.EmitLiteral(1.0f)};");
+              }
+            }
+            break;
           }
         }
         func.AddStatement($"return {returnLocal};");

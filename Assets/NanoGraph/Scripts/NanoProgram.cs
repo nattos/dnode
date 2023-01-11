@@ -22,6 +22,7 @@ namespace NanoGraph {
   public interface INanoCodeContext {
     string EmitBufferType(NanoProgramType type);
     string EmitWritableBufferType(NanoProgramType type);
+    string EmitMove(string source);
     string EmitSampleBuffer(string source, string index);
     string EmitSampleTexture(string source, string index, TextureFilterMode filterMode, TextureWrapMode wrapMode);
     string EmitWriteBuffer(string destination, string index, string value);
@@ -32,11 +33,12 @@ namespace NanoGraph {
   public class NanoCpuContext : INanoCodeContext {
     public string EmitBufferType(NanoProgramType type) => $"std::shared_ptr<NanoTypedBuffer<{type.EmitIdentifier(this)}>>";
     public string EmitWritableBufferType(NanoProgramType type) => $"std::shared_ptr<NanoTypedBuffer<{type.EmitIdentifier(this)}>>";
+    public string EmitMove(string source) => $"std::move({source})";
     public string EmitSampleBuffer(string source, string index) => $"SampleBuffer({source}, {index})";
     public string EmitSampleTexture(string source, string index, TextureFilterMode filterMode, TextureWrapMode wrapMode) => $"SampleTexture({source}, {index})"; // TODO: Invalid.
     public string EmitWriteBuffer(string destination, string index, string value) => $"WriteBuffer({destination}, {index}, {value})";
     public string EmitFunctionInput(NanoProgram program, CodeLocal cachedResult, string fieldName, int index) => $"{cachedResult.Identifier}.{program.GetProgramType(cachedResult.Type).GetField(fieldName)}";
-    public string EmitThreadId() => throw new NotSupportedException();
+    public string EmitThreadId() { NanoGraph.CurrentGenerateState.AddError("Thread ID is undefined in CPU contexts."); return ""; }
   }
 
   public struct NanoGpuBufferRef {
@@ -50,6 +52,7 @@ namespace NanoGraph {
   public class NanoGpuContext : INanoCodeContext {
     public string EmitBufferType(NanoProgramType type) => $"device const {type.EmitIdentifier(this)}*";
     public string EmitWritableBufferType(NanoProgramType type) => $"device {type.EmitIdentifier(this)}*";
+    public string EmitMove(string source) => $"move({source})";
     public string EmitSampleBuffer(string source, string index) => $"SampleBuffer({source}, {index})";
     public string EmitSampleTexture(string source, string index, TextureFilterMode filterMode, TextureWrapMode wrapMode) => $"SampleTexture<{TextureFilterModeToMetal(filterMode)}, {TextureWrapModeToMetal(wrapMode)}>({source}, {index})";
     public string EmitWriteBuffer(string destination, string index, string value) => $"WriteBuffer({destination}, {index}, {value})";
@@ -327,7 +330,8 @@ namespace NanoGraph {
         }
         // Note: Doesn't work on GPU.
         if (Context is NanoGpuContext) {
-          throw new NotSupportedException();
+          NanoGraph.CurrentGenerateState.AddError($"Cannot ConvertArray<{fromType.Identifier}, {fromType.Identifier}>({expr}) on GPU");
+          return "";
         }
         return $"ConvertArray<{fromElementType.Identifier}, {toElementType.Identifier}>({expr})";
       }
@@ -337,7 +341,8 @@ namespace NanoGraph {
       if (fromType.IsBuiltIn && toType.IsBuiltIn) {
         return $"Convert<{GetTypeIdentifier(fromType)}, {GetTypeIdentifier(toType)}>({expr})";
       }
-      throw new NotSupportedException();
+      NanoGraph.CurrentGenerateState.AddError($"Cannot Convert<{fromType.Identifier}, {fromType.Identifier}>({expr})");
+      return "";
     }
   }
 

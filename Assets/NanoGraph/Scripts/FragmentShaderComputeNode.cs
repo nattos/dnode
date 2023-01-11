@@ -145,6 +145,21 @@ namespace NanoGraph {
         string renderPassDescriptorIdentifier = program.AddInstanceField(program.MTLRenderPassDescriptor, $"{computeNode.ShortName}_RenderPassDescriptor");
         string renderTargetIdentifier = program.AddInstanceField(program.Texture, $"{computeNode.ShortName}_RenderTarget");
 
+        // Identify which vertex shader is the input.
+        VertexShaderComputeNode vertexNode = this.vertexNode;
+        VertexShaderComputeNode.EmitterGpu vertexOp = this.vertexOp;
+        if (vertexNode == null || vertexOp == null) {
+          return;
+        }
+        FragmentShaderComputeNode fragmentNode = Node;
+        FragmentShaderComputeNode.EmitterGpu fragmentOp = this;
+        NanoFunction vertexFunc = vertexOp.func;
+        NanoFunction fragmentFunc = fragmentOp.func;
+        IReadOnlyList<NanoGpuBufferRef> gpuVertexInputBuffers = vertexOp.gpuInputBuffers;
+        IReadOnlyList<NanoGpuBufferRef> gpuFragmentInputBuffers = fragmentOp.gpuInputBuffers;
+
+        validateCacheFunction.AddStatement($"{vertexOp.validateCacheFunction.Identifier}();");
+
         int sizeNumerator;
         int sizeDenominator;
         switch (Node.SizeMultiplier) {
@@ -181,19 +196,6 @@ namespace NanoGraph {
         string gridSizeXExpr = gridSizeXLocal;
         string gridSizeYExpr = gridSizeYLocal;
 
-        // Identify which vertex shader is the input.
-        VertexShaderComputeNode vertexNode = this.vertexNode;
-        VertexShaderComputeNode.EmitterGpu vertexOp = this.vertexOp;
-        if (vertexNode == null || vertexOp == null) {
-          return;
-        }
-        FragmentShaderComputeNode fragmentNode = Node;
-        FragmentShaderComputeNode.EmitterGpu fragmentOp = this;
-        NanoFunction vertexFunc = vertexOp.func;
-        NanoFunction fragmentFunc = fragmentOp.func;
-        IReadOnlyList<NanoGpuBufferRef> gpuVertexInputBuffers = vertexOp.gpuInputBuffers;
-        IReadOnlyList<NanoGpuBufferRef> gpuFragmentInputBuffers = fragmentOp.gpuInputBuffers;
-
         // Count number of input vertices.
         string vertexCountLocal = validateCacheFunction.AllocLocal("VertexCount");
         string vertexCountExpr;
@@ -203,11 +205,12 @@ namespace NanoGraph {
           NanoGraph.CurrentGenerateState.AddError($"Cannot determine the number of vertices for {fragmentNode}. Its vertex shader should have an array input.");
           return;
         }
-        vertexCountExpr = $"GetLength({primaryVertexBuffer.Expression})";
+        vertexCountExpr = $"GetLength({primaryVertexBuffer.Expression}) * {validateCacheFunction.EmitLiteral(vertexNode.VertexMultiplier)}";
 
         // Set up render target if necessary.
         // TODO: Allow configuration of texture sizes.
-        validateCacheFunction.AddStatement($"{renderTargetIdentifier} = ResizeTexture({renderTargetIdentifier}, {gridSizeXExpr}, {gridSizeYExpr}, {NanoGpuContext.BitDepthToMetal(graph.GetTextureBitDepth(Node.BitDepth))});");
+        string bitDepthExpr = NanoGpuContext.BitDepthToMetal(graph.GetTextureBitDepth(Node.BitDepth));
+        validateCacheFunction.AddStatement($"{renderTargetIdentifier} = ResizeTexture({renderTargetIdentifier}, {gridSizeXExpr}, {gridSizeYExpr}, {bitDepthExpr});");
         string outputTextureExpr = renderTargetIdentifier;
 
         // Sync buffers to GPU.
@@ -228,7 +231,26 @@ namespace NanoGraph {
         EmitBindBuffers(validateCacheFunction, gpuFragmentInputBuffers, variant: "Fragment");
 
         // Draw primitives.
-        validateCacheFunction.AddStatement($"[encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:(uint)({vertexCountLocal})];");
+        string primitiveTypeExpr;
+        switch (vertexNode.GeometryType) {
+          case GeometryType.Point:
+            primitiveTypeExpr = "MTLPrimitiveTypePoint";
+            break;
+          case GeometryType.Line:
+            primitiveTypeExpr = "MTLPrimitiveTypeLine";
+            break;
+          case GeometryType.LineStrip:
+            primitiveTypeExpr = "MTLPrimitiveTypeLineStrip";
+            break;
+          case GeometryType.Triangle:
+          default:
+            primitiveTypeExpr = "MTLPrimitiveTypeTriangle";
+            break;
+          case GeometryType.TriangleStrip:
+            primitiveTypeExpr = "MTLPrimitiveTypeTriangleStrip";
+            break;
+        }
+        validateCacheFunction.AddStatement($"[encoder drawPrimitives:{primitiveTypeExpr} vertexStart:0 vertexCount:(uint)({vertexCountLocal})];");
         validateCacheFunction.AddStatement($"[encoder endEncoding];");
 
         // Store the result.
@@ -242,7 +264,7 @@ namespace NanoGraph {
         createPipelinesFunction.AddStatement($"  pipelineStateDescriptor.label = @\"{computeNode.ShortName}\";");
         createPipelinesFunction.AddStatement($"  pipelineStateDescriptor.vertexFunction = vertexFunction;");
         createPipelinesFunction.AddStatement($"  pipelineStateDescriptor.fragmentFunction = fragmentFunction;");
-        createPipelinesFunction.AddStatement($"  pipelineStateDescriptor.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;");
+        createPipelinesFunction.AddStatement($"  pipelineStateDescriptor.colorAttachments[0].pixelFormat = {bitDepthExpr};");
         createPipelinesFunction.AddStatement($"  {pipelineStateIdentifier} = [device newRenderPipelineStateWithDescriptor:pipelineStateDescriptor error:&error];");
         createPipelinesFunction.AddStatement($"  MTLRenderPassDescriptor* renderPassDescriptor = [MTLRenderPassDescriptor new];");
         createPipelinesFunction.AddStatement($"  renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 0);");

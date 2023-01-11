@@ -176,6 +176,11 @@ namespace NanoGraph {
             }
           };
         }
+        if (GUILayout.Button("Compile")) {
+          EditorApplication.delayCall += () => {
+            NanoGraph.DebugInstance?.CompileLater();
+          };
+        }
         Input = EditorGUILayout.ToggleLeft("Show Input", Input);
         Locked = EditorGUILayout.ToggleLeft("Locked", Locked);
         EditorGUILayout.Space(0, expand: true);

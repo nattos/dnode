@@ -50,7 +50,7 @@ namespace NanoGraph {
       }
       node.Graph = null;
       DataEdge[] inputEdges = GetInputEdges(node);
-      DataEdge[] outputEdges = GetInputEdges(node);
+      DataEdge[] outputEdges = GetOutputEdges(node);
       foreach (var edge in inputEdges.Concat(outputEdges)) {
         Disconnect(edge.Source.Node, edge.Source.FieldName, edge.Destination.Node, edge.Destination.FieldName);
       }
@@ -485,7 +485,7 @@ namespace NanoGraph {
         if (hasConditions) {
           // Copy results into temps vars.
           foreach ((string outer, string inner) in conditionalOutputs) {
-            context.Function.AddStatement($"  {outer} = std::move({inner});");
+            context.Function.AddStatement($"  {outer} = {context.Function.Context.EmitMove(inner)};");
           }
           context.Function.AddStatement($"}}");
         }
@@ -498,6 +498,8 @@ namespace NanoGraph {
       public CodeGeneratorFromCodeNode(ICodeNode node) {
         Node = node;
       }
+
+      public override string ToString() => Node?.ToString();
 
       public IDataNode SourceNode => Node;
       public DataSpec InputSpec => Node.InputSpec;
@@ -552,6 +554,8 @@ namespace NanoGraph {
         Node = node;
         Root = root;
       }
+
+      public override string ToString() => Node?.ToString();
 
       public void SetInput(CodeCachedResult inputResult, IComputeNodeEmitCodeOperation operation) {
         InputResult = inputResult;
@@ -765,7 +769,9 @@ namespace NanoGraph {
       }
 
       string conditionGroupsStr = string.Join("\n", conditionGroups.Select(entry => $"{entry.Key} : {{\n{string.Join("\n", entry.Value)}\n}}"));
-      Debug.Log($"Condition Groups:\n{conditionGroupsStr}");
+      if (DebugVerbose) {
+        Debug.Log($"Condition Groups:\n{conditionGroupsStr}");
+      }
 
       (IDataNode node, bool isPreamble)[] rawOrder = DepthFirstTraversal<(IDataNode node, bool branch)>((root, false), entry => {
         IEnumerable<(IDataNode, bool)> result = Enumerable.Empty<(IDataNode, bool)>();
@@ -789,7 +795,9 @@ namespace NanoGraph {
         }
         return $"  {node}{conditionStr}";
       }));
-      Debug.Log($"Raw Order: [\n{rawOrderStr}\n]");
+      if (DebugVerbose) {
+        Debug.Log($"Raw Order: [\n{rawOrderStr}\n]");
+      }
 
 
       Dictionary<IDataNode, ICodeGenerator> generators = new Dictionary<IDataNode, ICodeGenerator>();
@@ -895,10 +903,11 @@ namespace NanoGraph {
 
     public class GenerateState {
       public void AddError(string message) {
-        Errors.Add((CurrentNode, message));
+        Errors.Add((DeepestNode ?? CurrentNode, message));
       }
 
       public IDataNode CurrentNode;
+      public IDataNode DeepestNode;
       public List<(IDataNode node, string message)> Errors = new List<(IDataNode node, string message)>();
     }
 
@@ -922,16 +931,44 @@ namespace NanoGraph {
       }
     }
 
+    private struct GenerateNodeScope : IDisposable {
+      public Stack<IDataNode> GenerateNodeStack;
+      public GenerateState GenerateState;
+      public IDataNode Node;
+
+      public void Push() {
+        if (Node == null) {
+          return;
+        }
+        GenerateNodeStack.Push(Node);
+        GenerateState.CurrentNode = Node;
+        GenerateState.DeepestNode = Node;
+      }
+
+      public void Pop() {
+        if (Node == null) {
+          return;
+        }
+        GenerateNodeStack.Pop();
+        GenerateNodeStack.TryPeek(out IDataNode top);
+        GenerateState.CurrentNode = top;
+        Node = null;
+      }
+
+      public void Dispose() {
+        Pop();
+      }
+    }
+
     private void GenerateProgramInner(IReadOnlyList<IComputeNode> outputNodes, GenerateState generateState) {
       Stack<IDataNode> generateNodeStack = new Stack<IDataNode>();
-      void PushGenerateNode(IDataNode node) {
-        generateNodeStack.Push(node);
-        generateState.CurrentNode = node;
+      GenerateNodeScope NewGenerateNodeScope(IDataNode node) {
+        GenerateNodeScope scope = new GenerateNodeScope { Node = node, GenerateNodeStack = generateNodeStack, GenerateState = generateState };
+        scope.Push();
+        return scope;
       }
-      void PopGenerateNode() {
-        generateNodeStack.Pop();
-        generateNodeStack.TryPeek(out IDataNode top);
-        generateState.CurrentNode = top;
+      void MarkGenerateNodeScopeExited() {
+        generateState.DeepestNode = generateState.CurrentNode;
       }
 
       var program = new NanoProgram(EffectName);
@@ -986,8 +1023,7 @@ namespace NanoGraph {
       // Traverse graph of compute nodes and generate a plan for each.
       Dictionary<IComputeNode, ComputePlan> computePlanMap = new Dictionary<IComputeNode, ComputePlan>();
       while (queuedCalcNodes.TryDequeue(out IComputeNode node)) {
-        PushGenerateNode(node);
-        try {
+        using (NewGenerateNodeScope(node)) {
           List<CodeGeneratorFromComputeNode> dependentComputeNodes = new List<CodeGeneratorFromComputeNode>();
           List<DataPlug> dependentComputeInputs = new List<DataPlug>();
           List<(ICodeGenerator, bool)> computePlan = GenerateComputePlan(node, dependentComputeNodes, dependentComputeInputs);
@@ -1006,9 +1042,8 @@ namespace NanoGraph {
           foreach (var dependency in dependentComputeNodes) {
             QueueComputeNode(dependency.Node);
           }
-        } finally {
-          PopGenerateNode();
         }
+        MarkGenerateNodeScopeExited();
       }
 
       // List out plans in dependency order.
@@ -1027,8 +1062,7 @@ namespace NanoGraph {
         var computePlan = plan.Generators;
         var dependentComputeNodes = plan.DependentComputeNodes;
         var dependentComputeInputs = plan.DependentComputeInputs;
-        PushGenerateNode(computeNode);
-        try {
+        using (NewGenerateNodeScope(computeNode)) {
           // Read inputs.
           var dependentComputeNodeResults = new List<ComputeNodeResultEntry>();
           foreach (var dependency in dependentComputeNodes) {
@@ -1102,12 +1136,11 @@ namespace NanoGraph {
           // Emit the meat of the function.
           Dictionary<ICodeGenerator, CodeLocal[]> cachedNodePreambleInputLocals = new Dictionary<ICodeGenerator, CodeLocal[]>();
           foreach ((ICodeGenerator codeGenerator, bool isPreamble) in computePlan) {
-            PushGenerateNode(codeGenerator.SourceNode);
-            try {
+            using (NewGenerateNodeScope(codeGenerator.SourceNode)) {
               DataSpec inputSpec = codeGenerator.InputSpec;
               var cachedPreambleInputLocals = cachedNodePreambleInputLocals.GetOrDefault(codeGenerator);
               CodeLocal[] inputLocals = GetInputLocals(codeGenerator.SourceNode, inputSpec, cachedPreambleInputLocals);
-              if (isPreamble) {
+              if (!cachedNodePreambleInputLocals.ContainsKey(codeGenerator)) {
                 cachedNodePreambleInputLocals[codeGenerator] = inputLocals;
               }
 
@@ -1213,16 +1246,14 @@ namespace NanoGraph {
                   getDebugValuesFunction.AddStatement($"debugValues.push_back(DebugValue {{ .Key = {getDebugValuesFunction.EmitLiteral(debugValueKey)}, .Length = {valueLengthExpr}, .Value = {debugIdentifier} }});");
                 }
               }
-            } finally {
-              PopGenerateNode();
             }
+            MarkGenerateNodeScopeExited();
           }
 
           var splitComputeDependencies = dependentComputeNodes.Where(dependency => dependency.SourceNode is ISplitComputeNode).ToArray();
           foreach (var dependency in splitComputeDependencies) {
             ISplitComputeNode splitComputeNode = dependency.SourceNode as ISplitComputeNode;
-            PushGenerateNode(splitComputeNode);
-            try {
+            using (NewGenerateNodeScope(splitComputeNode)) {
               if (dependency.Operation == null) {
                 CurrentGenerateState.AddError($"Node {splitComputeNode} is not ready.");
                 continue;
@@ -1238,9 +1269,8 @@ namespace NanoGraph {
                 InputLocals = inputLocals,
                 OutputLocals = Array.Empty<CodeLocal>(),
               });
-            } finally {
-              PopGenerateNode();
             }
+            MarkGenerateNodeScopeExited();
           }
 
           emitOp.ConsumeFunctionBodyResult(resultLocalMap);
@@ -1257,16 +1287,14 @@ namespace NanoGraph {
           emitOp.EmitExecuteFunctionCode(executeFunction, ExecuteFunctionContextType.GlobalFrameStep);
 
           computeNodeResults[computeNode] = (codeCachedResult, emitOp);
-        } finally {
-          PopGenerateNode();
         }
+        MarkGenerateNodeScopeExited();
       }
 
       // Store final outputs.
       int finalOutputIndex = 0;
       foreach (var outputNode in outputNodes) {
-        PushGenerateNode(outputNode);
-        try {
+        using (NewGenerateNodeScope(outputNode)) {
           var outputSpec = outputNode.OutputSpec;
           if (!computeNodeResults.TryGetValue(outputNode, out var cachedResult) || cachedResult.result == null) {
             CurrentGenerateState.AddError($"Missing result for output node {outputNode}");
@@ -1298,9 +1326,8 @@ namespace NanoGraph {
           }
           getParamsFunc.AddStatement("};");
           getParamsFunc.AddStatement($"return parameters;");
-        } finally {
-          PopGenerateNode();
         }
+        MarkGenerateNodeScopeExited();
       }
       getDebugValuesFunction.AddStatement($"return debugValues;");
       getDebugSettableValuesFunction.AddStatement($"return debugValues;");
@@ -1334,7 +1361,8 @@ namespace NanoGraph {
       foreach (IDataNode node in _nodes) {
         node.Messages = errorsByNode.GetOrDefault(node);
       }
-      Messages = errorsByNode.GetOrDefault(this);
+      // Messages = errorsByNode.GetOrDefault(this);
+      Messages = errors.Select(error => error.node == null ? error.message : $"({error.node}) => {error.message}").ToArray();
     }
 
     private static bool SyncToFile(string path, string text) {

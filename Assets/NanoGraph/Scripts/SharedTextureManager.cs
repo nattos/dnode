@@ -38,6 +38,9 @@ namespace NanoGraph {
       IntPtr nativeHandle = Plugin_GetSharedTextureTexture(handle);
       int width = Plugin_GetSharedTextureWidth(handle);
       int height = Plugin_GetSharedTextureHeight(handle);
+      if (nativeHandle == IntPtr.Zero) {
+        Debug.Log($"surfaceId: {surfaceId} handle: {handle} nativeHandle: {nativeHandle} width:{width} height: {height}");
+      }
       Texture2D rawTexture = Texture2D.CreateExternalTexture(width, height, TextureFormat.BGRA32, mipChain: false, linear: false, nativeHandle);
       SharedTexture texture = new SharedTexture(this, rawTexture, Plugin_GetSharedTextureSurfaceID(handle));
       _textures[texture] = handle;
