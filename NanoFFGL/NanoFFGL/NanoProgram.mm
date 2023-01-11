@@ -798,8 +798,11 @@ int main(int argc, const char* argv[]) {
     @autoreleasepool {
       std::string input;
       std::getline(std::cin, input);
+      if (input.length() == 0) {
+        continue;
+      }
       std::string inputStr;
-      macaron::Base64::Decode(input, inputStr);
+//      macaron::Base64::Decode(input, inputStr);
       inputStr = input; // TODO: Remove. This is here for testing so we can type JSON directly.
       bool hadResponse = false;
       try {
