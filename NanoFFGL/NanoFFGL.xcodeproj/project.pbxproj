@@ -7,48 +7,97 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		0C518A25294BCB0C00E31962 /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 0C518A24294BCB0C00E31962 /* AppDelegate.m */; };
-		0C518A28294BCB0C00E31962 /* ViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 0C518A27294BCB0C00E31962 /* ViewController.m */; };
+		0C34D37F296F783100D3C19F /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0C34D37E296F783100D3C19F /* Metal.framework */; };
+		0C34D381296F783E00D3C19F /* IOSurface.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0C34D380296F783E00D3C19F /* IOSurface.framework */; };
+		0C34D389296F78CF00D3C19F /* NanoFFGLLib.h in Headers */ = {isa = PBXBuildFile; fileRef = 0C34D388296F78CF00D3C19F /* NanoFFGLLib.h */; };
+		0C34D38B296F78CF00D3C19F /* NanoFFGLLib.m in Sources */ = {isa = PBXBuildFile; fileRef = 0C34D38A296F78CF00D3C19F /* NanoFFGLLib.m */; };
+		0C34D38F296F78E100D3C19F /* NanoProgram.mm in Sources */ = {isa = PBXBuildFile; fileRef = 0C518A36294BCB7B00E31962 /* NanoProgram.mm */; };
+		0C34D391296F790B00D3C19F /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = 0C518A2E294BCB0D00E31962 /* main.mm */; };
 		0C518A2A294BCB0D00E31962 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0C518A29294BCB0D00E31962 /* Assets.xcassets */; };
-		0C518A2D294BCB0D00E31962 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 0C518A2B294BCB0D00E31962 /* Main.storyboard */; };
-		0C518A2F294BCB0D00E31962 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 0C518A2E294BCB0D00E31962 /* main.m */; };
-		0C518A38294BCB7B00E31962 /* NanoProgram.mm in Sources */ = {isa = PBXBuildFile; fileRef = 0C518A36294BCB7B00E31962 /* NanoProgram.mm */; };
-		0C518A39294BCB7B00E31962 /* NanoProgram.metal in Sources */ = {isa = PBXBuildFile; fileRef = 0C518A37294BCB7B00E31962 /* NanoProgram.metal */; };
+		0CF2DE74296F9B3100E7E950 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0CF2DE73296F9B3100E7E950 /* MetalKit.framework */; };
+		0CF2DE75296F9B4E00E7E950 /* libNanoFFGLLib.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 0C34D386296F78CF00D3C19F /* libNanoFFGLLib.a */; };
+		0CF2DE7C296F9C6800E7E950 /* NanoProgram.metal in Sources */ = {isa = PBXBuildFile; fileRef = 0C518A37294BCB7B00E31962 /* NanoProgram.metal */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		0CF2DE76296F9B4E00E7E950 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0C518A18294BCB0C00E31962 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 0C34D385296F78CF00D3C19F;
+			remoteInfo = NanoFFGLLib;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
+		0C34D37C296F782100D3C19F /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
+		0C34D37E296F783100D3C19F /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
+		0C34D380296F783E00D3C19F /* IOSurface.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOSurface.framework; path = System/Library/Frameworks/IOSurface.framework; sourceTree = SDKROOT; };
+		0C34D386296F78CF00D3C19F /* libNanoFFGLLib.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libNanoFFGLLib.a; sourceTree = BUILT_PRODUCTS_DIR; };
+		0C34D388296F78CF00D3C19F /* NanoFFGLLib.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NanoFFGLLib.h; sourceTree = "<group>"; };
+		0C34D38A296F78CF00D3C19F /* NanoFFGLLib.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = NanoFFGLLib.m; sourceTree = "<group>"; };
+		0C34D392296F798D00D3C19F /* NanoProgram.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NanoProgram.h; sourceTree = "<group>"; };
 		0C518A20294BCB0C00E31962 /* NanoFFGL.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = NanoFFGL.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		0C518A23294BCB0C00E31962 /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
-		0C518A24294BCB0C00E31962 /* AppDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AppDelegate.m; sourceTree = "<group>"; };
-		0C518A26294BCB0C00E31962 /* ViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ViewController.h; sourceTree = "<group>"; };
-		0C518A27294BCB0C00E31962 /* ViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ViewController.m; sourceTree = "<group>"; };
 		0C518A29294BCB0D00E31962 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		0C518A2C294BCB0D00E31962 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
-		0C518A2E294BCB0D00E31962 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
+		0C518A2E294BCB0D00E31962 /* main.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
 		0C518A30294BCB0D00E31962 /* NanoFFGL.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = NanoFFGL.entitlements; sourceTree = "<group>"; };
 		0C518A36294BCB7B00E31962 /* NanoProgram.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = NanoProgram.mm; sourceTree = "<group>"; };
 		0C518A37294BCB7B00E31962 /* NanoProgram.metal */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.metal; path = NanoProgram.metal; sourceTree = "<group>"; };
 		0C518A3C294BD18F00E31962 /* Base64.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Base64.h; sourceTree = "<group>"; };
 		0C518A3D294BD2CF00E31962 /* json.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = json.hpp; sourceTree = "<group>"; };
 		0CA86911294DF9B60040333B /* Generated */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Generated; sourceTree = "<group>"; };
+		0CF2DE73296F9B3100E7E950 /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		0C518A1D294BCB0C00E31962 /* Frameworks */ = {
+		0C34D384296F78CF00D3C19F /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		0C518A1D294BCB0C00E31962 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0CF2DE75296F9B4E00E7E950 /* libNanoFFGLLib.a in Frameworks */,
+				0CF2DE74296F9B3100E7E950 /* MetalKit.framework in Frameworks */,
+				0C34D381296F783E00D3C19F /* IOSurface.framework in Frameworks */,
+				0C34D37F296F783100D3C19F /* Metal.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		0C34D37B296F782100D3C19F /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				0CF2DE73296F9B3100E7E950 /* MetalKit.framework */,
+				0C34D380296F783E00D3C19F /* IOSurface.framework */,
+				0C34D37E296F783100D3C19F /* Metal.framework */,
+				0C34D37C296F782100D3C19F /* Cocoa.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		0C34D387296F78CF00D3C19F /* NanoFFGLLib */ = {
+			isa = PBXGroup;
+			children = (
+				0C34D388296F78CF00D3C19F /* NanoFFGLLib.h */,
+				0C34D38A296F78CF00D3C19F /* NanoFFGLLib.m */,
+			);
+			path = NanoFFGLLib;
+			sourceTree = "<group>";
+		};
 		0C518A17294BCB0C00E31962 = {
 			isa = PBXGroup;
 			children = (
 				0C518A22294BCB0C00E31962 /* NanoFFGL */,
+				0C34D387296F78CF00D3C19F /* NanoFFGLLib */,
 				0C518A21294BCB0C00E31962 /* Products */,
+				0C34D37B296F782100D3C19F /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -56,6 +105,7 @@
 			isa = PBXGroup;
 			children = (
 				0C518A20294BCB0C00E31962 /* NanoFFGL.app */,
+				0C34D386296F78CF00D3C19F /* libNanoFFGLLib.a */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -65,14 +115,10 @@
 			children = (
 				0CA86911294DF9B60040333B /* Generated */,
 				0C518A37294BCB7B00E31962 /* NanoProgram.metal */,
+				0C34D392296F798D00D3C19F /* NanoProgram.h */,
 				0C518A36294BCB7B00E31962 /* NanoProgram.mm */,
-				0C518A23294BCB0C00E31962 /* AppDelegate.h */,
-				0C518A24294BCB0C00E31962 /* AppDelegate.m */,
-				0C518A26294BCB0C00E31962 /* ViewController.h */,
-				0C518A27294BCB0C00E31962 /* ViewController.m */,
 				0C518A29294BCB0D00E31962 /* Assets.xcassets */,
-				0C518A2B294BCB0D00E31962 /* Main.storyboard */,
-				0C518A2E294BCB0D00E31962 /* main.m */,
+				0C518A2E294BCB0D00E31962 /* main.mm */,
 				0C518A30294BCB0D00E31962 /* NanoFFGL.entitlements */,
 				0C518A3C294BD18F00E31962 /* Base64.h */,
 				0C518A3D294BD2CF00E31962 /* json.hpp */,
@@ -82,7 +128,35 @@
 		};
 /* End PBXGroup section */
 
+/* Begin PBXHeadersBuildPhase section */
+		0C34D382296F78CF00D3C19F /* Headers */ = {
+			isa = PBXHeadersBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0C34D389296F78CF00D3C19F /* NanoFFGLLib.h in Headers */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXHeadersBuildPhase section */
+
 /* Begin PBXNativeTarget section */
+		0C34D385296F78CF00D3C19F /* NanoFFGLLib */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0C34D38C296F78CF00D3C19F /* Build configuration list for PBXNativeTarget "NanoFFGLLib" */;
+			buildPhases = (
+				0C34D382296F78CF00D3C19F /* Headers */,
+				0C34D383296F78CF00D3C19F /* Sources */,
+				0C34D384296F78CF00D3C19F /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = NanoFFGLLib;
+			productName = NanoFFGLLib;
+			productReference = 0C34D386296F78CF00D3C19F /* libNanoFFGLLib.a */;
+			productType = "com.apple.product-type.library.static";
+		};
 		0C518A1F294BCB0C00E31962 /* NanoFFGL */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 0C518A33294BCB0D00E31962 /* Build configuration list for PBXNativeTarget "NanoFFGL" */;
@@ -94,6 +168,7 @@
 			buildRules = (
 			);
 			dependencies = (
+				0CF2DE77296F9B4E00E7E950 /* PBXTargetDependency */,
 			);
 			name = NanoFFGL;
 			productName = NanoFFGL;
@@ -109,6 +184,9 @@
 				BuildIndependentTargetsInParallel = 1;
 				LastUpgradeCheck = 1310;
 				TargetAttributes = {
+					0C34D385296F78CF00D3C19F = {
+						CreatedOnToolsVersion = 13.1;
+					};
 					0C518A1F294BCB0C00E31962 = {
 						CreatedOnToolsVersion = 13.1;
 					};
@@ -128,6 +206,7 @@
 			projectRoot = "";
 			targets = (
 				0C518A1F294BCB0C00E31962 /* NanoFFGL */,
+				0C34D385296F78CF00D3C19F /* NanoFFGLLib */,
 			);
 		};
 /* End PBXProject section */
@@ -138,39 +217,61 @@
 			buildActionMask = 2147483647;
 			files = (
 				0C518A2A294BCB0D00E31962 /* Assets.xcassets in Resources */,
-				0C518A2D294BCB0D00E31962 /* Main.storyboard in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		0C34D383296F78CF00D3C19F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0C34D38F296F78E100D3C19F /* NanoProgram.mm in Sources */,
+				0C34D38B296F78CF00D3C19F /* NanoFFGLLib.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		0C518A1C294BCB0C00E31962 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				0C518A28294BCB0C00E31962 /* ViewController.m in Sources */,
-				0C518A2F294BCB0D00E31962 /* main.m in Sources */,
-				0C518A38294BCB7B00E31962 /* NanoProgram.mm in Sources */,
-				0C518A39294BCB7B00E31962 /* NanoProgram.metal in Sources */,
-				0C518A25294BCB0C00E31962 /* AppDelegate.m in Sources */,
+				0CF2DE7C296F9C6800E7E950 /* NanoProgram.metal in Sources */,
+				0C34D391296F790B00D3C19F /* main.mm in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
-/* Begin PBXVariantGroup section */
-		0C518A2B294BCB0D00E31962 /* Main.storyboard */ = {
-			isa = PBXVariantGroup;
-			children = (
-				0C518A2C294BCB0D00E31962 /* Base */,
-			);
-			name = Main.storyboard;
-			sourceTree = "<group>";
+/* Begin PBXTargetDependency section */
+		0CF2DE77296F9B4E00E7E950 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 0C34D385296F78CF00D3C19F /* NanoFFGLLib */;
+			targetProxy = 0CF2DE76296F9B4E00E7E950 /* PBXContainerItemProxy */;
 		};
-/* End PBXVariantGroup section */
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		0C34D38D296F78CF00D3C19F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				EXECUTABLE_PREFIX = lib;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+			};
+			name = Debug;
+		};
+		0C34D38E296F78CF00D3C19F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				EXECUTABLE_PREFIX = lib;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+			};
+			name = Release;
+		};
 		0C518A31294BCB0D00E31962 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -333,6 +434,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		0C34D38C296F78CF00D3C19F /* Build configuration list for PBXNativeTarget "NanoFFGLLib" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0C34D38D296F78CF00D3C19F /* Debug */,
+				0C34D38E296F78CF00D3C19F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		0C518A1B294BCB0C00E31962 /* Build configuration list for PBXProject "NanoFFGL" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
