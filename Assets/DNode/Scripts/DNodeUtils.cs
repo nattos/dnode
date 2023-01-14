@@ -15,7 +15,7 @@ namespace DNode {
       int currentFrameNumber = -1;
       T cachedValue = default;
       return flow => {
-        int frameNumber = DScriptMachine.CurrentInstance.Transport.AbsoluteFrame;
+        int frameNumber = 0;//DScriptMachine.CurrentInstance.Transport.AbsoluteFrame;
         if (currentFrameNumber != frameNumber) {
           currentFrameNumber = frameNumber;
           cachedValue = producer.Invoke(flow);

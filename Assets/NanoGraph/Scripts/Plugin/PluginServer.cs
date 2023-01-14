@@ -78,7 +78,7 @@ namespace NanoGraph.Plugin {
   public class DebugSetValuesResponse {}
 
   public class PluginServer : IDisposable {
-    public static string PluginPackagePath => System.IO.Path.Combine(System.IO.Path.GetDirectoryName(UnityEngine.Application.dataPath), "NanoFFGL/build/NanoFFGL/Build/Products/Debug/NanoFFGL.app");
+    public static string PluginPackagePath => System.IO.Path.Combine(System.IO.Path.GetDirectoryName(UnityEngine.Application.dataPath), "NanoFFGL/build/Debug/NanoFFGL.app");
     public static string PluginBinaryPath => System.IO.Path.Combine(PluginPackagePath, "Contents/MacOS/NanoFFGL");
 
     private const bool DebugStandardError = false;

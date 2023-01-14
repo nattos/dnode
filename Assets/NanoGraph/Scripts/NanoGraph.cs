@@ -248,6 +248,7 @@ namespace NanoGraph {
         _isCompileLaterInFlight = false;
         if (Plugin.PluginService.Instance.IsCompiling) {
           CompileLater();
+          return;
         }
         Compile();
       });

@@ -49,7 +49,7 @@ namespace NanoGraph.Plugin {
     public Action TextureInputsNeedUpdating;
     public Action TextureOutputsUpdated;
 
-    public bool EnableAutoReload { get; set; } = true;
+    public bool EnableAutoReload { get; set; } = false;
 
     public bool IsCompiling => _pluginWatcher.IsCompiling || _pluginBuilder.IsCompiling;
     public bool HasCompileError => _pluginBuilder.IsError;
@@ -126,7 +126,7 @@ namespace NanoGraph.Plugin {
         return;
       }
       if (_textureInputs.Count > 0) {
-        TextureInputsNeedUpdating.Invoke();
+        TextureInputsNeedUpdating?.Invoke();
       }
 
       Dictionary<string, double> queuedParameterValues = null;

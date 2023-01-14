@@ -21,7 +21,9 @@ namespace NanoGraph.Plugin {
 
     public PluginWatcher() {
       {
-        FileSystemWatcher watcher = new FileSystemWatcher(Path.GetDirectoryName(NanoGraph.GeneratedCodeOutputPath));
+        string directoryPath = Path.GetDirectoryName(NanoGraph.GeneratedCodeOutputPath);
+        Directory.CreateDirectory(directoryPath);
+        FileSystemWatcher watcher = new FileSystemWatcher(directoryPath);
         _codeWatcher = watcher;
 
         watcher.NotifyFilter = NotifyFilters.Attributes
@@ -43,7 +45,9 @@ namespace NanoGraph.Plugin {
         watcher.EnableRaisingEvents = true;
       }
       {
-        FileSystemWatcher watcher = new FileSystemWatcher(Path.GetDirectoryName(PluginServer.PluginPackagePath));
+        string directoryPath = Path.GetDirectoryName(PluginServer.PluginPackagePath);
+        Directory.CreateDirectory(directoryPath);
+        FileSystemWatcher watcher = new FileSystemWatcher(directoryPath);
         _pluginWatcher = watcher;
 
         watcher.NotifyFilter = NotifyFilters.Attributes

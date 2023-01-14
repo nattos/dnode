@@ -48,7 +48,7 @@ namespace DNode {
         return _getter.Invoke(_component);
       }
       set {
-        _currentFrameNumber = DScriptMachine.CurrentInstance.Transport.AbsoluteFrame;
+        _currentFrameNumber = 0;//DScriptMachine.CurrentInstance.Transport.AbsoluteFrame;
         if ((_useChangeCheck || _useChangeCheckPredicate?.Invoke(_component) == true) && _comparer.Equals(_currentValue, value)) {
           return;
         }
@@ -86,7 +86,7 @@ namespace DNode {
         wasChanged = false;
         return;
       }
-      int currentFrame = DScriptMachine.CurrentInstance.Transport.AbsoluteFrame;
+      int currentFrame = 0;//DScriptMachine.CurrentInstance.Transport.AbsoluteFrame;
       if (_currentFrameNumber != currentFrame) {
         if (_shouldResetPredicate?.Invoke(_component) != false) {
           _setter.Invoke(_component, _initialValue);
