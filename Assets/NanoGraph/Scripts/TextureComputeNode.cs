@@ -123,8 +123,8 @@ namespace NanoGraph {
         AddDebugGpuFuncInputs(func, gpuInputBuffers, ref bufferIndex);
         AddGpuFuncOutputs(func, computeOutputSpec.Fields, gpuOutputBuffers, ref bufferIndex);
         if (graph.DebugEnabled) {
-          AddGpuFuncInput(func, "debugOutputNodeIndex", program.IntType, "debugOutputNodeIndex", "debugOutputNodeIndex", gpuInputBuffers, ref bufferIndex, isReadWrite: false);
-          AddGpuFuncOutput(func, "debugOutputTexture", program.Texture, "debugOutputTexture", "debugOutputTexture", gpuOutputBuffers, ref bufferIndex);
+          AddGpuFuncInput(func, "debugOutputNodeIndex", program.IntType, "debugOutputNodeIndex", "debugOutputNodeIndex", gpuInputBuffers, ref bufferIndex, isReadWrite: false, isDebugOnly: true);
+          AddGpuFuncOutput(func, "debugOutputTexture", program.Texture, "debugOutputTexture", "debugOutputTexture", gpuOutputBuffers, ref bufferIndex, isDebugOnly: true);
         }
         func.AddParam(Array.Empty<string>(), program.GetPrimitiveType(PrimitiveType.Uint2), $"gid_xy_uint", "[[thread_position_in_grid]]");
         func.AddParam(Array.Empty<string>(), program.GetPrimitiveType(PrimitiveType.Uint2), $"size_xy_uint", "[[threads_per_grid]]");
@@ -149,6 +149,7 @@ namespace NanoGraph {
         func.AddStatement($"WriteTexture({outputColorBuffer.ParameterName}, gid_xy_uint, {func.EmitConvert(outputColorLocal.Type, TypeSpec.MakePrimitive(PrimitiveType.Float4), outputColorLocal.Identifier)});");
 
         if (graph.DebugEnabled) {
+          func.AddStatement($"#if defined(DEBUG)");
           var outputDebugBuffer = gpuOutputBuffers.First(buffer => buffer.Expression == "debugOutputTexture");
           string debugOutLocal = func.AllocLocal("DebugOut");
           func.AddStatement($"{func.GetTypeIdentifier(PrimitiveType.Float4)} {debugOutLocal} = 0.0;");
@@ -232,6 +233,7 @@ namespace NanoGraph {
           func.AddStatement($"  }}");
           func.AddStatement($"  WriteTexture({outputDebugBuffer.ParameterName}, gid_xy_uint, {debugOutLocal});");
           func.AddStatement($"}}");
+          func.AddStatement($"#endif // defined(DEBUG)");
         }
 
         result = codeCachedResult;
@@ -310,6 +312,7 @@ namespace NanoGraph {
 
         AllocateGpuFuncOutputs(validateCacheFunction, computeOutputSpec.Fields, totalThreadCountExpr);
         if (graph.DebugEnabled) {
+          validateCacheFunction.AddStatement($"#if defined(DEBUG)");
           validateCacheFunction.AddStatement($"const std::string& debugOutputTextureKey = DebugGetOutputTextureKey();");
           validateCacheFunction.AddStatement($"int debugOutputNodeIndex = -1;");
           {
@@ -337,6 +340,7 @@ namespace NanoGraph {
           validateCacheFunction.AddStatement($"  ResizeSharedTexture(_debugOutputTexture, GetDevice(), {gridSizeXExpr}, {gridSizeYExpr});");
           validateCacheFunction.AddStatement($"}}");
           validateCacheFunction.AddStatement($"id<MTLTexture> debugOutputTexture = debugOutputNodeIndex >= 0 ? _debugOutputTexture->Texture : nullptr;");
+          validateCacheFunction.AddStatement($"#endif // defined(DEBUG)");
         }
 
         foreach (var dependency in dependentComputeNodes.Where(dependency => dependency.Operation is ISplitComputeNodeEmitCodeOperation)) {

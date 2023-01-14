@@ -9,6 +9,7 @@ namespace NanoGraph {
     public const bool DebugVerbose = false;
 
     public static string GeneratedCodeOutputPath => System.IO.Path.Combine(System.IO.Path.GetDirectoryName(UnityEngine.Application.dataPath), "NanoFFGL/NanoFFGL/Generated");
+    private static Lazy<System.Security.Cryptography.MD5> _md5 = new Lazy<System.Security.Cryptography.MD5>(() => System.Security.Cryptography.MD5.Create());
 
     public string EffectName = "Program";
     public bool DebugEnabled = true;
@@ -1174,6 +1175,7 @@ namespace NanoGraph {
                 codeGenerator.EmitCode(context);
               }
               if (DebugEnabled && !(func.Context is NanoGpuContext)) {
+                getDebugValuesFunction.AddStatement($"#if defined(DEBUG)");
                 string debugId = codeGenerator.SourceNode.DebugId;
                 for (int i = 0; i < outputLocals.Count; ++i) {
                   string fieldName = outputFieldNames[i];
@@ -1248,6 +1250,7 @@ namespace NanoGraph {
                   func.AddStatement($"{debugIdentifier} = {extractDebugValueExpr};");
                   getDebugValuesFunction.AddStatement($"debugValues.push_back(DebugValue {{ .Key = {getDebugValuesFunction.EmitLiteral(debugValueKey)}, .Length = {valueLengthExpr}, .Value = {debugIdentifier} }});");
                 }
+                getDebugValuesFunction.AddStatement($"#endif // defined(DEBUG)");
               }
             }
             MarkGenerateNodeScopeExited();
@@ -1344,10 +1347,18 @@ namespace NanoGraph {
         Debug.Log(outerGpuCode);
       }
 
+      string effectName = EffectName;
+      byte[] md5Hash = _md5.Value.ComputeHash(System.Text.Encoding.UTF8.GetBytes(effectName));
+      string effectCode = new string(System.Convert.ToBase64String(md5Hash).Take(4).ToArray());
+      string outerPluginCode =
+          $"#define PLUGIN_NAME {getDebugValuesFunction.EmitLiteral(effectName)}\n" +
+          $"#define PLUGIN_CODE {getDebugValuesFunction.EmitLiteral(effectCode)}\n";
+
       System.IO.Directory.CreateDirectory(GeneratedCodeOutputPath);
       bool modifiedCpuProgram = SyncToFile(System.IO.Path.Combine(GeneratedCodeOutputPath, "Program.incl.h"), outerCpuCode);
       bool modifiedGpuProgram = SyncToFile(System.IO.Path.Combine(GeneratedCodeOutputPath, "Program.metal.incl.h"), outerGpuCode);
-      if (modifiedCpuProgram || modifiedGpuProgram) {
+      bool modifiedPluginProgram = SyncToFile(System.IO.Path.Combine(GeneratedCodeOutputPath, "Plugin.incl.h"), outerPluginCode);
+      if (modifiedCpuProgram || modifiedGpuProgram || modifiedPluginProgram) {
         if (DebugVerbose) {
           Debug.Log("Code applied.");
         }

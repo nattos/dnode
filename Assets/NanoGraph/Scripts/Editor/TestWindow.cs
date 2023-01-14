@@ -197,7 +197,7 @@ namespace NanoGraph {
         var context = graphWindow?.context;
         var selection = context?.selection;
         bool hasSelection = selection?.Count > 0;
-        global::NanoGraph.VisualScripting.BaseNode selectedBaseNode = selection.FirstOrDefault() as global::NanoGraph.VisualScripting.BaseNode;
+        global::NanoGraph.VisualScripting.BaseNode selectedBaseNode = selection?.FirstOrDefault() as global::NanoGraph.VisualScripting.BaseNode;
         if (hasSelection) {
           string desiredDebugOutputTextureKey;
           if (selectedBaseNode != null) {

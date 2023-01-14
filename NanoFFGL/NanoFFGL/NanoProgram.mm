@@ -1,17 +1,11 @@
 #import "Foundation/Foundation.h"
 #import "simd/simd.h"
 #import "MetalKit/MetalKit.h"
-#import "CoreVideo/CoreVideo.h"
 
-#include <iostream>
 #include <map>
 #include <memory>
-#include <stdexcept>
 #include <string>
 #include <vector>
-
-#include "Base64.h"
-#include "json.hpp"
 
 #include "NanoProgram.h"
 
@@ -200,26 +194,6 @@ class NanoSharedTexture {
 
 
 
-//class NanoProgram {
-//public:
-//  struct ParameterDecl {
-//    std::string Name;
-//    double DefaultValue;
-//    double MinValue;
-//    double MaxValue;
-//  };
-//
-//  struct DebugValue {
-//    std::string Key;
-//    int Length;
-//    vector_double4 Value;
-//  };
-//
-//  struct DebugSettableValue {
-//    std::string Key;
-//    std::function<void(const std::vector<double>&)> Setter;
-//  };
-//
 NanoProgram::NanoProgram() {}
 NanoProgram::~NanoProgram() {}
 
@@ -314,40 +288,7 @@ NanoProgram* NanoProgram::GetCurrentInstance() {
   template<typename T> void WriteBuffer(const std::shared_ptr<NanoTypedBuffer<T>>& buffer, int index, T value) { (*buffer)[index] = value; }
   template<typename T> int GetLength(const std::shared_ptr<NanoTypedBuffer<T>>& buffer) { return buffer->GetElementCount(); }
   template<typename T> int GetDebugLength(const std::shared_ptr<NanoTypedBuffer<T>>& buffer) { return !buffer ? 0 : buffer->GetElementCount(); }
-//
-//
-//  id<MTLDevice> GetDevice() const { return _device; }
-//  void SetDevice(id<MTLDevice> value) { _device = value; }
-//  id<MTLCommandQueue> GetCommandQueue() const { return _commandQueue; }
-//  void SetCommandQueue(id<MTLCommandQueue> value) { _commandQueue = value; }
-//  id<MTLCommandBuffer> GetCurrentCommandBuffer() const { return _currentCommandBuffer; }
-//
-//  int GetFrameNumber() const { return _frameNumber; }
-//  double GetFrameTime() const { return _frameTime; }
-//
-//
-//protected:
-//  virtual void Execute() = 0;
-//  virtual void CreatePipelines() = 0;
-//
-//private:
-//  id<MTLDevice> _device;
-//  id<MTLCommandQueue> _commandQueue;
-//  id<MTLCommandBuffer> _currentCommandBuffer;
-//  bool _createdPipelines = false;
-//  std::vector<double> _valueInputs;
-//  std::vector<id<MTLTexture>> _inputTextures;
-//  std::string _debugOutputTextureKey;
-//
-//  int _frameNumber = 0;
-//  double _startTime = 0;
-//  double _frameTime = 0;
-//
-//  static NSLock* _threadMapLock;
-//  static std::unique_ptr<std::map<NSThread*, NanoProgram*>> _threadMap;
-//
-//protected:
-//  std::unique_ptr<NanoSharedTexture> _debugOutputTexture;
+
 
   id<MTLTexture> NanoProgram::ResizeTexture(id<MTLTexture> originalTexture, int width, int height, MTLPixelFormat format) {
     width = std::max(1, width);

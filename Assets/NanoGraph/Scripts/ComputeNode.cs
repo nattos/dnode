@@ -352,22 +352,23 @@ namespace NanoGraph {
         AddGpuFuncInput(func, "debugState", debugState.DebugGpuStateType, debugState.DebugGpuStateIdentifier, "debugState", gpuInputBuffers, ref bufferIndex, isReadWrite: false);
       }
 
-      protected static void AddGpuFuncInput(NanoFunction func, ComputeInput input, string paramName, List<NanoGpuBufferRef> gpuInputBuffers, ref int bufferIndex) {
-        AddGpuFuncInput(func, input.Field, input.Expression, paramName, gpuInputBuffers, ref bufferIndex, isReadWrite: input.ReadWrite);
+      protected static void AddGpuFuncInput(NanoFunction func, ComputeInput input, string paramName, List<NanoGpuBufferRef> gpuInputBuffers, ref int bufferIndex, bool isDebugOnly = false) {
+        AddGpuFuncInput(func, input.Field, input.Expression, paramName, gpuInputBuffers, ref bufferIndex, isReadWrite: input.ReadWrite, isDebugOnly: isDebugOnly);
       }
 
-      protected static void AddGpuFuncInput(NanoFunction func, DataField field, string inputExpression, string paramName, List<NanoGpuBufferRef> gpuInputBuffers, ref int bufferIndex, bool isReadWrite = false) {
+      protected static void AddGpuFuncInput(NanoFunction func, DataField field, string inputExpression, string paramName, List<NanoGpuBufferRef> gpuInputBuffers, ref int bufferIndex, bool isReadWrite = false, bool isDebugOnly = false) {
         var fieldType = func.Program.GetProgramType(field.Type);
-        AddGpuFuncInput(func, field.Name, fieldType, inputExpression, paramName, gpuInputBuffers, ref bufferIndex, isReadWrite: isReadWrite);
+        AddGpuFuncInput(func, field.Name, fieldType, inputExpression, paramName, gpuInputBuffers, ref bufferIndex, isReadWrite: isReadWrite, isDebugOnly: isDebugOnly);
       }
 
-      protected static void AddGpuFuncInput(NanoFunction func, string fieldName, NanoProgramType fieldType, string inputExpression, string paramName, List<NanoGpuBufferRef> gpuInputBuffers, ref int bufferIndex, bool isReadWrite = false) {
+      protected static void AddGpuFuncInput(NanoFunction func, string fieldName, NanoProgramType fieldType, string inputExpression, string paramName, List<NanoGpuBufferRef> gpuInputBuffers, ref int bufferIndex, bool isReadWrite = false, bool isDebugOnly = false) {
         gpuInputBuffers.Add(new NanoGpuBufferRef {
           FieldName = fieldName,
           Expression = inputExpression,
           ParameterName = paramName,
           Index = bufferIndex,
           Type = fieldType,
+          IsDebugOnly = isDebugOnly,
         });
         string[] modifiers = { "constant", "const" };
         string suffix = $"[[buffer({bufferIndex})]]";
@@ -380,7 +381,7 @@ namespace NanoGraph {
           modifiers = Array.Empty<string>();
           isReference = false;
         }
-        func.AddParam(modifiers, fieldType, paramName, suffix, new NanoParameterOptions { IsConst = !isReadWrite, IsReference = isReference });
+        func.AddParam(modifiers, fieldType, paramName, suffix, new NanoParameterOptions { IsConst = !isReadWrite, IsReference = isReference, IsDebugOnly = isDebugOnly });
         bufferIndex++;
       }
 
@@ -410,19 +411,20 @@ namespace NanoGraph {
           index++;
         }
       }
-      protected static void AddGpuFuncOutput(NanoFunction func, DataField field, string paramName, List<NanoGpuBufferRef> gpuOutputBuffers, ref int bufferIndex) {
+      protected static void AddGpuFuncOutput(NanoFunction func, DataField field, string paramName, List<NanoGpuBufferRef> gpuOutputBuffers, ref int bufferIndex, bool isDebugOnly = false) {
         var fieldType = field.Type;
         NanoProgramType programType = func.Program.GetProgramType(fieldType, field.Name);
-        AddGpuFuncOutput(func, field.Name, programType, paramName, expression: null, gpuOutputBuffers, ref bufferIndex);
+        AddGpuFuncOutput(func, field.Name, programType, paramName, expression: null, gpuOutputBuffers, ref bufferIndex, isDebugOnly: isDebugOnly);
       }
 
-      protected static void AddGpuFuncOutput(NanoFunction func, string fieldName, NanoProgramType fieldType, string paramName, string expression, List<NanoGpuBufferRef> gpuOutputBuffers, ref int bufferIndex) {
+      protected static void AddGpuFuncOutput(NanoFunction func, string fieldName, NanoProgramType fieldType, string paramName, string expression, List<NanoGpuBufferRef> gpuOutputBuffers, ref int bufferIndex, bool isDebugOnly = false) {
         gpuOutputBuffers.Add(new NanoGpuBufferRef {
           FieldName = fieldName,
           Expression = expression,
           ParameterName = paramName,
           Index = bufferIndex,
           Type = fieldType,
+          IsDebugOnly = isDebugOnly,
         });
         string[] modifiers = {};
         string suffix = $"[[buffer({bufferIndex})]]";
@@ -434,14 +436,20 @@ namespace NanoGraph {
           modifiers = Array.Empty<string>();
           programType = func.Program.WriteTexture;
         }
-        func.AddParam(modifiers, programType, paramName, suffix, new NanoParameterOptions { IsConst = false });
+        func.AddParam(modifiers, programType, paramName, suffix, new NanoParameterOptions { IsConst = false, IsDebugOnly = isDebugOnly });
         bufferIndex++;
       }
 
       protected static void EmitSyncBuffersToGpu(NanoFunction func, IReadOnlyList<NanoGpuBufferRef> gpuInputBuffers) {
         foreach (var inputBuffer in gpuInputBuffers) {
+          if (inputBuffer.IsDebugOnly) {
+            func.AddStatement($"#if defined(DEBUG)");
+          }
           if (inputBuffer.Type.IsArray) {
             func.AddStatement($"{inputBuffer.Expression}->SyncToGpu();");
+          }
+          if (inputBuffer.IsDebugOnly) {
+            func.AddStatement($"#endif // defined(DEBUG)");
           }
         }
       }
@@ -450,9 +458,15 @@ namespace NanoGraph {
         EmitSyncBuffersToGpu(func, gpuInputBuffers);
         NanoProgramType outputType = func.Program.GetProgramType(output.Type);
         foreach (var outputBuffer in gpuOutputBuffers) {
+          if (outputBuffer.IsDebugOnly) {
+            func.AddStatement($"#if defined(DEBUG)");
+          }
           var fieldName = outputType.GetField(outputBuffer.FieldName);
           if (outputBuffer.Type.IsArray) {
             func.AddStatement($"{output.Identifier}.{fieldName}->EnsureGpuBuffer();");
+          }
+          if (outputBuffer.IsDebugOnly) {
+            func.AddStatement($"#endif // defined(DEBUG)");
           }
         }
       }
@@ -460,6 +474,9 @@ namespace NanoGraph {
       protected static void EmitBindBuffers(NanoFunction func, IReadOnlyList<NanoGpuBufferRef> gpuInputBuffers, string variant = null) {
         variant = variant ?? "";
         foreach (var inputBuffer in gpuInputBuffers) {
+          if (inputBuffer.IsDebugOnly) {
+            func.AddStatement($"#if defined(DEBUG)");
+          }
           string expression = inputBuffer.Expression;
           int bufferIndex = inputBuffer.Index;
           if (inputBuffer.Type.IsArray) {
@@ -469,6 +486,9 @@ namespace NanoGraph {
           } else {
             func.AddStatement($"[encoder set{variant}Bytes:&{expression} length:sizeof({expression}) atIndex:{bufferIndex}];");
           }
+          if (inputBuffer.IsDebugOnly) {
+            func.AddStatement($"#endif // defined(DEBUG)");
+          }
         }
       }
 
@@ -477,6 +497,9 @@ namespace NanoGraph {
         EmitBindBuffers(func, gpuInputBuffers, variant: variant);
         NanoProgramType outputType = func.Program.GetProgramType(output.Type);
         foreach (var outputBuffer in gpuOutputBuffers) {
+          if (outputBuffer.IsDebugOnly) {
+            func.AddStatement($"#if defined(DEBUG)");
+          }
           string accessExpr;
           if (outputBuffer.Expression != null) {
             accessExpr = outputBuffer.Expression;
@@ -490,15 +513,24 @@ namespace NanoGraph {
           } else if (outputBuffer.Type == func.Program.Texture) {
             func.AddStatement($"[encoder set{variant}Texture:{accessExpr} atIndex:{bufferIndex}];");
           }
+          if (outputBuffer.IsDebugOnly) {
+            func.AddStatement($"#endif // defined(DEBUG)");
+          }
         }
       }
 
       protected static void EmitMarkBuffersDirty(NanoFunction func, CodeLocal output, IReadOnlyList<NanoGpuBufferRef> gpuInputBuffers, IReadOnlyList<NanoGpuBufferRef> gpuOutputBuffers) {
         NanoProgramType outputType = func.Program.GetProgramType(output.Type);
         foreach (var outputBuffer in gpuOutputBuffers) {
+          if (outputBuffer.IsDebugOnly) {
+            func.AddStatement($"#if defined(DEBUG)");
+          }
           var fieldName = outputType.GetField(outputBuffer.FieldName);
           if (outputBuffer.Type.IsArray) {
             func.AddStatement($"{output.Identifier}.{fieldName}->MarkGpuBufferChanged();");
+          }
+          if (outputBuffer.IsDebugOnly) {
+            func.AddStatement($"#endif // defined(DEBUG)");
           }
         }
       }

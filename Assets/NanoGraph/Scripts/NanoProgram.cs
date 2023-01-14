@@ -47,6 +47,7 @@ namespace NanoGraph {
     public string ParameterName;
     public int Index;
     public NanoProgramType Type;
+    public bool IsDebugOnly;
   }
 
   public class NanoGpuContext : INanoCodeContext {
@@ -101,6 +102,7 @@ namespace NanoGraph {
   public struct NanoParameterOptions {
     public bool IsConst;
     public bool IsReference;
+    public bool IsDebugOnly;
   }
 
   public class NanoFunction {
@@ -147,28 +149,44 @@ namespace NanoGraph {
         output.Append($"{string.Join(" ", signatureParts)}(");
         if (_params.Count > 1) {
           output.AppendLine();
-          output.Append("    ");
         }
-        output.Append(string.Join(",\n    ", _params.Select(param => {
-          var options = param.Item5;
+        int paramIndex = 0;
+        foreach (var (modifiers, type, identifier, suffix, options) in _params) {
+          bool isLast = (_params.Count - 1) == paramIndex;
+          bool isFirst = paramIndex == 0;
+          bool isFirstAndLast = isFirst && isLast;
           List<string> parts = new List<string>();
-          string modifierStr = string.Join(" ", param.Item1);
+          string modifierStr = string.Join(" ", modifiers);
           if (!string.IsNullOrWhiteSpace(modifierStr)) {
             parts.Add(modifierStr);
           }
           string typeIdentifier;
-          if (param.Item2.IsArray) {
-            typeIdentifier = options.IsConst ? Context.EmitBufferType(param.Item2.ElementType) : Context.EmitWritableBufferType(param.Item2.ElementType);
+          if (type.IsArray) {
+            typeIdentifier = options.IsConst ? Context.EmitBufferType(type.ElementType) : Context.EmitWritableBufferType(type.ElementType);
           } else {
-            typeIdentifier = GetTypeIdentifier(param.Item2) + (options.IsReference ? "&" : "");
+            typeIdentifier = GetTypeIdentifier(type) + (options.IsReference ? "&" : "");
           }
           parts.Add(typeIdentifier);
-          parts.Add(param.Item3);
-          if (!string.IsNullOrWhiteSpace(param.Item4)) {
-            parts.Add(param.Item4);
+          parts.Add(identifier);
+          if (!string.IsNullOrWhiteSpace(suffix)) {
+            parts.Add(suffix);
           }
-          return string.Join(" ", parts);
-        })));
+          string paramStr = string.Join(" ", parts);
+          if (!isFirstAndLast) {
+            paramStr = $"    {paramStr}";
+          }
+          if (!isLast) {
+            paramStr = $"{paramStr},";
+          }
+          if (options.IsDebugOnly) {
+            paramStr = $"{(isFirst ? "\n" : "")}#if defined(DEBUG)\n{paramStr}\n#endif // defined(DEBUG){(isFirstAndLast ? "\n" : "")}";
+          }
+          output.Append(paramStr);
+          if (!isLast) {
+            output.Append("\n");
+          }
+          ++paramIndex;
+        }
         output.AppendLine($") {{");
         foreach (string line in _statements) {
           output.AppendLine("  " + line);

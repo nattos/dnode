@@ -974,6 +974,7 @@ namespace NanoGraph {
         string internalValueExpr = context.Function.EmitLiteral(type, internalValue);
         string valueExpr = internalValueExpr;
         if (Graph.DebugEnabled) {
+          context.DebugState.GetDebugSettableValuesFunction.AddStatement($"#if defined(DEBUG)");
           bool isGpuContext = context.Function.Context is NanoGpuContext;
           string debugValueKey = DebugValueKey;
           NanoProgramType debugStateType = isGpuContext ? context.DebugState.DebugGpuStateType : context.DebugState.DebugCpuStateType;
@@ -1015,6 +1016,7 @@ namespace NanoGraph {
             string debugKeyExpr = context.DebugState.GetDebugSettableValuesFunction.EmitLiteral(debugValueKey);
             context.DebugState.GetDebugSettableValuesFunction.AddStatement($"debugValues.push_back(DebugSettableValue {{ .Key = {debugKeyExpr}, .Setter = [{debugStatePtrExpr}](const std::vector<double>& values) {{ {debugStatePtrExpr}->{debugValueIdentifier} = {decodeValuesExpr}; }} }});");
           }
+          context.DebugState.GetDebugSettableValuesFunction.AddStatement($"#endif // defined(DEBUG)");
         }
         context.Function.AddStatement($"{context.Function.GetTypeIdentifier(type)} {context.OutputLocals[0].Identifier} = {valueExpr};");
       } else {

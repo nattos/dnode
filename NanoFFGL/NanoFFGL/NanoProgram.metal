@@ -193,7 +193,7 @@ kernel void CopyTextureSampleLinear(
     NanoWriteTexture output [[texture(1)]],
     vector_uint2 gid_xy_uint [[thread_position_in_grid]],
     vector_uint2 size_xy_uint [[threads_per_grid]]) {
-  vector_float2 gid_xy_norm = float2(gid_xy_uint) / float2(size_xy_uint);
+  vector_float2 gid_xy_norm = (float2(gid_xy_uint) + 0.5) / float2(size_xy_uint);
   constexpr sampler sampler(coord::normalized, filter::linear, address::clamp_to_edge);
   output.write(input.sample(sampler, gid_xy_norm), gid_xy_uint);
 }
