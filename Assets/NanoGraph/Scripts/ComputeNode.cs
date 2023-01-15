@@ -387,18 +387,21 @@ namespace NanoGraph {
 
       protected void AllocateGpuFuncOutputs(NanoFunction func, IEnumerable<DataField> fields, string lengthExpr) {
         foreach (var field in fields) {
-          if (field.IsCompileTimeOnly) {
-            continue;
-          }
-          if (!field.Type.IsArray) {
-            continue;
-          }
-          func.AddStatement($"if (!{cachedResult.Identifier}.{resultType.GetField(field.Name)}) {{");
-          func.AddStatement($"  {cachedResult.Identifier}.{resultType.GetField(field.Name)}.reset(NanoTypedBuffer<{func.GetElementTypeIdentifier(field.Type)}>::Allocate({lengthExpr}));");
-          func.AddStatement($"}} else {{");
-          func.AddStatement($"  {cachedResult.Identifier}.{resultType.GetField(field.Name)}->Resize({lengthExpr});");
-          func.AddStatement($"}}");
+          AllocateGpuFuncOutput(func, field, lengthExpr);
         }
+      }
+      protected void AllocateGpuFuncOutput(NanoFunction func, DataField field, string lengthExpr) {
+        if (field.IsCompileTimeOnly) {
+          return;
+        }
+        if (!field.Type.IsArray) {
+          return;
+        }
+        func.AddStatement($"if (!{cachedResult.Identifier}.{resultType.GetField(field.Name)}) {{");
+        func.AddStatement($"  {cachedResult.Identifier}.{resultType.GetField(field.Name)}.reset(NanoTypedBuffer<{func.GetElementTypeIdentifier(field.Type)}>::Allocate({lengthExpr}));");
+        func.AddStatement($"}} else {{");
+        func.AddStatement($"  {cachedResult.Identifier}.{resultType.GetField(field.Name)}->Resize({lengthExpr});");
+        func.AddStatement($"}}");
       }
 
       protected static void AddGpuFuncOutputs(NanoFunction func, IEnumerable<DataField> fields, List<NanoGpuBufferRef> gpuOutputBuffers, ref int bufferIndex) {
@@ -411,13 +414,13 @@ namespace NanoGraph {
           index++;
         }
       }
-      protected static void AddGpuFuncOutput(NanoFunction func, DataField field, string paramName, List<NanoGpuBufferRef> gpuOutputBuffers, ref int bufferIndex, bool isDebugOnly = false) {
+      protected static void AddGpuFuncOutput(NanoFunction func, DataField field, string paramName, List<NanoGpuBufferRef> gpuOutputBuffers, ref int bufferIndex, bool isAtomic = false, bool isDebugOnly = false) {
         var fieldType = field.Type;
         NanoProgramType programType = func.Program.GetProgramType(fieldType, field.Name);
-        AddGpuFuncOutput(func, field.Name, programType, paramName, expression: null, gpuOutputBuffers, ref bufferIndex, isDebugOnly: isDebugOnly);
+        AddGpuFuncOutput(func, field.Name, programType, paramName, expression: null, gpuOutputBuffers, ref bufferIndex, isAtomic: isAtomic, isDebugOnly: isDebugOnly);
       }
 
-      protected static void AddGpuFuncOutput(NanoFunction func, string fieldName, NanoProgramType fieldType, string paramName, string expression, List<NanoGpuBufferRef> gpuOutputBuffers, ref int bufferIndex, bool isDebugOnly = false) {
+      protected static void AddGpuFuncOutput(NanoFunction func, string fieldName, NanoProgramType fieldType, string paramName, string expression, List<NanoGpuBufferRef> gpuOutputBuffers, ref int bufferIndex, bool isAtomic = false, bool isDebugOnly = false) {
         gpuOutputBuffers.Add(new NanoGpuBufferRef {
           FieldName = fieldName,
           Expression = expression,
@@ -436,7 +439,7 @@ namespace NanoGraph {
           modifiers = Array.Empty<string>();
           programType = func.Program.WriteTexture;
         }
-        func.AddParam(modifiers, programType, paramName, suffix, new NanoParameterOptions { IsConst = false, IsDebugOnly = isDebugOnly });
+        func.AddParam(modifiers, programType, paramName, suffix, new NanoParameterOptions { IsConst = false, IsAtomic = isAtomic, IsDebugOnly = isDebugOnly });
         bufferIndex++;
       }
 

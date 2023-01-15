@@ -24,6 +24,7 @@ public:
   }
 
   int GetByteLength() const { return ElementSize; }
+  int GetTotalByteLength() const { return ElementSize * _elementCount; }
   int GetElementCount() const { return _elementCount; }
   void* GetCpuBuffer() { return _cpuBuffer.data(); }
   id<MTLBuffer> GetGpuBuffer() const { return _gpuBuffer; }

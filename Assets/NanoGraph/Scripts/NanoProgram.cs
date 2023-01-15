@@ -21,7 +21,7 @@ namespace NanoGraph {
 
   public interface INanoCodeContext {
     string EmitBufferType(NanoProgramType type);
-    string EmitWritableBufferType(NanoProgramType type);
+    string EmitWritableBufferType(NanoProgramType type, bool isAtomic = false);
     string EmitMove(string source);
     string EmitSampleBuffer(string source, string index);
     string EmitSampleTexture(string source, string index, TextureFilterMode filterMode, TextureWrapMode wrapMode);
@@ -32,7 +32,7 @@ namespace NanoGraph {
 
   public class NanoCpuContext : INanoCodeContext {
     public string EmitBufferType(NanoProgramType type) => $"std::shared_ptr<NanoTypedBuffer<{type.EmitIdentifier(this)}>>";
-    public string EmitWritableBufferType(NanoProgramType type) => $"std::shared_ptr<NanoTypedBuffer<{type.EmitIdentifier(this)}>>";
+    public string EmitWritableBufferType(NanoProgramType type, bool isAtomic) => $"std::shared_ptr<NanoTypedBuffer<{type.EmitIdentifier(this)}>>";
     public string EmitMove(string source) => $"std::move({source})";
     public string EmitSampleBuffer(string source, string index) => $"SampleBuffer({source}, {index})";
     public string EmitSampleTexture(string source, string index, TextureFilterMode filterMode, TextureWrapMode wrapMode) => $"SampleTexture({source}, {index})"; // TODO: Invalid.
@@ -52,7 +52,7 @@ namespace NanoGraph {
 
   public class NanoGpuContext : INanoCodeContext {
     public string EmitBufferType(NanoProgramType type) => $"device const {type.EmitIdentifier(this)}*";
-    public string EmitWritableBufferType(NanoProgramType type) => $"device {type.EmitIdentifier(this)}*";
+    public string EmitWritableBufferType(NanoProgramType type, bool isAtomic) => $"device {(isAtomic ? $"atomic<{type.EmitIdentifier(this)}>" : type.EmitIdentifier(this))}*";
     public string EmitMove(string source) => $"move({source})";
     public string EmitSampleBuffer(string source, string index) => $"SampleBuffer({source}, {index})";
     public string EmitSampleTexture(string source, string index, TextureFilterMode filterMode, TextureWrapMode wrapMode) => $"SampleTexture<{TextureFilterModeToMetal(filterMode)}, {TextureWrapModeToMetal(wrapMode)}>({source}, {index})";
@@ -103,6 +103,7 @@ namespace NanoGraph {
     public bool IsConst;
     public bool IsReference;
     public bool IsDebugOnly;
+    public bool IsAtomic;
   }
 
   public class NanoFunction {
@@ -162,7 +163,7 @@ namespace NanoGraph {
           }
           string typeIdentifier;
           if (type.IsArray) {
-            typeIdentifier = options.IsConst ? Context.EmitBufferType(type.ElementType) : Context.EmitWritableBufferType(type.ElementType);
+            typeIdentifier = options.IsConst ? Context.EmitBufferType(type.ElementType) : Context.EmitWritableBufferType(type.ElementType, isAtomic: options.IsAtomic);
           } else {
             typeIdentifier = GetTypeIdentifier(type) + (options.IsReference ? "&" : "");
           }

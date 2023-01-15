@@ -21,6 +21,11 @@ namespace NanoGraph {
     [EditableAttribute]
     public TypeDeclBuilder Fields = new TypeDeclBuilder();
 
+    [EditableAttribute]
+    public int AtomicCounterFieldIndex = -1;
+    [EditableAttribute]
+    public int AtomicCounterBufferLength = 1;
+
     protected override PrimitiveType? SingleFieldModeType => OutputType.ToPrimitiveTypeOrNull();
     protected override bool RequiresTypeDeclInput => OutputType == BasicOutputType.Fields ? false : base.RequiresTypeDeclInput;
 
@@ -89,7 +94,16 @@ namespace NanoGraph {
         AddGpuFuncInputs(func, CollectComputeInputs(DependentComputeInputsToLoad), gpuInputBuffers, ref bufferIndex);
         AddDebugGpuFuncInputs(func, gpuInputBuffers, ref bufferIndex);
         // Define outputs.
-        AddGpuFuncOutputs(func, computeOutputSpec.Fields, gpuOutputBuffers, ref bufferIndex);
+        // AddGpuFuncOutputs(func, computeOutputSpec.Fields, gpuOutputBuffers, ref bufferIndex);
+        int outputIndex = 0;
+        foreach (DataField field in computeOutputSpec.Fields) {
+          if (field.IsCompileTimeOnly) {
+            continue;
+          }
+          AddGpuFuncOutput(func, field, $"output{outputIndex}", gpuOutputBuffers, ref bufferIndex, isAtomic: outputIndex == Node.AtomicCounterFieldIndex);
+          outputIndex++;
+        }
+
         func.AddParam(Array.Empty<string>(), program.GetPrimitiveType(PrimitiveType.Uint), $"gid_uint", "[[thread_position_in_grid]]");
         func.AddStatement($"{func.GetTypeIdentifier(PrimitiveType.Int)} gid = gid_uint;");
       }
@@ -165,7 +179,12 @@ namespace NanoGraph {
                 continue;
               }
               if (field.Type.IsArray) {
-                func.AddStatement($"{func.Context.EmitWriteBuffer($"output{i}", func.Context.EmitThreadId(), inputLocal?.Identifier)};");
+                if (i == Node.AtomicCounterFieldIndex) {
+                  string counterWriteIndexExpr = func.EmitConvert(inputLocal.Value.Type, TypeSpec.MakePrimitive(PrimitiveType.Int), inputLocal?.Identifier);
+                  func.AddStatement($"atomic_fetch_add_explicit(&output{i}[{counterWriteIndexExpr}], 1, memory_order_relaxed);");
+                } else {
+                  func.AddStatement($"{func.Context.EmitWriteBuffer($"output{i}", func.Context.EmitThreadId(), inputLocal?.Identifier)};");
+                }
               } else {
                 func.AddStatement($"output{i} = {inputLocal?.Identifier};");
               }
@@ -208,8 +227,28 @@ namespace NanoGraph {
         string threadCountLocal = validateCacheFunction.AllocLocal("ThreadCount");
         validateCacheFunction.AddStatement($"{NanoProgram.IntIdentifier} {threadCountLocal} = {EmitThreadCountExpr()};");
         string threadCountExpr = threadCountLocal;
-        AllocateGpuFuncOutputs(validateCacheFunction, computeOutputSpec.Fields, threadCountExpr);
+        int allocateBufferIndex = 0;
+        foreach (var field in computeOutputSpec.Fields) {
+          string thisThreadCountExpr = threadCountExpr;
+          if (allocateBufferIndex == Node.AtomicCounterFieldIndex) {
+            thisThreadCountExpr = validateCacheFunction.EmitLiteral(Node.AtomicCounterBufferLength);
+          }
+          AllocateGpuFuncOutput(validateCacheFunction, field, thisThreadCountExpr);
+          ++allocateBufferIndex;
+        }
         EmitSyncBuffersToGpu(validateCacheFunction, cachedResult, gpuInputBuffers, gpuOutputBuffers);
+
+        if (Node.AtomicCounterFieldIndex >= 0) {
+          NanoProgramType outputType = func.Program.GetProgramType(cachedResult.Type);
+          var outputBuffer = gpuOutputBuffers[Node.AtomicCounterFieldIndex];
+          var fieldName = outputType.GetField(outputBuffer.FieldName);
+          validateCacheFunction.AddStatement($"{{");
+          validateCacheFunction.AddStatement($"  id<MTLBlitCommandEncoder> blitEncoder = [GetCurrentCommandBuffer() blitCommandEncoder];");
+          validateCacheFunction.AddStatement($"  [blitEncoder fillBuffer:{cachedResult.Identifier}.{fieldName}->GetGpuBuffer() range:NSMakeRange(0, {cachedResult.Identifier}.{fieldName}->GetTotalByteLength()) value:0];");
+          validateCacheFunction.AddStatement($"  [blitEncoder endEncoding];");
+          validateCacheFunction.AddStatement($"}}");
+        }
+
         validateCacheFunction.AddStatement($"id<MTLComputeCommandEncoder> encoder = [GetCurrentCommandBuffer() computeCommandEncoder];");
         validateCacheFunction.AddStatement($"[encoder setComputePipelineState:{pipelineStateIdentifier}];");
         // Bind buffers.
