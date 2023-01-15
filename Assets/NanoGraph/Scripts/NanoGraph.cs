@@ -76,6 +76,11 @@ namespace NanoGraph {
       ValidateLater();
     }
 
+    public void ClearOutputNodes() {
+      _outputNodes.Clear();
+      ValidateLater();
+    }
+
     public void Connect(IDataNode sourceNode, string sourcePlugName, IDataNode destNode, string destPlugName) {
       if (sourceNode == null || destNode == null) {
         return;
@@ -240,6 +245,9 @@ namespace NanoGraph {
       if (!Plugin.PluginService.Instance.EnableAutoReload) {
         return;
       }
+      CompileLaterInner();
+    }
+    private void CompileLaterInner() {
       if (_isCompileLaterInFlight) {
         return;
       }
@@ -247,7 +255,7 @@ namespace NanoGraph {
       EditorUtils.InvokeLater(() => {
         _isCompileLaterInFlight = false;
         if (Plugin.PluginService.Instance.IsCompiling) {
-          CompileLater();
+          CompileLaterInner();
           return;
         }
         Compile();
@@ -966,6 +974,12 @@ namespace NanoGraph {
     }
 
     private void GenerateProgramInner(IReadOnlyList<IComputeNode> outputNodes, GenerateState generateState) {
+      // HACK!!
+      string graphName = DebugScriptInstance?.title;
+      if (!string.IsNullOrEmpty(graphName)) {
+        EffectName = graphName;
+      }
+
       Stack<IDataNode> generateNodeStack = new Stack<IDataNode>();
       GenerateNodeScope NewGenerateNodeScope(IDataNode node) {
         GenerateNodeScope scope = new GenerateNodeScope { Node = node, GenerateNodeStack = generateNodeStack, GenerateState = generateState };
@@ -987,6 +1001,9 @@ namespace NanoGraph {
       program.AddPreambleStatement($"@end");
       program.AddPreambleStatement($"@implementation {objCPlaceholderClassIdentifier}");
       program.AddPreambleStatement($"@end");
+      program.AddPreambleStatement($"typedef {objCPlaceholderClassIdentifier} NanoProgramPlaceholder;");
+      program.AddPreambleStatement($"class {program.Identifier};");
+      program.AddPreambleStatement($"typedef {program.Identifier} NanoProgramImpl;");
 
       var getDebugValuesFunction = program.AddOverrideFunction("GetDebugValues", NanoProgram.CpuContext, NanoProgramType.MakeBuiltIn(program, "std::vector<DebugValue>"), modifiers: new[] { "virtual" });
       getDebugValuesFunction.AddStatement("std::vector<DebugValue> debugValues;");
@@ -1400,5 +1417,6 @@ namespace NanoGraph {
       return new NanoGraph { EffectName = "Program" };
     });
     public static NanoGraph DebugInstance => _debugInstance.Value;
+    public static Unity.VisualScripting.FlowGraph DebugScriptInstance = null;
   }
 }

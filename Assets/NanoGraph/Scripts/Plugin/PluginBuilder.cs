@@ -11,6 +11,8 @@ using System.Text.RegularExpressions;
 namespace NanoGraph.Plugin {
   public class PluginBuilder {
     public static string ProjectPath => System.IO.Path.Combine(System.IO.Path.GetDirectoryName(UnityEngine.Application.dataPath), "NanoFFGL");
+    public static string PluginBuildPath => System.IO.Path.Combine(System.IO.Path.GetDirectoryName(UnityEngine.Application.dataPath), "NanoFFGL/build/Release/Plugin.bundle");
+    public static string ProductsPath => System.IO.Path.Combine(System.IO.Path.GetDirectoryName(UnityEngine.Application.dataPath), "Products");
 
     private bool _isDirty = false;
     private bool _isBuilding = false;
@@ -28,7 +30,11 @@ namespace NanoGraph.Plugin {
       StartBuilding();
     }
 
-    private void StartBuilding() {
+    public void ExportPlugin(string exportAs) {
+      StartBuilding(isExportPlugin: true, exportAs: exportAs);
+    }
+
+    private void StartBuilding(bool isExportPlugin = false, string exportAs = null) {
       if (_isBuilding) {
         return;
       }
@@ -38,7 +44,7 @@ namespace NanoGraph.Plugin {
       IsError = false;
       EditorUtils.DelayCall += async () => {
         bool success = await Task.Run(() => {
-          return DoBuild();
+          return DoBuild(isExportPlugin, exportAs); 
         });
         IsError = !success;
         _isBuilding = false;
@@ -51,7 +57,7 @@ namespace NanoGraph.Plugin {
     private static readonly Regex _warningLinePattern =  new Regex(@"^.*:[0-9]+:[0-9]+: warning: .*$");
     private static readonly Regex _endOfErrorsLinePattern =  new Regex(@"[0-9]+ warnings and [0-9]+ errors generated.");
 
-    private bool DoBuild() {
+    private bool DoBuild(bool isExportPlugin, string exportAs) {
       UnityEngine.Debug.Log("Beginning build.");
 
       ProcessStartInfo startParams = new ProcessStartInfo();
@@ -61,21 +67,30 @@ namespace NanoGraph.Plugin {
       startParams.UseShellExecute = false;
       startParams.WorkingDirectory = ProjectPath;
       startParams.FileName = "/usr/bin/xcodebuild";
-      startParams.ArgumentList.Add("-target");
-      startParams.ArgumentList.Add("NanoFFGL");
-      startParams.ArgumentList.Add("-configuration");
-      startParams.ArgumentList.Add("Debug");
-      startParams.ArgumentList.Add("-scheme");
-      startParams.ArgumentList.Add("NanoFFGL");
+      if (isExportPlugin) {
+        startParams.ArgumentList.Add("-target");
+        startParams.ArgumentList.Add("Plugin");
+        startParams.ArgumentList.Add("-configuration");
+        startParams.ArgumentList.Add("Release");
+        startParams.ArgumentList.Add("-scheme");
+        startParams.ArgumentList.Add("Plugin");
+      } else {
+        startParams.ArgumentList.Add("-target");
+        startParams.ArgumentList.Add("NanoFFGL");
+        startParams.ArgumentList.Add("-configuration");
+        startParams.ArgumentList.Add("Debug");
+        startParams.ArgumentList.Add("-scheme");
+        startParams.ArgumentList.Add("NanoFFGL");
+      }
 
       Process process = new Process();
       process.StartInfo = startParams;
 
       process.Start();
-      process.WaitForExit();
-
       string outputStr = process.StandardOutput.ReadToEnd();
       string errorStr = process.StandardError.ReadToEnd();
+      process.WaitForExit();
+
       int resultCode = process.ExitCode;
 
       UnityEngine.Debug.Log($"Done build: Code {resultCode}\n{outputStr}\n{errorStr}");
@@ -114,6 +129,27 @@ namespace NanoGraph.Plugin {
         currentSegment.Add(line);
       }
       FinishPushSegment();
+
+      if (isExportPlugin && resultCode == 0) {
+        try {
+          if (!Directory.Exists(PluginBuildPath)) {
+            errors.Add($"ExportPlugin: Plugin bundle not found at {PluginBuildPath}.");
+          } else {
+            Directory.CreateDirectory(ProductsPath);
+            string pluginName = exportAs ?? "Plugin";
+            string sourcePath = PluginBuildPath;
+            string dstPath = Path.Combine(ProductsPath, $"{pluginName}.bundle");
+            if (Directory.Exists(dstPath)) {
+              Directory.Delete(dstPath, recursive: true);
+            }
+            Directory.Move(sourcePath, dstPath);
+            File.Move(Path.Combine(dstPath, "Contents/MacOS/Plugin"), Path.Combine(dstPath, $"Contents/MacOS/{pluginName}"));
+          }
+        } catch (Exception e) {
+          errors.Add($"ExportPlugin: Error running export: {e}.");
+        }
+      }
+
       lock (_compileErrorsLock) {
         _compileErrors = errors.ToArray();
       }

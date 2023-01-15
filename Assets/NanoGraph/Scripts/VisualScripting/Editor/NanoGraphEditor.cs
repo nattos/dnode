@@ -22,7 +22,7 @@ namespace NanoGraph.VisualScripting {
       return baseHeight + controlsHeight + _messagesHeight;
     }
 
-    protected override void OnGUI(Rect position, GUIContent label) {
+    protected override void OnGUI(Rect position, GUIContent label) {      
       base.OnGUI(position, label);
       position.y = y;
       position.height -= y;

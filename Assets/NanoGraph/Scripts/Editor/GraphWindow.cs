@@ -399,6 +399,11 @@ namespace NanoGraph.VisualScripting {
     private Vector2 m_Scroll;
 
     protected override void OnGUI() {
+      FlowGraph debugScriptInstance = graph as FlowGraph;
+      if (NanoGraph.DebugScriptInstance != debugScriptInstance) {
+        NanoGraph.DebugScriptInstance = debugScriptInstance;
+        NanoGraph.DebugInstance?.ClearOutputNodes();
+      }
       base.OnGUI();
 
       FixActive();

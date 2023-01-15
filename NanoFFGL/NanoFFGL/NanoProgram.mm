@@ -658,7 +658,7 @@ namespace {
 
 
 NanoProgram* CreateProgram() {
-  return new Program_Program();
+  return new NanoProgramImpl();
 }
 
 
@@ -668,7 +668,7 @@ void NanoProgram::EnsureResources() {
     _startTime = [NSDate now].timeIntervalSince1970;
 
     NSError* error;
-    id<MTLLibrary> defaultLibrary = [_device newDefaultLibraryWithBundle:[NSBundle bundleForClass:[Program_Program_Placeholder class]] error:&error];
+    id<MTLLibrary> defaultLibrary = [_device newDefaultLibraryWithBundle:[NSBundle bundleForClass:[NanoProgramPlaceholder class]] error:&error];
     id<MTLComputePipelineState> copyTextureSampleNearestPipeline = [_device newComputePipelineStateWithFunction:[defaultLibrary newFunctionWithName:@"CopyTextureSampleNearest"] error:&error];
     id<MTLComputePipelineState> copyTextureSampleLinearPipeline = [_device newComputePipelineStateWithFunction:[defaultLibrary newFunctionWithName:@"CopyTextureSampleLinear"] error:&error];
     id<MTLComputePipelineState> clearTextureSolidPipeline = [_device newComputePipelineStateWithFunction:[defaultLibrary newFunctionWithName:@"ClearTextureSolid"] error:&error];
@@ -689,7 +689,7 @@ void NanoProgram::EnsureResources() {
 }
 
 void NanoProgram::BlitOutputTexture(int index, id<MTLTexture> outputTexture) {
-  BlitOutputTextureImpl(((Program_Program*)this)->GetOutput0(), outputTexture, this, &this->_blitOutputTextureResources);
+  BlitOutputTextureImpl(((NanoProgramImpl*)this)->GetOutput0(), outputTexture, this, &this->_blitOutputTextureResources);
 }
 
 

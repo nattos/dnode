@@ -181,8 +181,14 @@ namespace NanoGraph {
             NanoGraph.DebugInstance?.CompileLater();
           };
         }
+        if (GUILayout.Button("Export Plugin")) {
+          EditorApplication.delayCall += () => {
+            PluginService.Instance.ExportPlugin(NanoGraph.DebugInstance?.EffectName);
+          };
+        }
         Input = EditorGUILayout.ToggleLeft("Show Input", Input);
         Locked = EditorGUILayout.ToggleLeft("Locked", Locked);
+        PluginService.Instance.EnableAutoReload = EditorGUILayout.ToggleLeft("Auto Reload", PluginService.Instance.EnableAutoReload);
         EditorGUILayout.Space(0, expand: true);
       }
 

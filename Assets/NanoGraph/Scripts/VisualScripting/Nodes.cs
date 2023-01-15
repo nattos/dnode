@@ -272,6 +272,11 @@ namespace NanoGraph.VisualScripting {
           }
         }
       }
+      if (isOutputNode) {
+        if (NanoGraph.DebugScriptInstance != this.graph) {
+          isOutputNode = false;
+        }
+      }
 
       if (_isRegisteredAsOutputNode != isOutputNode) {
         _isRegisteredAsOutputNode = isOutputNode;

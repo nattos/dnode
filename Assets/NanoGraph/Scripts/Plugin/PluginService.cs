@@ -49,7 +49,7 @@ namespace NanoGraph.Plugin {
     public Action TextureInputsNeedUpdating;
     public Action TextureOutputsUpdated;
 
-    public bool EnableAutoReload { get; set; } = false;
+    public bool EnableAutoReload { get; set; } = true;
 
     public bool IsCompiling => _pluginWatcher.IsCompiling || _pluginBuilder.IsCompiling;
     public bool HasCompileError => _pluginBuilder.IsError;
@@ -78,6 +78,10 @@ namespace NanoGraph.Plugin {
       if (EnableAutoReload) {
         StartRendering();
       }
+    }
+
+    public void ExportPlugin(string exportAs) {
+      _pluginBuilder.ExportPlugin(exportAs);
     }
 
     public Texture2D GetTextureInput() {
