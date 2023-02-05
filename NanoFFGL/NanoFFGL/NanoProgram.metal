@@ -95,7 +95,24 @@ template<> vector_float3 inline Convert<vector_float4, vector_float3>(vector_flo
 
 
 
+template<typename T> static inline float min_op(T a, T b) { return min(a, b); }
+template<typename T> static inline float max_op(T a, T b) { return max(a, b); }
 
+
+static inline float atan_op(float a) { return atan(a); }
+static inline vector_float2 atan_op(vector_float2 a) { return vector_float2 { atan_op(a.x), atan_op(a.y) }; }
+static inline vector_float3 atan_op(vector_float3 a) { return vector_float3 { atan_op(a.x), atan_op(a.y), atan_op(a.z) }; }
+static inline vector_float4 atan_op(vector_float4 a) { return vector_float4 { atan_op(a.x), atan_op(a.y), atan_op(a.z), atan_op(a.w) }; }
+
+static inline float atan2_op(float a, float b) { return atan2(a, b); }
+static inline vector_float2 atan2_op(vector_float2 a, vector_float2 b) { return vector_float2 { atan2_op(a.x, b.x), atan2_op(a.y, b.y) }; }
+static inline vector_float3 atan2_op(vector_float3 a, vector_float3 b) { return vector_float3 { atan2_op(a.x, b.x), atan2_op(a.y, b.y), atan2_op(a.z, b.z) }; }
+static inline vector_float4 atan2_op(vector_float4 a, vector_float4 b) { return vector_float4 { atan2_op(a.x, b.x), atan2_op(a.y, b.y), atan2_op(a.z, b.z), atan2_op(a.w, b.w) }; }
+
+static inline float abs_op(float a) { return abs(a); }
+static inline vector_float2 abs_op(vector_float2 a) { return vector_float2 { abs(a.x), abs(a.y) }; }
+static inline vector_float3 abs_op(vector_float3 a) { return vector_float3 { abs(a.x), abs(a.y), abs(a.z) }; }
+static inline vector_float4 abs_op(vector_float4 a) { return vector_float4 { abs(a.x), abs(a.y), abs(a.z), abs(a.w) }; }
 
 static inline float modulo_op(int a, int b) { return (a % b); }
 static inline float modulo_op(float a, float b) { return modf(a, b); }
@@ -160,7 +177,25 @@ static inline float logE(float a) { return log(a); }
 static inline vector_float2 logE(vector_float2 a) { return vector_float2 { log(a.x), log(a.y) }; }
 static inline vector_float3 logE(vector_float3 a) { return vector_float3 { log(a.x), log(a.y), log(a.z) }; }
 static inline vector_float4 logE(vector_float4 a) { return vector_float4 { log(a.x), log(a.y), log(a.z), log(a.w) }; }
-  
+
+template<typename T>
+struct ValueAndBool {
+  T Value;
+  bool Flag;
+};
+
+template<typename T> static inline bool to_bool(const T value) { return Convert<T, bool>(value); }
+template<typename T> static inline bool to_bool(const ValueAndBool<T> value) { return value.Flag; }
+
+template<typename T> static inline bool not_op(const T value) { return !to_bool(value); }
+template<typename T> static inline bool and_op(const T lhs, const T rhs) { return to_bool(lhs) && to_bool(rhs); }
+template<typename T> static inline bool or_op(const T lhs, const T rhs) { return to_bool(lhs) || to_bool(rhs); }
+template<typename T> static inline bool xor_op(const T lhs, const T rhs) { return to_bool(lhs) ^ to_bool(rhs); }
+template<typename T> static inline ValueAndBool<T> greater_than_op(const T lhs, const T rhs) { return ValueAndBool<T> { rhs, (lhs > rhs) }; }
+template<typename T> static inline ValueAndBool<T> less_than_op(const T lhs, const T rhs) { return ValueAndBool<T> { rhs, (lhs < rhs) }; }
+template<typename T> static inline ValueAndBool<T> greater_or_equal_op(const T lhs, const T rhs) { return ValueAndBool<T> { rhs, (lhs >= rhs) }; }
+template<typename T> static inline ValueAndBool<T> less_or_equal_op(const T lhs, const T rhs) { return ValueAndBool<T> { rhs, (lhs <= rhs) }; }
+
 template<bool useAlpha, typename T> static inline T lerp_mix(T rhs, float t) { return rhs * t; }
 template<bool useAlpha, typename T> static inline T lerp_mix(T rhs, T lhs, float t) { return mix(rhs, lhs, t); }
 

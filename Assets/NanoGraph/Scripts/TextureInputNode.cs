@@ -9,6 +9,7 @@ namespace NanoGraph {
   public class TextureInputNode : ScalarComputeNode {
     public override DataSpec InputSpec => DataSpec.Empty;
     public override DataSpec OutputSpec => DataSpec.FromFields(DataField.MakePrimitive("Out", PrimitiveType.Texture));
+    protected override string ShortNamePart => $"TextureIn";
 
     public override IComputeNodeEmitCodeOperation CreateEmitCodeOperation(ComputeNodeEmitCodeOperationContext context) => new EmitterInput(this, context);
 

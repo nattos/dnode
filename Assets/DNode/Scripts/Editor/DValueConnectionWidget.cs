@@ -40,8 +40,8 @@ namespace DNode {
           EditorGUIUtility.SetIconSize(new Vector2(IconSize.Small, IconSize.Small));
 
           object value = null;
-          var sourceNode = NanoGraph.VisualScripting.BaseNode.GetSourceBaseNodeOrNull(connection.source?.unit, connection.source?.key, out _);
-          string debugId = sourceNode?.Node?.DebugId;
+          var sourceNode = NanoGraph.VisualScripting.BaseNode.GetSourceNodeOrNull(connection.source?.unit, connection.source?.key, out _);
+          string debugId = sourceNode?.DebugId;
           if (debugId != null) {
             string debugKey = $"{debugId}.{connection.source.key}";
             double[] values = NanoGraph.Plugin.PluginService.Instance.GetDebugValues(debugKey);

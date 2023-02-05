@@ -107,6 +107,15 @@ namespace NanoGraph {
           output.AppendLine($"  {edge},");
         }
         output.AppendLine($"]");
+
+
+        foreach (var edge in inputEdges) {
+          string child = (edge.Source.Node as DataNode)?.DebugInfoDump;
+          output.AppendLine();
+          output.AppendLine(child);
+        }
+
+
         return output.ToString();
       }
     }

@@ -19,6 +19,7 @@ namespace NanoGraph {
     [EditableAttribute]
     public AutoType OutType = AutoType.Auto;
     public TypeSpec InternalElementType = TypeSpec.MakePrimitive(PrimitiveType.Float);
+    protected override string ShortNamePart => $"Latch";
 
     [EditableAttribute]
     public bool IsGpuContext = false;
@@ -72,7 +73,7 @@ namespace NanoGraph {
         // TODO: Allow the CPU buffer to not exist at all.
         validateCacheFunc.AddStatement($"{instanceFieldIdentifier}->Resize({threadCountExpr});");
         // Note: We don't care about the contents of the CPU buffer at all.
-        validateCacheFunc.AddStatement($"{instanceFieldIdentifier}->MarkGpuBufferChanged();");
+        // validateCacheFunc.AddStatement($"{instanceFieldIdentifier}->MarkGpuBufferChanged();");
       }
 
       public void EmitPostValidateCache(NanoFunction validateCacheFunc, IComputeNode fromNode) {

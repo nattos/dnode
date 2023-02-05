@@ -203,11 +203,11 @@ namespace NanoGraph {
         var context = graphWindow?.context;
         var selection = context?.selection;
         bool hasSelection = selection?.Count > 0;
-        global::NanoGraph.VisualScripting.BaseNode selectedBaseNode = selection?.FirstOrDefault() as global::NanoGraph.VisualScripting.BaseNode;
+        global::NanoGraph.VisualScripting.NodeBasedNode selectedBaseNode = selection?.FirstOrDefault() as global::NanoGraph.VisualScripting.NodeBasedNode;
         if (hasSelection) {
           string desiredDebugOutputTextureKey;
           if (selectedBaseNode != null) {
-            string nodeDebugId = selectedBaseNode.Node?.DebugId ?? "";
+            string nodeDebugId = selectedBaseNode.DebugId ?? "";
             string nodeDebugFieldKey = "";
             foreach (var output in selectedBaseNode.outputs) {
               if (string.IsNullOrEmpty(nodeDebugFieldKey)) {

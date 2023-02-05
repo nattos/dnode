@@ -20,12 +20,12 @@ namespace NanoGraph.VisualScripting {
     }
 
     protected override float GetHeight(float width, GUIContent label) {
-      _attributesHeight = EditableAttributesInspector.GetHeight(width, (metadata.value as BaseNode)?.Node as IEditableAttributeProvider);
+      _attributesHeight = EditableAttributesInspector.GetHeight(width, (metadata.value as NodeBasedNode)?.Node as IEditableAttributeProvider);
       return base.GetHeight(width, label) + _attributesHeight + _messagesHeight + EditorGUIUtility.singleLineHeight * 2;
     }
 
     protected override void OnGUI(Rect position, GUIContent label) {
-      BaseNode node = metadata.value as BaseNode;
+      NodeBasedNode node = metadata.value as NodeBasedNode;
       if (node == null) {
         return;
       }
@@ -75,7 +75,7 @@ namespace NanoGraph.VisualScripting {
     }
 
     private void DrawMessages(Rect rect) {
-      IReadOnlyList<string> messages = (metadata.value as BaseNode)?.Node?.Messages ?? Array.Empty<string>();
+      IReadOnlyList<string> messages = (metadata.value as NodeBasedNode)?.Node?.Messages ?? Array.Empty<string>();
       EditorGUI.TextArea(rect, string.Join("\n\n", messages) + "\n", _styles.Value.WrappedTextArea);
     }
 
@@ -107,7 +107,8 @@ namespace NanoGraph.VisualScripting {
           } catch (KeyNotFoundException e) {
             return;
           }
-          if (BaseNode.GetSourceBaseNodeOrNull(connection.source.unit, connection.source.key, out _) is BaseNode sourceNode) {
+          // if (BaseNode.GetSourceBaseNodeOrNull(connection.source.unit, connection.source.key, out _) is BaseNode sourceNode) {
+          if (connection.source.unit is BaseNode sourceNode) {
             try {
               sourceNode.NotifyOutputConnectionsChanged();
             } catch {}

@@ -8,8 +8,14 @@ using Unity.VisualScripting;
 
 namespace NanoGraph.VisualScripting {
   public abstract class BaseNode : Unit, IDCustomInspectorDataProvider, IValueEditedHandler {
-    [Serialize]
-    public IDataNode Node;
+    // [Serialize]
+    // public IDataNode Node;
+    public abstract NanoGraph Graph { get; }
+    public abstract string DebugId { get; }
+    public abstract DataSpec NodeInputSpec { get; }
+    public abstract DataSpec NodeOutputSpec { get; }
+    protected abstract DataEdge[] GetAllInputDataEdges();
+    protected abstract IDataNode GetNodeConnectedToInputPort(string fieldName, out string actualFieldName);
 
     private readonly Dictionary<string, IUnitInputPort> _fieldNameToInputPortMap = new Dictionary<string, IUnitInputPort>();
 
@@ -19,8 +25,7 @@ namespace NanoGraph.VisualScripting {
     private bool _didConnectSerializedLiteralNodes = false;
     private readonly Dictionary<string, DCustomInspectorData> _fieldNameToCustomInspectorData = new Dictionary<string, DCustomInspectorData>();
 
-    private readonly Action _nodeInvalidatedHandler;
-    private bool _isRegisteredAsOutputNode;
+    protected readonly Action _nodeInvalidatedHandler;
 
     public BaseNode() {
       _nodeInvalidatedHandler = () => { PortsChanged(); Define(); SyncInputConnectionsToGraphEdges(); };
@@ -29,7 +34,6 @@ namespace NanoGraph.VisualScripting {
     public override void BeforeAdd() {
       base.BeforeAdd();
       EnsureNode();
-      Node.Graph.AddNodeInvalidatedHandler(Node, _nodeInvalidatedHandler);
     }
 
     public override void AfterAdd() {
@@ -39,22 +43,17 @@ namespace NanoGraph.VisualScripting {
 
     public override void AfterRemove() {
       base.AfterRemove();
-      // TODO: Remove node.
-      Node?.Graph?.RemoveNode(Node);
       foreach (LiteralNode node in _fieldNameToLiteralNodes.Values) {
         node?.Graph?.RemoveNode(node);
       }
       _fieldNameToLiteralNodes.Clear();
-
-      Node?.Graph?.AddNodeInvalidatedHandler(Node, _nodeInvalidatedHandler);
     }
 
-    public void NotifyInputConnectionsChanged() {
+    public virtual void NotifyInputConnectionsChanged() {
       SyncInputConnectionsToGraphEdges();
-      (Node as IAutoTypeNode)?.UpdateTypesFromInputs();
     }
 
-    public void NotifyOutputConnectionsChanged() {
+    public virtual void NotifyOutputConnectionsChanged() {
       SyncOutputNodeRegistration();
     }
 
@@ -63,16 +62,14 @@ namespace NanoGraph.VisualScripting {
         Plugin.PluginService.Instance.SetDebugValue(literalNode.DebugValueKey, literalNode.EffectiveInternalValue.ValueArray);
         return;
       }
-      Node?.Graph?.CompileLater();
+      Graph?.CompileLater();
     }
 
     protected override void Definition() {
       EnsureNode();
-      Node.DebugId = this.guid.ToString();
-
       _fieldNameToCustomInspectorData.Clear();
-      DataSpec inputSpec = Node.InputSpec;
-      DataSpec outputSpec = Node.OutputSpec;
+      DataSpec inputSpec = NodeInputSpec;
+      DataSpec outputSpec = NodeOutputSpec;
       foreach (var field in inputSpec.Fields) {
         DValue? value = null;
         if (field.Type.Primitive != null) {
@@ -119,8 +116,6 @@ namespace NanoGraph.VisualScripting {
       foreach (var input in inputs) {
         _fieldNameToInputPortMap[input.key] = input;
       }
-      Node.Graph.MarkNodeDirty(Node);
-      Node.Graph.ValidateLater();
     }
 
     public DCustomInspectorData? ProvideCustomInspectorData(string key) {
@@ -130,27 +125,14 @@ namespace NanoGraph.VisualScripting {
       return null;
     }
 
-    private void EnsureNode() {
-      if (Node != null) {
-        if (Node.Graph == null) {
-          Node.DebugId = this.guid.ToString();
-          NanoGraph.DebugInstance.AddNode(Node);
-        }
-        return;
-      }
-      Node = CreateNode();
-      Node.DebugId = this.guid.ToString();
-      NanoGraph.DebugInstance.AddNode(Node);
-    }
+    protected abstract void EnsureNode();
 
-    protected abstract IDataNode CreateNode();
-
-    public void SyncInputConnectionsToGraphEdges() {
+    public virtual void SyncInputConnectionsToGraphEdges() {
       // Debug.Log($"Syncing Input: {this}");
-      NanoGraph graph = Node.Graph;
-      DataEdge[] oldInputEdges = graph.GetInputEdges(Node);
+      NanoGraph graph = Graph;
+      DataEdge[] oldInputEdges = GetAllInputDataEdges();
 
-      DataSpec inputSpec = Node.InputSpec;
+      DataSpec inputSpec = NodeInputSpec;
       List<DataEdge> edgesToRemove = new List<DataEdge>();
       List<DataEdge> edgesToAdd = new List<DataEdge>();
 
@@ -172,7 +154,7 @@ namespace NanoGraph.VisualScripting {
           edgesToRemove.Add(oldInputEdge);
           continue;
         }
-        IDataNode newSourceNode = GetSourceBaseNodeOrNull(inputConnection.source.unit, inputConnection.source.key, out string actualKey)?.Node;
+        IDataNode newSourceNode = GetSourceNodeOrNull(inputConnection.source.unit, inputConnection.source.key, out string actualKey);
         if (oldSourceNode != newSourceNode || actualKey != oldInputEdge.Source.FieldName) {
           edgesToRemove.Add(oldInputEdge);
           edgesToAdd.Add(new DataEdge { Source = new DataPlug { Node = newSourceNode, FieldName = actualKey }, Destination = oldInputEdge.Destination });
@@ -181,8 +163,9 @@ namespace NanoGraph.VisualScripting {
       }
       // Look for new connections.
       foreach (IUnitInputPort inputPort in inputs) {
+        IDataNode outputNode = GetNodeConnectedToInputPort(inputPort.key, out string actualInputPortKey);
         var inputConnection = inputPort.connections.FirstOrDefault();
-        IDataNode inputNode = GetSourceBaseNodeOrNull(inputConnection?.source.unit, inputConnection?.source.key, out string actualKey)?.Node;
+        IDataNode inputNode = GetSourceNodeOrNull(inputConnection?.source.unit, inputConnection?.source.key, out string actualKey);
         if (inputNode == null) {
           // TODO: Update nodes if types differ.
           // Link a LiteralNode if appropriate.
@@ -201,7 +184,7 @@ namespace NanoGraph.VisualScripting {
                 Func<DValue> valueProvider = () => defaultValues.GetValueOrDefault(inputPort.key) as DValue? ?? default;
                 literalNode.InternalValueProvider = valueProvider;
                 graph.AddNode(literalNode);
-                edgesToAdd.Add(new DataEdge { Source = new DataPlug { Node = literalNode, FieldName = "Out" }, Destination = new DataPlug { Node = Node, FieldName = inputPort.key } });
+                edgesToAdd.Add(new DataEdge { Source = new DataPlug { Node = literalNode, FieldName = "Out" }, Destination = new DataPlug { Node = outputNode, FieldName = actualInputPortKey } });
               }
             }
           } else {
@@ -214,7 +197,7 @@ namespace NanoGraph.VisualScripting {
             _fieldNameToLiteralNodes[inputPort.key] = literalNode;
 
             graph.AddNode(literalNode);
-            edgesToAdd.Add(new DataEdge { Source = new DataPlug { Node = literalNode, FieldName = "Out" }, Destination = new DataPlug { Node = Node, FieldName = inputPort.key } });
+            edgesToAdd.Add(new DataEdge { Source = new DataPlug { Node = literalNode, FieldName = "Out" }, Destination = new DataPlug { Node = outputNode, FieldName = actualInputPortKey } });
           }
           continue;
         }
@@ -223,7 +206,7 @@ namespace NanoGraph.VisualScripting {
           continue;
         }
         // Input is connected and not in the existing edges. Add it.
-        edgesToAdd.Add(new DataEdge { Source = new DataPlug { Node = inputNode, FieldName = actualKey }, Destination = new DataPlug { Node = Node, FieldName = inputPort.key } });
+        edgesToAdd.Add(new DataEdge { Source = new DataPlug { Node = inputNode, FieldName = actualKey }, Destination = new DataPlug { Node = outputNode, FieldName = actualInputPortKey } });
       }
 
       foreach (var entry in _fieldNameToLiteralNodes.ToArray()) {
@@ -231,7 +214,7 @@ namespace NanoGraph.VisualScripting {
           RemoveLiteralNode(entry);
           continue;
         }
-        bool isConnected = inputPort.connections.Any(connection => GetSourceBaseNodeOrNull(connection.source.unit, connection.source.key, out _) != null);
+        bool isConnected = inputPort.connections.Any(connection => GetSourceNodeOrNull(connection.source.unit, connection.source.key, out _) != null);
         if (isConnected) {
           RemoveLiteralNode(entry);
           continue;
@@ -260,36 +243,7 @@ namespace NanoGraph.VisualScripting {
       entry.Value?.Graph?.RemoveNode(entry.Value);
     }
 
-    private void SyncOutputNodeRegistration() {
-      bool isOutputNode = false;
-      foreach (var output in outputs) {
-        foreach (var connection in output.connections) {
-          if (connection.destination.unit is GraphOutput graphOutput) {
-            if (GetSubgraphUnit(graphOutput.graph) == null) {
-              isOutputNode = true;
-            }
-            break;
-          }
-        }
-      }
-      if (isOutputNode) {
-        if (NanoGraph.DebugScriptInstance != this.graph) {
-          isOutputNode = false;
-        }
-      }
-
-      if (_isRegisteredAsOutputNode != isOutputNode) {
-        _isRegisteredAsOutputNode = isOutputNode;
-        IComputeNode computeNode = Node as IComputeNode;
-        if (computeNode != null) {
-          if (isOutputNode) {
-            Node.Graph.RegisterOutputNode(computeNode);
-          } else {
-            Node.Graph.UnregisterOutputNode(computeNode);
-          }
-        }
-      }
-    }
+    protected virtual void SyncOutputNodeRegistration() {}
 
     public static IEnumerable<BaseNode> GetDestBaseNodes(IUnit dest, string key) {
       if (dest is SubgraphUnit subgraphUnit) {
@@ -310,7 +264,8 @@ namespace NanoGraph.VisualScripting {
       }
     }
 
-    public static BaseNode GetSourceBaseNodeOrNull(IUnit src, string key, out string actualKey) {
+    // public static BaseNode GetSourceBaseNodeOrNull(IUnit src, string key, out string actualKey) {
+    public static IDataNode GetSourceNodeOrNull(IUnit src, string key, out string actualKey) {
       actualKey = key;
       if (src is SubgraphUnit subgraphUnit) {
         GraphOutput graphOutput = subgraphUnit?.nest?.graph?.units?.FirstOrDefault(unit => unit is GraphOutput) as GraphOutput;
@@ -319,8 +274,8 @@ namespace NanoGraph.VisualScripting {
         }
         foreach (var connection in graphOutput.connections) {
           if (connection.destination.key == key) {
-            if (connection.source.unit is BaseNode baseNode) {
-              return baseNode;
+            if (connection.source.unit is NodeBasedNode baseNode) {
+              return baseNode.Node;
             }
           }
         }
@@ -332,11 +287,13 @@ namespace NanoGraph.VisualScripting {
         }
         foreach (var connection in ownerSubgraphUnit.connections) {
           if (connection.destination.key == key) {
-            return GetSourceBaseNodeOrNull(connection.source.unit, connection.source.key, out actualKey);
+            return GetSourceNodeOrNull(connection.source.unit, connection.source.key, out actualKey);
           }
         }
-      } else if (src is BaseNode baseNode) {
-        return baseNode;
+      } else if (src is EmbeddedNode embeddedNode) {
+        return embeddedNode.GetNodeConnectedToOutputPort(key, out actualKey);
+      } else if (src is NodeBasedNode baseNode) {
+        return baseNode.Node;
       }
       return null;
     }
@@ -383,7 +340,272 @@ namespace NanoGraph.VisualScripting {
     }
   }
 
-  public abstract class NodeOfType<T> : BaseNode where T : IDataNode, new() {
+  public class EmbeddedNode : BaseNode {
+    [Serialize]
+    public ScriptGraphAsset ScriptGraphAssetReference;
+
+    private NanoGraph _graph;
+    public override NanoGraph Graph => _graph;
+    public override string DebugId => null;
+
+    private FlowGraph _flowGraph;
+    private DataSpec _inputSpec = DataSpec.Empty;
+    private DataSpec _outputSpec = DataSpec.Empty;
+
+    public override DataSpec NodeInputSpec => _inputSpec;
+    public override DataSpec NodeOutputSpec => _outputSpec;
+
+    private Dictionary<string, RouteNode> _inputRouteNodes = new Dictionary<string, RouteNode>();
+    private Dictionary<string, RouteNode> _outputRouteNodes = new Dictionary<string, RouteNode>();
+
+    protected override DataEdge[] GetAllInputDataEdges() => Array.Empty<DataEdge>();
+    protected override IDataNode GetNodeConnectedToInputPort(string fieldName, out string actualFieldName) {
+      if (_inputRouteNodes.TryGetValue(fieldName, out RouteNode routeNode)) {
+        actualFieldName = "In";
+        return routeNode;
+      }
+      actualFieldName = null;
+      return null;
+    }
+    public IDataNode GetNodeConnectedToOutputPort(string fieldName, out string actualFieldName) {
+      if (_outputRouteNodes.TryGetValue(fieldName, out RouteNode routeNode)) {
+        actualFieldName = "Out";
+        return routeNode;
+      }
+      actualFieldName = null;
+      return null;
+    }
+
+    public override void BeforeAdd() {
+      base.BeforeAdd();
+    }
+
+    public override void AfterAdd() {
+      base.AfterAdd();
+    }
+
+    public override void AfterRemove() {
+      base.AfterRemove();
+      _flowGraph?.Dispose();
+    }
+
+    public override void Dispose() {
+      base.Dispose();
+      _flowGraph?.Dispose();
+    }
+
+    public override void NotifyInputConnectionsChanged() {
+      base.NotifyInputConnectionsChanged();
+    }
+
+    public override void NotifyOutputConnectionsChanged() {
+      base.NotifyOutputConnectionsChanged();
+    }
+
+    protected override void Definition() {
+      base.Definition();
+    }
+
+    public override void SyncInputConnectionsToGraphEdges() {
+      NanoGraph graph = _graph;
+      GraphInput graphInputUnit = _flowGraph.units.FirstOrDefault(unit => unit is GraphInput) as GraphInput;
+      GraphOutput graphOutputUnit = _flowGraph.units.FirstOrDefault(unit => unit is GraphOutput) as GraphOutput;
+
+      if (graphInputUnit != null) {
+        var routeNodes = _inputRouteNodes;
+        HashSet<string> removedKeys = new HashSet<string>(routeNodes.Keys);
+        foreach (var port in graphInputUnit.valueOutputs) {
+          string key = port.key;
+          removedKeys.Remove(key);
+          if (!routeNodes.TryGetValue(key, out RouteNode routeNode)) {
+            routeNode = new RouteNode { TypeSpecSource = InputSource.External };
+            graph.AddNode(routeNode);
+            routeNodes[key] = routeNode;
+
+            // foreach (var connection in port.connections) {
+            //   foreach (var dest in BaseNode.GetDestBaseNodes(connection.destination.unit, connection.destination.key)) {
+            //     // TODO: Fix.
+            //     graph.Connect(routeNode, "Out", (dest as NodeBasedNode).Node, connection.destination.key);
+            //   }
+            // }
+          }
+          foreach (var connection in port.connections) {
+            foreach (var dest in BaseNode.GetDestBaseNodes(connection.destination.unit, connection.destination.key)) {
+              // TODO: Fix.
+              graph.Connect(routeNode, "Out", (dest as NodeBasedNode).Node, connection.destination.key);
+            }
+          }
+        }
+        foreach (string removedKey in removedKeys) {
+          RouteNode node = routeNodes[removedKey];
+          routeNodes.Remove(removedKey);
+          graph.RemoveNode(node);
+        }
+      }
+      if (graphOutputUnit != null) {
+        var routeNodes = _outputRouteNodes;
+        HashSet<string> removedKeys = new HashSet<string>(routeNodes.Keys);
+        foreach (var port in graphOutputUnit.valueInputs) {
+          string key = port.key;
+          removedKeys.Remove(key);
+          if (!routeNodes.TryGetValue(key, out RouteNode routeNode)) {
+            routeNode = new RouteNode { TypeSpecSource = InputSource.Internal };
+            graph.AddNode(routeNode);
+            routeNodes[key] = routeNode;
+            var connection = port.connections.FirstOrDefault();
+            if (connection != null) {
+              IDataNode input = BaseNode.GetSourceNodeOrNull(connection.source.unit, connection.source.key, out string actualKey);
+              if (input != null) {
+                graph.Connect(input, actualKey, routeNode, "In");
+              }
+            }
+          }
+          {
+            var connection = port.connections.FirstOrDefault();
+            if (connection != null) {
+              IDataNode input = BaseNode.GetSourceNodeOrNull(connection.source.unit, connection.source.key, out string actualKey);
+              if (input != null) {
+                DataField field = input.OutputSpec.Fields.First(field => field.Name == actualKey);
+                routeNode.InternalTypeSpec = field.Type;
+              }
+            }
+          }
+        }
+        foreach (string removedKey in removedKeys) {
+          RouteNode node = routeNodes[removedKey];
+          routeNodes.Remove(removedKey);
+          graph.RemoveNode(node);
+        }
+      }
+
+      base.SyncInputConnectionsToGraphEdges();
+    }
+
+    protected override void EnsureNode() {
+      _graph = NanoGraph.DebugInstance;
+
+      if (!ScriptGraphAssetReference) {
+        try {
+          ScriptGraphAssetReference = UnityEditor.AssetDatabase.LoadAssetAtPath<ScriptGraphAsset>("Assets/NanoGraph/SubGraphs/Clamp.asset");
+        } catch (Exception) {
+        }
+      }
+      if (_flowGraph != null) { 
+        return;
+      }
+      if (ScriptGraphAssetReference) {
+        _flowGraph = Unity.VisualScripting.Serialization.CloneViaSerialization(ScriptGraphAssetReference.graph);
+      }
+      if (_flowGraph == null) {
+        return;
+      }
+      _inputSpec = DataSpec.FromFields(_flowGraph.valueInputDefinitions.Select(port => DataField.MakePrimitive(port.key, PrimitiveType.Float)).ToArray());
+      _outputSpec = DataSpec.FromFields(_flowGraph.valueOutputDefinitions.Select(port => DataField.MakePrimitive(port.key, PrimitiveType.Float)).ToArray());
+      _flowGraph.Prewarm();
+      foreach (var unit in _flowGraph.units) {
+        unit.Define();
+      }
+    }
+  }
+
+  public abstract class NodeBasedNode : BaseNode {
+    [Serialize]
+    public IDataNode Node;
+    public override NanoGraph Graph => Node?.Graph;
+    public override string DebugId => Node?.DebugId;
+
+    public override DataSpec NodeInputSpec => Node.InputSpec;
+    public override DataSpec NodeOutputSpec => Node.OutputSpec;
+
+    private bool _isRegisteredAsOutputNode;
+
+    protected abstract IDataNode CreateNode();
+    protected override DataEdge[] GetAllInputDataEdges() => Graph.GetInputEdges(Node);
+    protected override IDataNode GetNodeConnectedToInputPort(string fieldName, out string actualFieldName) {
+      actualFieldName = fieldName;
+      return Node;
+    }
+
+    public override void BeforeAdd() {
+      base.BeforeAdd();
+      Node.Graph.AddNodeInvalidatedHandler(Node, _nodeInvalidatedHandler);
+    }
+
+    public override void AfterAdd() {
+      base.AfterAdd();
+    }
+
+    public override void AfterRemove() {
+      base.AfterRemove();
+      // TODO: Remove node.
+      Node?.Graph?.RemoveNode(Node);
+      Node?.Graph?.AddNodeInvalidatedHandler(Node, _nodeInvalidatedHandler);
+    }
+
+    public override void NotifyInputConnectionsChanged() {
+      base.NotifyInputConnectionsChanged();
+      (Node as IAutoTypeNode)?.UpdateTypesFromInputs();
+    }
+
+    public override void NotifyOutputConnectionsChanged() {
+      base.NotifyOutputConnectionsChanged();
+    }
+
+    protected override void SyncOutputNodeRegistration() {
+      base.SyncOutputNodeRegistration();
+
+      bool isOutputNode = false;
+      foreach (var output in outputs) {
+        foreach (var connection in output.connections) {
+          if (connection.destination.unit is GraphOutput graphOutput) {
+            if (GetSubgraphUnit(graphOutput.graph) == null) {
+              isOutputNode = true;
+            }
+            break;
+          }
+        }
+      }
+      if (isOutputNode) {
+        if (NanoGraph.DebugScriptInstance != this.graph) {
+          isOutputNode = false;
+        }
+      }
+
+      if (_isRegisteredAsOutputNode != isOutputNode) {
+        _isRegisteredAsOutputNode = isOutputNode;
+        IComputeNode computeNode = Node as IComputeNode;
+        if (computeNode != null) {
+          if (isOutputNode) {
+            Node.Graph.RegisterOutputNode(computeNode);
+          } else {
+            Node.Graph.UnregisterOutputNode(computeNode);
+          }
+        }
+      }
+    }
+
+    protected override void Definition() {
+      base.Definition();
+      Node.DebugId = this.guid.ToString();
+      Node.Graph.MarkNodeDirty(Node);
+      Node.Graph.ValidateLater();
+    }
+
+    protected override void EnsureNode() {
+      if (Node != null) {
+        if (Node.Graph == null) {
+          Node.DebugId = this.guid.ToString();
+          NanoGraph.DebugInstance.AddNode(Node);
+        }
+        return;
+      }
+      Node = CreateNode();
+      Node.DebugId = this.guid.ToString();
+      NanoGraph.DebugInstance.AddNode(Node);
+    }
+  }
+
+  public abstract class NodeOfType<T> : NodeBasedNode where T : IDataNode, new() {
     protected override IDataNode CreateNode() => new T();
   }
 
@@ -415,6 +637,7 @@ namespace NanoGraph.VisualScripting {
   public class Switch : NodeOfType<SwitchNode>{}
   [Alias(typeof(LiteralAliasProvider))]
   public class Literal : NodeOfType<LiteralNode>{}
+  public class Route : NodeOfType<RouteNode>{}
   [Alias(typeof(GenerateValueAliasProvider))]
   public class GenerateValue : NodeOfType<GenerateValueNode>{}
   public class Latch : NodeOfType<LatchNode>{}
@@ -438,7 +661,7 @@ namespace NanoGraph.VisualScripting {
             value == BasicOutputType.Texture) {
           continue;
         }
-        yield return (name, null, unit => ((unit as BaseNode).Node as ScalarComputeNode).OutputType = value);
+        yield return (name, null, unit => ((unit as NodeBasedNode).Node as ScalarComputeNode).OutputType = value);
       }
     }
   }
@@ -461,7 +684,7 @@ namespace NanoGraph.VisualScripting {
         } else if (value == StandardOperatorType.Invert) {
           aliases = new[] { "1 /" };
         }
-        yield return (name, aliases, unit => ((unit as BaseNode).Node as MathNode).Operator = value);
+        yield return (name, aliases, unit => ((unit as NodeBasedNode).Node as MathNode).Operator = value);
       }
     }
   }
@@ -474,7 +697,7 @@ namespace NanoGraph.VisualScripting {
       for (int i = 0; i < names.Length; ++i) {
         string name = $"{names[i]}Mix";
         StandardMixType value = values[i];
-        yield return (name, null, unit => ((unit as BaseNode).Node as MixNode).MixType = value);
+        yield return (name, null, unit => ((unit as NodeBasedNode).Node as MixNode).MixType = value);
       }
     }
   }
@@ -487,7 +710,7 @@ namespace NanoGraph.VisualScripting {
       for (int i = 0; i < names.Length; ++i) {
         string name = $"Fill{names[i]}";
         ValueProviderType value = values[i];
-        yield return (name, null, unit => ((unit as BaseNode).Node as FillArrayNode).Source = value);
+        yield return (name, null, unit => ((unit as NodeBasedNode).Node as FillArrayNode).Source = value);
       }
     }
   }
@@ -500,7 +723,7 @@ namespace NanoGraph.VisualScripting {
       for (int i = 0; i < names.Length; ++i) {
         string name = $"Array{names[i]}";
         ReduceOperatorType value = values[i];
-        yield return (name, null, unit => ((unit as BaseNode).Node as ReduceArrayNode).Operation = value);
+        yield return (name, null, unit => ((unit as NodeBasedNode).Node as ReduceArrayNode).Operation = value);
       }
     }
   }
@@ -516,7 +739,7 @@ namespace NanoGraph.VisualScripting {
         if (value == ValueProviderType.Value) {
           continue;
         }
-        yield return (name, null, unit => ((unit as BaseNode).Node as GenerateValueNode).Source = value);
+        yield return (name, null, unit => ((unit as NodeBasedNode).Node as GenerateValueNode).Source = value);
       }
     }
   }
@@ -532,7 +755,7 @@ namespace NanoGraph.VisualScripting {
         if (value == PackableType.Custom) {
           continue;
         }
-        yield return (name, null, unit => ((unit as BaseNode).Node as PackNode).Type = value);
+        yield return (name, null, unit => ((unit as NodeBasedNode).Node as PackNode).Type = value);
       }
     }
   }
@@ -550,7 +773,7 @@ namespace NanoGraph.VisualScripting {
             value == PrimitiveType.Vertices) {
           continue;
         }
-        yield return (name, null, unit => ((unit as BaseNode).Node as LiteralNode).Type = value);
+        yield return (name, null, unit => ((unit as NodeBasedNode).Node as LiteralNode).Type = value);
       }
     }
   }
@@ -563,7 +786,7 @@ namespace NanoGraph.VisualScripting {
           node.InputFields.Fields.Add(TypeDeclBuilderField.Make("x", PrimitiveType.Float));
           node.OutputFields.Fields.Add(TypeDeclBuilderField.Make("out", PrimitiveType.Float));
         }
-        yield return ("UnaryExpression", null, unit => Configure((unit as BaseNode).Node as ExpressionNode));
+        yield return ("UnaryExpression", null, unit => Configure((unit as NodeBasedNode).Node as ExpressionNode));
       }
       {
         void Configure(ExpressionNode node) {
@@ -571,7 +794,7 @@ namespace NanoGraph.VisualScripting {
           node.InputFields.Fields.Add(TypeDeclBuilderField.Make("y", PrimitiveType.Float));
           node.OutputFields.Fields.Add(TypeDeclBuilderField.Make("out", PrimitiveType.Float));
         }
-        yield return ("BinaryExpression", null, unit => Configure((unit as BaseNode).Node as ExpressionNode));
+        yield return ("BinaryExpression", null, unit => Configure((unit as NodeBasedNode).Node as ExpressionNode));
       }
     }
   }
@@ -584,7 +807,7 @@ namespace NanoGraph.VisualScripting {
       for (int i = 0; i < names.Length; ++i) {
         string name = $"{names[i]}In";
         ValueInputNode.InputType value = values[i];
-        yield return (name, null, unit => ((unit as BaseNode).Node as ValueInputNode).Type = value);
+        yield return (name, null, unit => ((unit as NodeBasedNode).Node as ValueInputNode).Type = value);
       }
     }
   }
@@ -597,7 +820,7 @@ namespace NanoGraph.VisualScripting {
       for (int i = 0; i < names.Length; ++i) {
         string name = $"{names[i]}Index";
         VectorIndexNode.DimensionType value = values[i];
-        yield return (name, null, unit => ((unit as BaseNode).Node as VectorIndexNode).Dimensions = value);
+        yield return (name, null, unit => ((unit as NodeBasedNode).Node as VectorIndexNode).Dimensions = value);
       }
     }
   }

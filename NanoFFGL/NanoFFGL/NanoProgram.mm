@@ -425,6 +425,11 @@ NanoProgram* NanoProgram::GetCurrentInstance() {
   static inline vector_float3 log_op(vector_float3 a, vector_float3 b) { return vector_float3 { log_op(a.x, b.x), log_op(a.y, b.y), log_op(a.z, b.z) }; }
   static inline vector_float4 log_op(vector_float4 a, vector_float4 b) { return vector_float4 { log_op(a.x, b.x), log_op(a.y, b.y), log_op(a.z, b.z), log_op(a.w, b.w) }; }
 
+  static inline float atan_op(float a) { return std::atan(a); }
+  static inline vector_float2 atan_op(vector_float2 a) { return vector_float2 { atan_op(a.x), atan_op(a.y) }; }
+  static inline vector_float3 atan_op(vector_float3 a) { return vector_float3 { atan_op(a.x), atan_op(a.y), atan_op(a.z) }; }
+  static inline vector_float4 atan_op(vector_float4 a) { return vector_float4 { atan_op(a.x), atan_op(a.y), atan_op(a.z), atan_op(a.w) }; }
+
   static inline float atan2_op(float a, float b) { return std::atan2(a, b); }
   static inline vector_float2 atan2_op(vector_float2 a, vector_float2 b) { return vector_float2 { std::atan2(a.x, b.x), std::atan2(a.y, b.y) }; }
   static inline vector_float3 atan2_op(vector_float3 a, vector_float3 b) { return vector_float3 { std::atan2(a.x, b.x), std::atan2(a.y, b.y), std::atan2(a.z, b.z) }; }
@@ -514,11 +519,6 @@ NanoProgram* NanoProgram::GetCurrentInstance() {
   static inline vector_float2 log10_op(vector_float2 a) { return vector_float2 { std::log10(a.x), std::log10(a.y) }; }
   static inline vector_float3 log10_op(vector_float3 a) { return vector_float3 { std::log10(a.x), std::log10(a.y), std::log10(a.z) }; }
   static inline vector_float4 log10_op(vector_float4 a) { return vector_float4 { std::log10(a.x), std::log10(a.y), std::log10(a.z), std::log10(a.w) }; }
-
-  static inline float atan_op(float a) { return std::atan(a); }
-  static inline vector_float2 atan_op(vector_float2 a) { return vector_float2 { std::atan(a.x), std::atan(a.y) }; }
-  static inline vector_float3 atan_op(vector_float3 a) { return vector_float3 { std::atan(a.x), std::atan(a.y), std::atan(a.z) }; }
-  static inline vector_float4 atan_op(vector_float4 a) { return vector_float4 { std::atan(a.x), std::atan(a.y), std::atan(a.z), std::atan(a.w) }; }
 
   template<typename T>
   struct ValueAndBool {

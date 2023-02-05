@@ -595,40 +595,46 @@ namespace NanoGraph {
     }
 
     private static IEnumerable<T> DepthFirstTraversal<T>(T root, Func<T, IEnumerable<T>> getChildrenFunc) {
+      return DepthFirstTraversal(new[] { root }, getChildrenFunc);
+    }
+
+    private static IEnumerable<T> DepthFirstTraversal<T>(IEnumerable<T> roots, Func<T, IEnumerable<T>> getChildrenFunc) {
       HashSet<T> visited = new HashSet<T>();
       Stack<IEnumerator<T>> stack = new Stack<IEnumerator<T>>();
-      var rootIt = getChildrenFunc.Invoke(root)?.GetEnumerator();
-      if (rootIt != null) {
-        stack.Push(rootIt);
-      }
-      while (stack.Count > 0) {
-        IEnumerator<T> it = stack.Peek();
-        if (it.MoveNext()) {
-          T next = it.Current;
-          if (!visited.Contains(next)) {
-            var nextIt = getChildrenFunc.Invoke(next)?.GetEnumerator();
-            if (nextIt != null) {
-              stack.Push(nextIt);
-            } else {
-              if (visited.Add(next)) {
-                yield return next;
+      foreach (var root in roots) {
+        var rootIt = getChildrenFunc.Invoke(root)?.GetEnumerator();
+        if (rootIt != null) {
+          stack.Push(rootIt);
+        }
+        while (stack.Count > 0) {
+          IEnumerator<T> it = stack.Peek();
+          if (it.MoveNext()) {
+            T next = it.Current;
+            if (!visited.Contains(next)) {
+              var nextIt = getChildrenFunc.Invoke(next)?.GetEnumerator();
+              if (nextIt != null) {
+                stack.Push(nextIt);
+              } else {
+                if (visited.Add(next)) {
+                  yield return next;
+                }
+              }
+            }
+          } else {
+            stack.Pop();
+            if (stack.Count > 0) {
+              T toVisit = stack.Peek().Current;
+              if (visited.Add(toVisit)) {
+                yield return toVisit;
               }
             }
           }
-        } else {
-          stack.Pop();
-          if (stack.Count > 0) {
-            T toVisit = stack.Peek().Current;
-            if (visited.Add(toVisit)) {
-              yield return toVisit;
-            }
+          if (stack.Count > 1024 * 1024) {
+            throw new InvalidOperationException("Recursion limit hit.");
           }
         }
-        if (stack.Count > 1024 * 1024) {
-          throw new InvalidOperationException("Recursion limit hit.");
-        }
+        yield return root;
       }
-      yield return root;
     }
 
     private List<(ICodeGenerator, bool)> GenerateComputePlan(IComputeNode root, List<CodeGeneratorFromComputeNode> dependentComputeNodes, List<DataPlug> dependentComputeInputs) {
@@ -668,6 +674,7 @@ namespace NanoGraph {
       }
       inputMap[(root, false)] = rootInputs;
 
+      List<ISplitComputeNode> splitComputeNodes = new List<ISplitComputeNode>();
       while (currentCondition != null) {
         HashSet<IDataNode> conditionPreambleInputNodes = new HashSet<IDataNode>();
         {
@@ -709,6 +716,9 @@ namespace NanoGraph {
             }
           }
 
+          if (node is ISplitComputeNode splitComputeNode) {
+            splitComputeNodes.Add(splitComputeNode);
+          }
           if (node is IComputeNode && !(node is ISplitComputeNode)) {
             continue;
           }
@@ -786,21 +796,27 @@ namespace NanoGraph {
         Debug.Log($"Condition Groups:\n{conditionGroupsStr}");
       }
 
-      (IDataNode node, bool isPreamble)[] rawOrder = DepthFirstTraversal<(IDataNode node, bool branch)>((root, false), entry => {
-        IEnumerable<(IDataNode, bool)> result = Enumerable.Empty<(IDataNode, bool)>();
-        if (inputMap.TryGetValue(entry, out List<IDataNode> inputs)) {
+      var rawOrderRoots = new List<(IDataNode, bool, bool)> { (root, false, false) };
+      rawOrderRoots.AddRange(splitComputeNodes.Select(node => ((IDataNode)node, false, true)));
+      (IDataNode node, bool isPreamble, bool isLateSplitCompute)[] rawOrder =
+          DepthFirstTraversal<(IDataNode node, bool branch, bool isLateSplitCompute)>(rawOrderRoots, entry => {
+        IEnumerable<(IDataNode node, bool isPreamble)> result = Enumerable.Empty<(IDataNode, bool)>();
+        if (entry.node is ISplitComputeNode && !entry.isLateSplitCompute) {
+          return null;
+        }
+        if (inputMap.TryGetValue((entry.node, entry.branch), out List<IDataNode> inputs)) {
           result = result.Concat(inputs.Select(input => (input, false)));
           result = result.Concat(inputs.Select(input => (input, true)));
         }
         List<IConditionalNode> conditionedOn = conditionedOnMap[entry.node];
         result = result.Concat(conditionedOn.Select(node => ((IDataNode)node, true)));
-        return result;
+        return result.Select(entry => (entry.node, entry.isPreamble, false));
       }).ToArray();
 
       string rawOrderStr = string.Join("\n", rawOrder.Select(node => {
         string conditionStr = "";
-        List<IDataNode> conditions = conditionedOnMap[node.Item1].Where(cond => cond != root).Cast<IDataNode>().ToList();
-        if (conditionedOnRootNode.Contains(node.Item1)) {
+        List<IDataNode> conditions = conditionedOnMap[node.node].Where(cond => cond != root).Cast<IDataNode>().ToList();
+        if (conditionedOnRootNode.Contains(node.node)) {
           conditions = conditions.Append(root).ToList();
         }
         if (conditions.Count > 0) {
@@ -1050,10 +1066,10 @@ namespace NanoGraph {
           List<DataPlug> dependentComputeInputs = new List<DataPlug>();
           List<(ICodeGenerator, bool)> computePlan = GenerateComputePlan(node, dependentComputeNodes, dependentComputeInputs);
           if (node is ISplitComputeNode) {
-            if (dependentComputeNodes.Count > 1) {
-              CurrentGenerateState.AddError($"Node {node} is in multiple compute nodes. It must depend on exactly one node.");
-              continue;
-            }
+            // if (dependentComputeNodes.Count > 1) {
+            //   CurrentGenerateState.AddError($"Node {node} is in multiple compute nodes. It must depend on exactly one node.");
+            //   continue;
+            // }
             // TODO: Verify that the dependee is actually the same as the dependency.
             // Do not actually compute anything for this node.
             computePlan.Clear();

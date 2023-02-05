@@ -236,6 +236,10 @@ namespace NanoGraph {
           AllocateGpuFuncOutput(validateCacheFunction, field, thisThreadCountExpr);
           ++allocateBufferIndex;
         }
+        foreach (var dependency in dependentComputeNodes.Where(dependency => dependency.Operation is ISplitComputeNodeEmitCodeOperation)) {
+          var op = dependency.Operation as ISplitComputeNodeEmitCodeOperation;
+          op?.EmitPreValidateCache(validateCacheFunction, Node, threadCountExpr);
+        }
         EmitSyncBuffersToGpu(validateCacheFunction, cachedResult, gpuInputBuffers, gpuOutputBuffers);
 
         if (Node.AtomicCounterFieldIndex >= 0) {

@@ -30,6 +30,9 @@ namespace NanoGraph {
     public bool HasVertexPosition;
 
     [EditableAttribute]
+    public bool HasPointSize;
+
+    [EditableAttribute]
     public TypeDeclBuilder Fields = new TypeDeclBuilder();
     public TypeDecl Type => new TypeDecl(AllTypeFields.ToArray());
 
@@ -42,6 +45,9 @@ namespace NanoGraph {
     public IEnumerable<TypeField> AllTypeFields {
       get {
         IEnumerable<TypeField> fields = EditableTypeFields;
+        if (HasPointSize) {
+          fields = new[] { new TypeField { Name = "PointSize", Type = TypeSpec.MakePrimitive(PrimitiveType.Float), Attributes = new[] { "[[point_size]]" } } }.Concat(fields);
+        }
         if (HasVertexPosition) {
           fields = new[] { new TypeField { Name = "Position", Type = TypeSpec.MakePrimitive(PrimitiveType.Float4), Attributes = new[] { "[[position]]" } } }.Concat(fields);
         }

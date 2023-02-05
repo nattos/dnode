@@ -154,7 +154,7 @@ namespace NanoGraph {
           new StandardOperator(StandardOperatorType.Floor, inputCount: 1, codeEmitter: StandardOperatorCodeEmitter.MakeChainedFunction("floor_op")),
           new StandardOperator(StandardOperatorType.Ceil, inputCount: 1, codeEmitter: StandardOperatorCodeEmitter.MakeChainedFunction("ceil_op")),
           new StandardOperator(StandardOperatorType.Round, inputCount: 1, codeEmitter: StandardOperatorCodeEmitter.MakeChainedFunction("round_op")),
-          new StandardOperator(StandardOperatorType.Magnitude, inputCount: 1, codeEmitter: StandardOperatorCodeEmitter.MakeChainedFunction("magnitude_op")),
+          new StandardOperator(StandardOperatorType.Magnitude, inputCount: 1, fixedOutputType: PrimitiveType.Float, codeEmitter: StandardOperatorCodeEmitter.MakeChainedFunction("magnitude_op")),
           new StandardOperator(StandardOperatorType.Normalize, inputCount: 1, codeEmitter: StandardOperatorCodeEmitter.MakeChainedFunction("normalize_op")),
           new StandardOperator(StandardOperatorType.Cos, inputCount: 1, codeEmitter: StandardOperatorCodeEmitter.MakeChainedFunction("cos_op")),
           new StandardOperator(StandardOperatorType.Sin, inputCount: 1, codeEmitter: StandardOperatorCodeEmitter.MakeChainedFunction("sin_op")),

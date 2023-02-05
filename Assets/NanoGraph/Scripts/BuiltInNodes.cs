@@ -257,6 +257,8 @@ namespace NanoGraph {
       { ValueProviderType.Time, new TimeValueProvider() },
       { ValueProviderType.Length, new LengthValueProvider() },
       { ValueProviderType.TextureSize, new TextureSizeValueProvider() },
+      { ValueProviderType.OutputTextureSize, new OutputTextureSizeValueProvider() },
+      { ValueProviderType.Pi, new PiValueProvider() },
     };
 
     public static IValueProvider GetValueProvider(ValueProviderType type) {
@@ -274,6 +276,8 @@ namespace NanoGraph {
     Time,
     Length,
     TextureSize,
+    OutputTextureSize,
+    Pi,
   }
 
   public class ValueValueProvider : IValueProvider {
@@ -373,6 +377,25 @@ namespace NanoGraph {
     public string EmitCode(ICodeNode node, CodeContext context, int inputsIndexOffset, string indexExpr, string lengthExpr, TypeSpec elementType) {
       string textureSizeExpr = $"GetTextureSizeFloat({context.InputLocals[inputsIndexOffset].Identifier})";
       return context.Function.EmitConvert(TypeSpec.MakePrimitive(PrimitiveType.Float2), elementType, textureSizeExpr);
+    }
+  }
+
+  public class OutputTextureSizeValueProvider : IValueProvider {
+    public DataField[] GetExtraInputFields(TypeSpec elementType) => Array.Empty<DataField>();
+    public IEnumerable<DataEdge> FilteredAutoTypeEdges(IReadOnlyList<DataEdge> inputEdges) => Array.Empty<DataEdge>();
+    public PrimitiveType? PreferredType => PrimitiveType.Float2;
+    public string EmitCode(ICodeNode node, CodeContext context, int inputsIndexOffset, string indexExpr, string lengthExpr, TypeSpec elementType) {
+      string textureSizeExpr = $"OutputTextureSize";
+      return context.Function.EmitConvert(context.Function.Program.Int2Type, context.Function.Program.GetProgramType(elementType), textureSizeExpr);
+    }
+  }
+
+  public class PiValueProvider : IValueProvider {
+    public DataField[] GetExtraInputFields(TypeSpec elementType) => Array.Empty<DataField>();
+    public IEnumerable<DataEdge> FilteredAutoTypeEdges(IReadOnlyList<DataEdge> inputEdges) => Array.Empty<DataEdge>();
+    public PrimitiveType? PreferredType => PrimitiveType.Float;
+    public string EmitCode(ICodeNode node, CodeContext context, int inputsIndexOffset, string indexExpr, string lengthExpr, TypeSpec elementType) {
+      return context.Function.EmitConvert(TypeSpec.MakePrimitive(PrimitiveType.Float), elementType, context.Function.EmitLiteral((float)Math.PI));
     }
   }
 
@@ -514,18 +537,44 @@ namespace NanoGraph {
     public AutoType OutType = AutoType.Auto;
     public TypeSpec InternalElementType = TypeSpec.MakePrimitive(PrimitiveType.Float);
 
+    [EditableAttribute]
+    public TextureFilterMode FilterMode = TextureFilterMode.Nearest;
+
     public TypeSpec ElementType => AutoTypeUtils.GetAutoType(OutType, InternalElementType);
 
     public void UpdateTypesFromInputs() {
       AutoTypeUtils.UpdateAutoType(Graph.GetEdgeToDestinationOrNull(this, "In"), ref InternalElementType, forceIsArray: false);
     }
 
-    public override DataSpec InputSpec => DataSpec.FromFields(DataField.MakeType("In", TypeSpec.MakeArray(ElementType)), DataField.MakeType("Index", TypeSpec.MakePrimitive(PrimitiveType.Int)));
-
+    public override DataSpec InputSpec => DataSpec.FromFields(DataField.MakeType("In", TypeSpec.MakeArray(InternalElementType)), DataField.MakeType("Index", TypeSpec.MakePrimitive((FilterMode == TextureFilterMode.Nearest) ? PrimitiveType.Int : PrimitiveType.Float)));
     public override DataSpec OutputSpec => DataSpec.FromFields(DataField.MakeType("Out", ElementType));
 
     public void EmitCode(CodeContext context) {
-      context.Function.AddStatement($"{context.Function.GetTypeIdentifier(ElementType)} {context.OutputLocals[0].Identifier} = {context.Function.Context.EmitSampleBuffer(context.InputLocals[0].Identifier, context.InputLocals[1].Identifier)};");
+      string inputExpr = context.InputLocals[0].Identifier;
+      string indexExpr = context.InputLocals[1].Identifier;
+      string sampleExpr;
+      switch (FilterMode) {
+        default:
+        case TextureFilterMode.Nearest:
+          sampleExpr = context.Function.Context.EmitSampleBuffer(inputExpr, indexExpr);
+          break;
+        case TextureFilterMode.Linear:
+        case TextureFilterMode.Bicubic: {
+          string indexLocal = context.Function.AllocLocal("Index");
+          string index0Local = context.Function.AllocLocal("Index0");
+          string index1Local = context.Function.AllocLocal("Index1");
+          string alphaLocal = context.Function.AllocLocal("T");
+          context.Function.AddStatement($"float {indexLocal} = {indexExpr};");
+          context.Function.AddStatement($"int {index0Local} = (int)floor_op({indexLocal});");
+          context.Function.AddStatement($"int {index1Local} = {index0Local} + 1;");
+          context.Function.AddStatement($"float {alphaLocal} = {indexLocal} - {index0Local};");
+          string sample0Expr = context.Function.Context.EmitSampleBuffer(inputExpr, index0Local);
+          string sample1Expr = context.Function.Context.EmitSampleBuffer(inputExpr, index1Local);
+          sampleExpr = $"lerp_op({sample0Expr}, {sample1Expr}, {alphaLocal})";
+          break;
+        }
+      }
+      context.Function.AddStatement($"{context.Function.GetTypeIdentifier(ElementType)} {context.OutputLocals[0].Identifier} = {sampleExpr};");
     }
   }
 
@@ -1025,6 +1074,31 @@ namespace NanoGraph {
     }
 
     public string DebugValueKey => $"{DebugId}.value";
+  }
+
+  public class RouteNode : DataNode, ICodeNode, IAutoTypeNode, IInternalNode {
+    public InputSource TypeSpecSource = InputSource.External;
+    public TypeSpec InternalTypeSpec;
+
+    public TypeSpec OutTypeSpec => TypeSpecSource == InputSource.Internal ? InternalTypeSpec : InternalElementType;
+
+    public override DataSpec InputSpec => DataSpec.FromFields(DataField.MakeType("In", OutTypeSpec));
+    public override DataSpec OutputSpec => DataSpec.FromFields(DataField.MakeType("Out", OutTypeSpec));
+
+    [EditableAttribute]
+    public AutoType OutType = AutoType.Auto;
+    public TypeSpec InternalElementType = TypeSpec.MakePrimitive(PrimitiveType.Float);
+
+    public void UpdateTypesFromInputs() {
+      AutoTypeUtils.UpdateAutoType(Graph.GetInputEdges(this), ref InternalElementType);
+    }
+
+    bool IInternalNode.IsInternal => TypeSpecSource == InputSource.Internal;
+
+    public void EmitCode(CodeContext context) {
+      TypeSpec type = OutTypeSpec;
+      context.Function.AddStatement($"{context.Function.GetTypeIdentifier(type)} {context.OutputLocals[0].Identifier} = {context.InputLocals[0].Identifier};");
+    }
   }
 
   public class GenerateValueNode : DataNode, ICodeNode, IAutoTypeNode {

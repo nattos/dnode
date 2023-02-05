@@ -12,7 +12,7 @@ namespace NanoGraph.VisualScripting {
     }
 
     protected override IEnumerable<EditorTexture> DefinedIcons() {
-      return Node?.Node?.Messages?.Count > 0 ? new[] { BoltCore.Icons.errorMessage } : Array.Empty<EditorTexture>();
+      return (Node as NodeBasedNode)?.Node?.Messages?.Count > 0 ? new[] { BoltCore.Icons.errorMessage } : Array.Empty<EditorTexture>();
     }
   }
 }

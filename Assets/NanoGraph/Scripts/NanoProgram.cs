@@ -6,6 +6,11 @@ using System.Text;
 using DNode;
 
 namespace NanoGraph {
+  public enum TextureAddressMode {
+    Index,
+    Normalized,
+  }
+
   public enum TextureFilterMode {
     Nearest,
     Linear,
@@ -13,6 +18,7 @@ namespace NanoGraph {
   }
 
   public enum TextureWrapMode {
+    None,
     ClampToZero,
     ClampToEdge,
     Repeat,
