@@ -14,8 +14,10 @@ namespace NanoGraph.VisualScripting {
     public abstract string DebugId { get; }
     public abstract DataSpec NodeInputSpec { get; }
     public abstract DataSpec NodeOutputSpec { get; }
+    public abstract IEditableAttributeProvider EditableAttributeProvider { get; }
     protected abstract DataEdge[] GetAllInputDataEdges();
     protected abstract IDataNode GetNodeConnectedToInputPort(string fieldName, out string actualFieldName);
+    public bool DebugEnabled = true;
 
     private readonly Dictionary<string, IUnitInputPort> _fieldNameToInputPortMap = new Dictionary<string, IUnitInputPort>();
 
@@ -116,6 +118,9 @@ namespace NanoGraph.VisualScripting {
       foreach (var input in inputs) {
         _fieldNameToInputPortMap[input.key] = input;
       }
+      foreach (LiteralNode literalNode in _fieldNameToLiteralNodes.Values) {
+        literalNode.DebugEnabled = DebugEnabled;
+      }
     }
 
     public DCustomInspectorData? ProvideCustomInspectorData(string key) {
@@ -183,6 +188,7 @@ namespace NanoGraph.VisualScripting {
               if (!_didConnectSerializedLiteralNodes) {
                 Func<DValue> valueProvider = () => defaultValues.GetValueOrDefault(inputPort.key) as DValue? ?? default;
                 literalNode.InternalValueProvider = valueProvider;
+                literalNode.DebugEnabled = DebugEnabled;
                 graph.AddNode(literalNode);
                 edgesToAdd.Add(new DataEdge { Source = new DataPlug { Node = literalNode, FieldName = "Out" }, Destination = new DataPlug { Node = outputNode, FieldName = actualInputPortKey } });
               }
@@ -193,7 +199,7 @@ namespace NanoGraph.VisualScripting {
           if (relinkNode) {
             bool isArray = field?.Type.IsArray ?? false;
             Func<DValue> valueProvider = () => defaultValues.GetValueOrDefault(inputPort.key) as DValue? ?? default;
-            literalNode = new LiteralNode { Name = "Value", Type = fieldPrimitiveType, ValueSource = InputSource.Internal, InternalValueProvider = valueProvider };
+            literalNode = new LiteralNode { Name = "Value", Type = fieldPrimitiveType, ValueSource = InputSource.Internal, InternalValueProvider = valueProvider, DebugEnabled = DebugEnabled };
             _fieldNameToLiteralNodes[inputPort.key] = literalNode;
 
             graph.AddNode(literalNode);
@@ -344,18 +350,27 @@ namespace NanoGraph.VisualScripting {
     [Serialize]
     public ScriptGraphAsset ScriptGraphAssetReference;
 
+    public FlowGraph FlowGraph => _flowGraph;
+
+    [DoNotSerialize]
     private NanoGraph _graph;
     public override NanoGraph Graph => _graph;
     public override string DebugId => null;
+    public override IEditableAttributeProvider EditableAttributeProvider => null;
 
+    [DoNotSerialize]
     private FlowGraph _flowGraph;
+    [Serialize]
     private DataSpec _inputSpec = DataSpec.Empty;
+    [Serialize]
     private DataSpec _outputSpec = DataSpec.Empty;
 
     public override DataSpec NodeInputSpec => _inputSpec;
     public override DataSpec NodeOutputSpec => _outputSpec;
 
+    [DoNotSerialize]
     private Dictionary<string, RouteNode> _inputRouteNodes = new Dictionary<string, RouteNode>();
+    [DoNotSerialize]
     private Dictionary<string, RouteNode> _outputRouteNodes = new Dictionary<string, RouteNode>();
 
     protected override DataEdge[] GetAllInputDataEdges() => Array.Empty<DataEdge>();
@@ -407,6 +422,9 @@ namespace NanoGraph.VisualScripting {
     }
 
     public override void SyncInputConnectionsToGraphEdges() {
+      if (_flowGraph == null) {
+        return;
+      }
       NanoGraph graph = _graph;
       GraphInput graphInputUnit = _flowGraph.units.FirstOrDefault(unit => unit is GraphInput) as GraphInput;
       GraphOutput graphOutputUnit = _flowGraph.units.FirstOrDefault(unit => unit is GraphOutput) as GraphOutput;
@@ -418,7 +436,7 @@ namespace NanoGraph.VisualScripting {
           string key = port.key;
           removedKeys.Remove(key);
           if (!routeNodes.TryGetValue(key, out RouteNode routeNode)) {
-            routeNode = new RouteNode { TypeSpecSource = InputSource.External };
+            routeNode = new RouteNode { TypeSpecSource = InputSource.External, DebugEnabled = DebugEnabled };
             graph.AddNode(routeNode);
             routeNodes[key] = routeNode;
 
@@ -449,7 +467,7 @@ namespace NanoGraph.VisualScripting {
           string key = port.key;
           removedKeys.Remove(key);
           if (!routeNodes.TryGetValue(key, out RouteNode routeNode)) {
-            routeNode = new RouteNode { TypeSpecSource = InputSource.Internal };
+            routeNode = new RouteNode { TypeSpecSource = InputSource.Internal, DebugEnabled = DebugEnabled };
             graph.AddNode(routeNode);
             routeNodes[key] = routeNode;
             var connection = port.connections.FirstOrDefault();
@@ -481,19 +499,8 @@ namespace NanoGraph.VisualScripting {
       base.SyncInputConnectionsToGraphEdges();
     }
 
-    protected override void EnsureNode() {
-      _graph = NanoGraph.DebugInstance;
-
-      if (!ScriptGraphAssetReference) {
-        try {
-          ScriptGraphAssetReference = UnityEditor.AssetDatabase.LoadAssetAtPath<ScriptGraphAsset>("Assets/NanoGraph/SubGraphs/Clamp.asset");
-        } catch (Exception) {
-        }
-      }
-      if (_flowGraph != null) { 
-        return;
-      }
-      if (ScriptGraphAssetReference) {
+    public void LoadFromScriptGraphAsset() {
+      if (ScriptGraphAssetReference && ScriptGraphAssetReference.graph.units.Count > 0) {
         _flowGraph = Unity.VisualScripting.Serialization.CloneViaSerialization(ScriptGraphAssetReference.graph);
       }
       if (_flowGraph == null) {
@@ -503,8 +510,24 @@ namespace NanoGraph.VisualScripting {
       _outputSpec = DataSpec.FromFields(_flowGraph.valueOutputDefinitions.Select(port => DataField.MakePrimitive(port.key, PrimitiveType.Float)).ToArray());
       _flowGraph.Prewarm();
       foreach (var unit in _flowGraph.units) {
+        BaseNode baseNode = unit as BaseNode;
+        if (baseNode != null) {
+          baseNode.DebugEnabled = false;
+        }
+        DataNode node = (unit as NodeBasedNode)?.Node as DataNode;
+        if (node != null) {
+          node.DebugEnabled = false;
+        }
         unit.Define();
       }
+    }
+
+    protected override void EnsureNode() {
+      _graph = NanoGraph.DebugInstance;
+      if (_flowGraph != null) { 
+        return;
+      }
+      LoadFromScriptGraphAsset();
     }
   }
 
@@ -513,6 +536,7 @@ namespace NanoGraph.VisualScripting {
     public IDataNode Node;
     public override NanoGraph Graph => Node?.Graph;
     public override string DebugId => Node?.DebugId;
+    public override IEditableAttributeProvider EditableAttributeProvider => Node as IEditableAttributeProvider;
 
     public override DataSpec NodeInputSpec => Node.InputSpec;
     public override DataSpec NodeOutputSpec => Node.OutputSpec;
@@ -539,7 +563,7 @@ namespace NanoGraph.VisualScripting {
       base.AfterRemove();
       // TODO: Remove node.
       Node?.Graph?.RemoveNode(Node);
-      Node?.Graph?.AddNodeInvalidatedHandler(Node, _nodeInvalidatedHandler);
+      Node?.Graph?.RemoveNodeInvalidatedHandler(Node, _nodeInvalidatedHandler);
     }
 
     public override void NotifyInputConnectionsChanged() {

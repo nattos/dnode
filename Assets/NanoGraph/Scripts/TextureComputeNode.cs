@@ -122,7 +122,7 @@ namespace NanoGraph {
         AddGpuFuncInputs(func, computeInputs, gpuInputBuffers, ref bufferIndex);
         AddDebugGpuFuncInputs(func, gpuInputBuffers, ref bufferIndex);
         AddGpuFuncOutputs(func, computeOutputSpec.Fields, gpuOutputBuffers, ref bufferIndex);
-        if (graph.DebugEnabled) {
+        if (graph.DebugEnabled && Node.DebugEnabled) {
           AddGpuFuncInput(func, "debugOutputNodeIndex", program.IntType, "debugOutputNodeIndex", "debugOutputNodeIndex", gpuInputBuffers, ref bufferIndex, isReadWrite: false, isDebugOnly: true);
           AddGpuFuncOutput(func, "debugOutputTexture", program.Texture, "debugOutputTexture", "debugOutputTexture", gpuOutputBuffers, ref bufferIndex, isDebugOnly: true);
         }
@@ -148,7 +148,7 @@ namespace NanoGraph {
         var outputColorBuffer = gpuOutputBuffers.First(buffer => buffer.FieldName == "Out");
         func.AddStatement($"WriteTexture({outputColorBuffer.ParameterName}, gid_xy_uint, {func.EmitConvert(outputColorLocal.Type, TypeSpec.MakePrimitive(PrimitiveType.Float4), outputColorLocal.Identifier)});");
 
-        if (graph.DebugEnabled) {
+        if (graph.DebugEnabled && Node.DebugEnabled) {
           func.AddStatement($"#if defined(DEBUG)");
           var outputDebugBuffer = gpuOutputBuffers.First(buffer => buffer.Expression == "debugOutputTexture");
           string debugOutLocal = func.AllocLocal("DebugOut");
@@ -311,7 +311,7 @@ namespace NanoGraph {
         string totalThreadCountExpr = $"(({gridSizeXExpr}) * ({gridSizeYExpr}))";
 
         AllocateGpuFuncOutputs(validateCacheFunction, computeOutputSpec.Fields, totalThreadCountExpr);
-        if (graph.DebugEnabled) {
+        if (graph.DebugEnabled && Node.DebugEnabled) {
           validateCacheFunction.AddStatement($"#if defined(DEBUG)");
           validateCacheFunction.AddStatement($"const std::string& debugOutputTextureKey = DebugGetOutputTextureKey();");
           validateCacheFunction.AddStatement($"int debugOutputNodeIndex = -1;");

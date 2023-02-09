@@ -1022,7 +1022,7 @@ namespace NanoGraph {
         var internalValue = EffectiveInternalValue;
         string internalValueExpr = context.Function.EmitLiteral(type, internalValue);
         string valueExpr = internalValueExpr;
-        if (Graph.DebugEnabled) {
+        if (Graph.DebugEnabled && DebugEnabled) {
           context.DebugState.GetDebugSettableValuesFunction.AddStatement($"#if defined(DEBUG)");
           bool isGpuContext = context.Function.Context is NanoGpuContext;
           string debugValueKey = DebugValueKey;

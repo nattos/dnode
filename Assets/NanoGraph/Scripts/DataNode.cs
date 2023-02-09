@@ -50,6 +50,9 @@ namespace NanoGraph {
     public DataNodeCacheData CacheData { get; set; }
 
     [DoNotSerialize]
+    public bool DebugEnabled = true;
+
+    [DoNotSerialize]
     private readonly List<string> _errorMessages = new List<string>();
 
     public DataNode() {

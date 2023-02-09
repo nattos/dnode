@@ -20,31 +20,64 @@ namespace NanoGraph.VisualScripting {
     }
 
     protected override float GetHeight(float width, GUIContent label) {
-      _attributesHeight = EditableAttributesInspector.GetHeight(width, (metadata.value as NodeBasedNode)?.Node as IEditableAttributeProvider);
-      return base.GetHeight(width, label) + _attributesHeight + _messagesHeight + EditorGUIUtility.singleLineHeight * 2;
+      BaseNode node = metadata.value as NodeBasedNode;
+      float embeddedNodeHeight = 0.0f;
+      if (node is EmbeddedNode embeddedNode) {
+        embeddedNodeHeight = EditorGUIUtility.singleLineHeight * 2;
+      }
+      var editableAttributeProvider = node?.EditableAttributeProvider;
+      if (editableAttributeProvider != null) {
+        _attributesHeight = EditableAttributesInspector.GetHeight(width, (metadata.value as NodeBasedNode)?.Node as IEditableAttributeProvider);
+      } else {
+        _attributesHeight = 0.0f;
+      }
+      return base.GetHeight(width, label) + embeddedNodeHeight + _attributesHeight + _messagesHeight + EditorGUIUtility.singleLineHeight * 2;
     }
 
     protected override void OnGUI(Rect position, GUIContent label) {
-      NodeBasedNode node = metadata.value as NodeBasedNode;
+      BaseNode node = metadata.value as BaseNode;
       if (node == null) {
         return;
       }
 
       Rect rect = position;
-      using (var check = new EditorGUI.ChangeCheckScope()) {
-        rect.height = _attributesHeight;
-        EditableAttributesInspector.OnGUI(rect, node.Node as IEditableAttributeProvider);
+      if (node is EmbeddedNode embeddedNode) {
+        using (var check = new EditorGUI.ChangeCheckScope()) {
+          rect.height = EditorGUIUtility.singleLineHeight;
+          ScriptGraphAsset newGraph = EditorGUI.ObjectField(rect, embeddedNode.ScriptGraphAssetReference, typeof(ScriptGraphAsset), allowSceneObjects: false) as ScriptGraphAsset;
+          rect.y += rect.height;
+          if (check.changed) {
+            embeddedNode.ScriptGraphAssetReference = newGraph;
+            embeddedNode.LoadFromScriptGraphAsset();
+          }
+        }
+        if (GUI.Button(rect, "Refresh Graph")) {
+          EditorApplication.delayCall += () => {
+            embeddedNode.LoadFromScriptGraphAsset();
+          };
+        }
         rect.y += rect.height;
+        rect.y += rect.height;
+      }
 
-        if (check.changed) {
-          node.PortsChanged();
+      var editableAttributeProvider = node.EditableAttributeProvider;
+      if (editableAttributeProvider != null) {
+        using (var check = new EditorGUI.ChangeCheckScope()) {
+          rect.height = _attributesHeight;
+          EditableAttributesInspector.OnGUI(rect, editableAttributeProvider);
+          rect.y += rect.height;
+
+          if (check.changed) {
+            node.PortsChanged();
+          }
         }
       }
 
       rect.height = EditorGUIUtility.singleLineHeight;
       if (GUI.Button(rect, "Dump Debug Info")) {
         EditorApplication.delayCall += () => {
-          Debug.Log((node.Node as DataNode)?.DebugInfoDump);
+          node.Define();
+          Debug.Log(((node as NodeBasedNode)?.Node as DataNode)?.DebugInfoDump);
         };
       }
       rect.y += EditorGUIUtility.singleLineHeight;
@@ -56,11 +89,11 @@ namespace NanoGraph.VisualScripting {
           //   }
           //   otherNode.SyncInputConnectionsToGraphEdges();
           // }
-          IComputeNode computeNode = node.Node as IComputeNode;
+          IComputeNode computeNode = (node as NodeBasedNode)?.Node as IComputeNode;
           if (computeNode == null) {
             return;
           }
-          node.Node.Graph.GenerateProgram(new[] { computeNode });
+          (node as NodeBasedNode).Node.Graph.GenerateProgram(new[] { computeNode });
         };
       }
       rect.y += EditorGUIUtility.singleLineHeight;

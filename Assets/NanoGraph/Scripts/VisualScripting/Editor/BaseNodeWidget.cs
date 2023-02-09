@@ -659,7 +659,15 @@ namespace NanoGraph.VisualScripting {
     // }
 
     protected void DrawTitle() {
-      titleContent.text = (this.unit as NodeBasedNode)?.Node?.ShortName ?? titleContent.text;
+      string titleContentText = titleContent.text;
+      if (this.unit is NodeBasedNode nodeBasedNode) {
+        titleContentText = nodeBasedNode.Node?.ShortName ?? titleContentText;
+      } else if (this.unit is EmbeddedNode embeddedNode) {
+        if (embeddedNode.ScriptGraphAssetReference) {
+          titleContentText = embeddedNode.ScriptGraphAssetReference.name ?? titleContentText;
+        }
+      }
+      titleContent.text = titleContentText;
       GUI.Label(titlePosition, titleContent, invertForeground ? Styles.titleInverted : Styles.title);
     }
 

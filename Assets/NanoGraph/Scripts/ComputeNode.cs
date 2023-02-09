@@ -346,7 +346,7 @@ namespace NanoGraph {
       }
 
       protected void AddDebugGpuFuncInputs(NanoFunction func, List<NanoGpuBufferRef> gpuInputBuffers, ref int bufferIndex) {
-        if (!graph.DebugEnabled) {
+        if (!(graph.DebugEnabled && computeNode.DebugEnabled)) {
           return;
         }
         AddGpuFuncInput(func, "debugState", debugState.DebugGpuStateType, debugState.DebugGpuStateIdentifier, "debugState", gpuInputBuffers, ref bufferIndex, isReadWrite: false);

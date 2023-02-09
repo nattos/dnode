@@ -224,6 +224,22 @@ namespace NanoGraph.VisualScripting {
       lastActiveContext = activeContext;
       activeContextChanged?.Invoke(activeContext);
 
+      // HACK!!!
+      if (activeContext?.graph != null) {
+        void DefineEmbeddedRec(IGraph graph) {
+          if (graph == null) {
+            return;
+          }
+          foreach (var element in graph.elements) {
+            if (element is EmbeddedNode embeddedNode) {
+              embeddedNode.Define();
+              DefineEmbeddedRec(embeddedNode.FlowGraph);
+            }
+          }
+        }
+        DefineEmbeddedRec(activeContext.graph);
+      }
+
       // Sigh. Forward this invocation to the original GraphWindow. GraphClipboard relies on this.
       {
         Type type = typeof(Unity.VisualScripting.GraphWindow);

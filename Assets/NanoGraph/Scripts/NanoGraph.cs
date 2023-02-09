@@ -1208,7 +1208,8 @@ namespace NanoGraph {
               } else {
                 codeGenerator.EmitCode(context);
               }
-              if (DebugEnabled && !(func.Context is NanoGpuContext)) {
+              bool debugEnabled = DebugEnabled && (codeGenerator.SourceNode as DataNode)?.DebugEnabled != false;
+              if (debugEnabled && !(func.Context is NanoGpuContext)) {
                 getDebugValuesFunction.AddStatement($"#if defined(DEBUG)");
                 string debugId = codeGenerator.SourceNode.DebugId;
                 for (int i = 0; i < outputLocals.Count; ++i) {
