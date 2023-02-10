@@ -100,14 +100,14 @@ public:
     if (!_hasCpuBuffer) {
       return;
     }
-    id<MTLDevice> device = NanoProgramGetCurrentMTLDevice();
-    int length = _elementCount * ElementSize;
-    id<MTLBuffer> tmpSharedBuffer = [device newBufferWithBytes:_cpuBuffer.data() length:length options:MTLResourceStorageModeShared];
+   id<MTLDevice> device = NanoProgramGetCurrentMTLDevice();
+   int length = _elementCount * ElementSize;
+   id<MTLBuffer> tmpSharedBuffer = [device newBufferWithBytes:_cpuBuffer.data() length:length options:MTLResourceStorageModeShared];
 
-    id<MTLCommandBuffer> commandBuffer = NanoProgramGetCurrentCurrentMTLCommandBuffer();
-    id<MTLBlitCommandEncoder> encoder = [commandBuffer blitCommandEncoder];
-    [encoder copyFromBuffer:tmpSharedBuffer sourceOffset:0 toBuffer:_gpuBuffer destinationOffset:0 size:length];
-    [encoder endEncoding];
+   id<MTLCommandBuffer> commandBuffer = NanoProgramGetCurrentCurrentMTLCommandBuffer();
+   id<MTLBlitCommandEncoder> encoder = [commandBuffer blitCommandEncoder];
+   [encoder copyFromBuffer:tmpSharedBuffer sourceOffset:0 toBuffer:_gpuBuffer destinationOffset:0 size:length];
+   [encoder endEncoding];
   }
 
   void CopyCpuFrom(NanoBuffer* other) {

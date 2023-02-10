@@ -94,6 +94,7 @@ namespace NanoGraph.VisualScripting {
               break;
             case PrimitiveType.TypeDecl:
             case PrimitiveType.Vertices:
+            case PrimitiveType.BufferRef:
             default:
               break;
           }
@@ -665,6 +666,7 @@ namespace NanoGraph.VisualScripting {
   [Alias(typeof(GenerateValueAliasProvider))]
   public class GenerateValue : NodeOfType<GenerateValueNode>{}
   public class Latch : NodeOfType<LatchNode>{}
+  public class ReadBufferRef : NodeOfType<ReadBufferRefNode>{}
   [Alias(typeof(ExpressionAliasProvider))]
   public class Expression : NodeOfType<ExpressionNode>{}
   [Alias(typeof(ValueInAliasProvider))]
@@ -794,7 +796,8 @@ namespace NanoGraph.VisualScripting {
         PrimitiveType value = values[i];
         if (value == PrimitiveType.Texture ||
             value == PrimitiveType.TypeDecl ||
-            value == PrimitiveType.Vertices) {
+            value == PrimitiveType.Vertices ||
+            value == PrimitiveType.BufferRef) {
           continue;
         }
         yield return (name, null, unit => ((unit as NodeBasedNode).Node as LiteralNode).Type = value);

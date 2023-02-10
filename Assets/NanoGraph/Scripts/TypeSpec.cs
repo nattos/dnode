@@ -56,6 +56,7 @@ namespace NanoGraph {
     Texture,
     TypeDecl,
     Vertices,
+    BufferRef,
   }
 
   public struct TypeSpec {

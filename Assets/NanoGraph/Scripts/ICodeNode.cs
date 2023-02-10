@@ -54,6 +54,7 @@ namespace NanoGraph {
 
     public IReadOnlyList<ComputeNodeResultEntry> dependentComputeNodes;
     public IReadOnlyList<DataPlug> dependentComputeInputs;
+    public Dictionary<IComputeNode, CodeCachedResult> bufferRefTokens;
   }
 
   public interface IComputeNodeEmitCodeOperation {

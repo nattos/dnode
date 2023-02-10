@@ -561,6 +561,7 @@ namespace NanoGraph {
       public readonly IComputeNode Root;
       public CodeCachedResult? InputResult;
       public IComputeNodeEmitCodeOperation Operation;
+      public bool IsCompileTimeOnlyDependency = false;
       public IReadOnlyList<(ICodeGenerator generator, int inputIndex)> Conditions { get; set; }
 
       public CodeGeneratorFromComputeNode(IComputeNode node, IComputeNode root) {
@@ -664,9 +665,15 @@ namespace NanoGraph {
       }
 
       List<IDataNode> rootInputs = new List<IDataNode>();
+      List<IDataNode> bufferRefInputs = new List<IDataNode>();
       foreach (var field in root.InputSpec.Fields) {
         var edge = _edgesByDest.GetOrDefault(new DataPlug { Node = root, FieldName = field.Name });
         if (edge?.Source.Node == null) {
+          continue;
+        }
+        // TODO: Hacky!!!
+        if (field.Type.Primitive == PrimitiveType.BufferRef) {
+          bufferRefInputs.Add(edge.Source.Node);
           continue;
         }
         QueueNode(edge.Source);
@@ -849,6 +856,13 @@ namespace NanoGraph {
         }
         if (generator != null) {
           generators[node] = generator;
+        }
+      }
+      foreach (IDataNode node in bufferRefInputs) {
+        if (node is IComputeNode computeNode) {
+          var codeGenerator = new CodeGeneratorFromComputeNode(computeNode, root);
+          codeGenerator.IsCompileTimeOnlyDependency = true;
+          dependentComputeNodes.Add(codeGenerator);
         }
       }
 
@@ -1086,7 +1100,10 @@ namespace NanoGraph {
 
       // List out plans in dependency order.
       List<ComputePlan> computePlans = new List<ComputePlan>();
-      IComputeNode[] computeNodeSeenOrder = outputNodes.SelectMany(outputNode => DepthFirstTraversal(outputNode, node => computePlanMap[node].DependentComputeNodes.Select(generator => generator.Node))).ToArray();
+      IComputeNode[] computeNodeSeenOrder = outputNodes.SelectMany(outputNode =>
+          DepthFirstTraversal(outputNode, node => computePlanMap[node].DependentComputeNodes
+              .Where(generator => !generator.IsCompileTimeOnlyDependency)
+              .Select(generator => generator.Node))).ToArray();
       HashSet<IComputeNode> computePlanAdded = new HashSet<IComputeNode>();
       foreach (IComputeNode computeNode in computeNodeSeenOrder) {
         if (computePlanAdded.Add(computeNode)) {
@@ -1095,6 +1112,7 @@ namespace NanoGraph {
       }
 
       // Execute each compute plan in order.
+      Dictionary<IComputeNode, CodeCachedResult> bufferRefTokens = new Dictionary<IComputeNode, CodeCachedResult>();
       foreach (var plan in computePlans) {
         var computeNode = plan.Node;
         var computePlan = plan.Generators;
@@ -1104,12 +1122,16 @@ namespace NanoGraph {
           // Read inputs.
           var dependentComputeNodeResults = new List<ComputeNodeResultEntry>();
           foreach (var dependency in dependentComputeNodes) {
-            if (!computeNodeResults.TryGetValue(dependency.Node, out var result)) {
-              CurrentGenerateState.AddError($"Dependency {dependency.Node} for {computeNode} not yet ready.");
-              continue;
+            if (dependency.IsCompileTimeOnlyDependency) {
+              dependentComputeNodeResults.Add(new ComputeNodeResultEntry { Node = dependency.Node });
+            } else {
+              if (!computeNodeResults.TryGetValue(dependency.Node, out var result)) {
+                CurrentGenerateState.AddError($"Dependency {dependency.Node} for {computeNode} not yet ready.");
+                continue;
+              }
+              dependency.SetInput(result.result ?? default, result.op);
+              dependentComputeNodeResults.Add(new ComputeNodeResultEntry { Node = dependency.Node, Result = result.result, Operation = result.op });
             }
-            dependency.SetInput(result.result ?? default, result.op);
-            dependentComputeNodeResults.Add(new ComputeNodeResultEntry { Node = dependency.Node, Result = result.result, Operation = result.op });
           }
 
           var emitContext = new ComputeNodeEmitCodeOperationContext {
@@ -1119,6 +1141,7 @@ namespace NanoGraph {
               createPipelinesFunction = createPipelinesFunction,
               dependentComputeNodes = dependentComputeNodeResults,
               dependentComputeInputs = dependentComputeInputs,
+              bufferRefTokens = bufferRefTokens,
           };
           var emitOp = computeNode.CreateEmitCodeOperation(emitContext);
 

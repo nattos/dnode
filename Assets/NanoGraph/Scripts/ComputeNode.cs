@@ -45,6 +45,8 @@ namespace NanoGraph {
     public FieldPortsMode OutputPortsMode = FieldPortsMode.Individual;
     [EditableAttribute]
     public bool IsArray = false;
+    [EditableAttribute]
+    public bool HasBufferRefOut = false;
 
     public TypeDeclMode TypeDeclMode = TypeDeclMode.External;
     public TypeDecl InternalType;
@@ -56,7 +58,8 @@ namespace NanoGraph {
     public virtual DataSpec ComputeInputSpec => DataSpec.ExtendWithFields(TypeDeclFields, GetInputOutputDataSpec(FieldPortsMode.Combined, InputTypeFields));
     public virtual DataSpec ComputeOutputSpec => OutputSpec;
     public override DataSpec InputSpec => DataSpec.ExtendWithFields(TypeDeclFields, GetInputOutputDataSpec(InputPortsMode, InputTypeFields));
-    public override DataSpec OutputSpec => GetInputOutputDataSpec(OutputPortsMode, OutputTypeFields, ForceOutputIsArray);
+    public override DataSpec OutputSpec => DataSpec.ExtendWithFields(BaseOutputSpec, BufferRefOutFields);
+    private DataSpec BaseOutputSpec => GetInputOutputDataSpec(OutputPortsMode, OutputTypeFields, ForceOutputIsArray);
     protected virtual bool ForceOutputIsArray => false;
 
     private DataSpec GetInputOutputDataSpec(FieldPortsMode fieldsMode, TypeField[] fields, bool forceIsArray = false) {
@@ -76,6 +79,17 @@ namespace NanoGraph {
     }
 
     protected DataField[] TypeDeclFields => !RequiresTypeDeclInput ? Array.Empty<DataField>() : new[] { new DataField { Name = "TypeDecl", IsCompileTimeOnly = true, Type = TypeSpec.MakePrimitive(PrimitiveType.TypeDecl) } };
+
+    private DataField[] BufferRefOutFields {
+      get {
+        if (!HasBufferRefOut) {
+          return Array.Empty<DataField>();
+        }
+        DataField field = DataField.MakePrimitive("BufferRef", PrimitiveType.BufferRef);
+        field.IsCompileTimeOnly = true;
+        return new[] { field };
+      }
+    }
 
     public virtual TypeField[] InputTypeFields => InputOutputTypeFields;
     public virtual TypeField[] OutputTypeFields => InputOutputTypeFields;
@@ -112,6 +126,7 @@ namespace NanoGraph {
         createPipelinesFunction = context.createPipelinesFunction;
         dependentComputeNodes = context.dependentComputeNodes;
         dependentComputeInputs = context.dependentComputeInputs;
+        bufferRefTokens = context.bufferRefTokens;
       }
 
       // TODO: Rename all!!
@@ -125,6 +140,7 @@ namespace NanoGraph {
       public TypeSpec resultTypeSpec { get; private set; }
       public NanoProgramType resultType { get; private set; }
       public DataSpec computeOutputSpec { get; private set; }
+      public Dictionary<IComputeNode, CodeCachedResult> bufferRefTokens { get; private set; }
 
       public readonly NanoFunction createPipelinesFunction;
 
@@ -145,6 +161,7 @@ namespace NanoGraph {
       public Dictionary<IComputeNode, List<(DataField field, int inputIndex)>> descendantInputs = new Dictionary<IComputeNode, List<(DataField field, int inputIndex)>>();
 
       public CodeLocal cachedResult { get; private set; }
+      protected ComputeInput[] collectedComputeInputs { get; private set; }
 
       private string _lastUpdateFrameNumberIdentifier;
       private string _didInitializeFlagIdentifier;
@@ -160,7 +177,12 @@ namespace NanoGraph {
         this.resultTypeSpec = TypeSpec.MakeType(resultTypeDecl);
         this.resultType = program.AddType(resultTypeDecl, $"Result_{computeNode.ShortName}");
         // Define a field to hold the cached result.
-        string cachedResultIdentifier = program.AddInstanceField(resultType, $"Result_{computeNode.ShortName}");
+        string cachedResultIdentifier;
+        if (bufferRefTokens.TryGetValue(computeNode, out var bufferedResult)) {
+          cachedResultIdentifier = bufferedResult.Result.Identifier;
+        } else {
+          cachedResultIdentifier = program.AddInstanceField(resultType, $"Result_{computeNode.ShortName}");
+        }
         this.cachedResult = new CodeLocal { Type = resultTypeSpec, Identifier = cachedResultIdentifier };
 
         if (NeedsLastUpdateFrameNumber) {
@@ -177,8 +199,9 @@ namespace NanoGraph {
 
       public void EmitLoadFunctionInputs() {
         int inputIndex = 0;
-        foreach (var input in CollectComputeInputs(DependentComputeInputsToLoad)) {
-          input.Operation.RecordLoadInputForDescendantNode(computeNode, input.Field, inputIndex++);
+        collectedComputeInputs = CollectComputeInputs(DependentComputeInputsToLoad).ToArray();
+        foreach (var input in collectedComputeInputs) {
+          input.Operation?.RecordLoadInputForDescendantNode(computeNode, input.Field, inputIndex++);
         }
       }
 
@@ -316,21 +339,47 @@ namespace NanoGraph {
             NanoGraph.CurrentGenerateState.AddError($"Dependency {input.Node} for {computeNode} does not have output field {input.FieldName}.");
             continue;
           }
+          bool isBufferRef = outputFieldOrNull?.Type.Primitive == PrimitiveType.BufferRef;
 
           // TODO: Figure out how to do this...
           bool readWrite = result.Node is ISplitComputeNode;
 
           DataField field = outputFieldOrNull.Value;
-          if (field.IsCompileTimeOnly) {
+          if (field.IsCompileTimeOnly && !isBufferRef) {
             continue;
           }
-          var fieldType = program.GetProgramType(field.Type, field.Name);
+
+          NanoProgramType fieldType;
+          string expression;
+          if (isBufferRef) {
+            fieldType = this.resultType;
+            string bufferedResultIdentifier;
+            if (bufferRefTokens.TryGetValue(result.Node, out var bufferedResult)) {
+              bufferedResultIdentifier = bufferedResult.Result.Identifier;
+            } else {
+              bufferedResultIdentifier = program.AddInstanceField(resultType, $"BufferedResult_{result.Node.ShortName}");
+              bufferRefTokens[result.Node] = new CodeCachedResult { ResultType = resultType, Result = new CodeLocal { Identifier = bufferedResultIdentifier, Type = resultTypeSpec } };
+
+              foreach (var bufferedField in resultTypeSpec.Type.Fields) {
+                string bufferedFieldName = resultType.GetField(bufferedField.Name);
+                if (bufferedField.Type.IsArray) {
+                  this.createPipelinesFunction.AddStatement($"{bufferedResultIdentifier}.{bufferedFieldName}.reset(NanoTypedBuffer<{this.createPipelinesFunction.GetElementTypeIdentifier(bufferedField.Type)}>::Allocate(1));");
+                } else {
+                  this.createPipelinesFunction.AddStatement($"{bufferedResultIdentifier}.{bufferedFieldName} = 0;");
+                }
+              }
+            }
+            expression = bufferedResultIdentifier;
+          } else {
+            fieldType = program.GetProgramType(field.Type, field.Name);
+            expression = $"{resultIdentifier}.{result.Result?.ResultType.GetField(field.Name)}";
+          }
           yield return new ComputeInput {
             Plug = input,
             Field = field,
             FieldType = fieldType,
             Operation = result.Operation,
-            Expression = $"{resultIdentifier}.{result.Result?.ResultType.GetField(field.Name)}",
+            Expression = expression,
             ReadWrite = readWrite,
           };
         }

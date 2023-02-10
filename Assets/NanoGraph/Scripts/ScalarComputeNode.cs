@@ -147,6 +147,9 @@ namespace NanoGraph {
           }
           string resultIdentifier = dependency.Result?.Result.Identifier;
           foreach (var field in dependency.Node.OutputSpec.Fields) {
+            if (field.IsCompileTimeOnly) {
+              continue;
+            }
             var fieldType = program.GetProgramType(field.Type, field.Name);
             if (fieldType.IsArray) {
               string inputBuffer = $"{resultIdentifier}.{dependency.Result?.ResultType.GetField(field.Name)}";
