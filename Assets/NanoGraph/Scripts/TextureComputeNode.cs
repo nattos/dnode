@@ -60,7 +60,7 @@ namespace NanoGraph {
 
     public override DataSpec InputSpec => DataSpec.FromFields(TextureSizeFields.Concat(InputFields).ToArray());
     public override DataSpec ComputeInputSpec => DataSpec.FromFields(InputFields);
-    public override DataSpec OutputSpec => DataSpec.FromFields(new DataField { Name = "Out", Type = TypeSpec.MakePrimitive(PrimitiveType.Texture) });
+    public override DataSpec OutputSpec => DataSpec.FromFields(new[] { new DataField { Name = "Out", Type = TypeSpec.MakePrimitive(PrimitiveType.Texture) } }.Concat(BufferRefOutFields).ToArray());
 
     public override IComputeNodeEmitCodeOperation CreateEmitCodeOperation(ComputeNodeEmitCodeOperationContext context) => new EmitterGpu(this, context);
   

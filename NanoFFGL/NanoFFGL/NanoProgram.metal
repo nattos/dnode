@@ -215,6 +215,9 @@ template<> inline vector_float4 blend_mix<true, vector_float4>(vector_float4 rhs
   }
 }
 
+template<bool useAlpha, typename T> static inline T add_mix(T rhs, float t) { return rhs * t; }
+template<bool useAlpha, typename T> static inline T add_mix(T rhs, T lhs, float t) { return rhs + lhs * t; }
+
 
 kernel void CopyTextureSampleNearest(
     NanoTexture input [[texture(0)]],

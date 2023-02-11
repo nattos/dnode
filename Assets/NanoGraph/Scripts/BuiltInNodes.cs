@@ -579,15 +579,28 @@ namespace NanoGraph {
   }
 
   public class ReadTextureNode : DataNode, ICodeNode {
+    public enum CoordinateMode {
+      Normal,
+      Inverse,
+    }
+
     [EditableAttribute]
     public TextureFilterMode FilterMode = TextureFilterMode.Linear;
     [EditableAttribute]
     public TextureWrapMode WrapMode = TextureWrapMode.Repeat;
+    [EditableAttribute]
+    public CoordinateMode Coordinates = CoordinateMode.Normal;
     public override DataSpec InputSpec => DataSpec.FromFields(DataField.MakePrimitive("In", PrimitiveType.Texture), DataField.MakePrimitive("Index", PrimitiveType.Float2));
     public override DataSpec OutputSpec => DataSpec.FromFields(DataField.MakePrimitive("Out", PrimitiveType.Float4));
 
     public void EmitCode(CodeContext context) {
-      context.Function.AddStatement($"{context.Function.GetTypeIdentifier(context.OutputLocals[0].Type)} {context.OutputLocals[0].Identifier} = {context.Function.Context.EmitSampleTexture(context.InputLocals[0].Identifier, context.InputLocals[1].Identifier, FilterMode, WrapMode)};");
+      string indexExpr = context.InputLocals[1].Identifier;
+      switch (Coordinates) {
+        case CoordinateMode.Inverse:
+          indexExpr = $"(vector_float2 {{ ({indexExpr}).x, -({indexExpr}).y }})";
+          break;
+      }
+      context.Function.AddStatement($"{context.Function.GetTypeIdentifier(context.OutputLocals[0].Type)} {context.OutputLocals[0].Identifier} = {context.Function.Context.EmitSampleTexture(context.InputLocals[0].Identifier, indexExpr, FilterMode, WrapMode)};");
     }
   }
 

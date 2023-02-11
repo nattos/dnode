@@ -521,6 +521,13 @@ namespace NanoGraph.VisualScripting {
         }
         unit.Define();
       }
+      foreach (var unit in _flowGraph.units) {
+        BaseNode baseNode = unit as BaseNode;
+        if (baseNode == null) {
+          continue;
+        }
+        baseNode.SyncInputConnectionsToGraphEdges();
+      }
     }
 
     protected override void EnsureNode() {

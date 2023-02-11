@@ -80,7 +80,7 @@ namespace NanoGraph {
 
     protected DataField[] TypeDeclFields => !RequiresTypeDeclInput ? Array.Empty<DataField>() : new[] { new DataField { Name = "TypeDecl", IsCompileTimeOnly = true, Type = TypeSpec.MakePrimitive(PrimitiveType.TypeDecl) } };
 
-    private DataField[] BufferRefOutFields {
+    protected DataField[] BufferRefOutFields {
       get {
         if (!HasBufferRefOut) {
           return Array.Empty<DataField>();

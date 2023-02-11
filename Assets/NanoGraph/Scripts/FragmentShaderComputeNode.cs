@@ -5,6 +5,27 @@ using System.Linq;
 using UnityEngine;
 
 namespace NanoGraph {
+  public enum BlendOperation {
+    Add,
+    Subtract,
+    ReverseSubtract,
+    Min,
+    Max,
+  }
+
+  public enum BlendFactor {
+    Zero,
+    One,
+    SourceColor,
+    OneMinusSourceColor,
+    SourceAlpha,
+    OneMinusSourceAlpha,
+    DestinationColor,
+    OneMinusDestinationColor,
+    DestinationAlpha,
+    OneMinusDestinationAlpha,
+  }
+
   // A fragment shader takes the outputs of a vertex shader and turns that into a color.
   //
   // Its color input must depend on the outputs of exactly one vertex shader node, although it may
@@ -18,6 +39,21 @@ namespace NanoGraph {
     public TextureChannelFormat Channels = TextureChannelFormat.RGBA;
     [EditableAttribute]
     public TextureBitDepth BitDepth = TextureBitDepth.Global;
+
+    [EditableAttribute]
+    public bool BlendEnabled = false;
+    [EditableAttribute]
+    public BlendOperation ColorBlendOperation = BlendOperation.Add;
+    [EditableAttribute]
+    public BlendOperation AlphaBlendOperation = BlendOperation.Add;
+    [EditableAttribute]
+    public BlendFactor SourceColorBlendFactor = BlendFactor.One;
+    [EditableAttribute]
+    public BlendFactor SourceAlphaBlendFactor = BlendFactor.One;
+    [EditableAttribute]
+    public BlendFactor DestinationColorBlendFactor = BlendFactor.Zero;
+    [EditableAttribute]
+    public BlendFactor DestinationAlphaBlendFactor = BlendFactor.Zero;
 
     public override INanoCodeContext CodeContext => NanoProgram.GpuContext;
 
@@ -137,6 +173,48 @@ namespace NanoGraph {
             return "OutputTextureSize";
           case TextureComputeSizeMode.Custom:
             return func.EmitConvert(func.Program.Float2Type, func.Program.Int2Type, GetInputExpr("Size"));
+        }
+      }
+
+      private static string ToMetalBlendOperation(BlendOperation value) {
+        switch (value) {
+          default:
+          case BlendOperation.Add:
+            return "MTLBlendOperationAdd";
+          case BlendOperation.Subtract:
+            return "MTLBlendOperationSubtract";
+          case BlendOperation.ReverseSubtract:
+            return "MTLBlendOperationSubtract";
+          case BlendOperation.Min:
+            return "MTLBlendOperationMax";
+          case BlendOperation.Max:
+            return "MTLBlendOperationMin";
+        }
+      }
+
+      private static string ToMetalBlendFactor(BlendFactor value) {
+        switch (value) {
+          default:
+          case BlendFactor.Zero:
+            return "MTLBlendFactorZero";
+          case BlendFactor.One:
+            return "MTLBlendFactorOne";
+          case BlendFactor.SourceColor:
+            return "MTLBlendFactorSourceColor";
+          case BlendFactor.OneMinusSourceColor:
+            return "MTLBlendFactorOneMinusSourceColor";
+          case BlendFactor.SourceAlpha:
+            return "MTLBlendFactorSourceAlpha";
+          case BlendFactor.OneMinusSourceAlpha:
+            return "MTLBlendFactorOneMinusSourceAlpha";
+          case BlendFactor.DestinationColor:
+            return "MTLBlendFactorDestinationColor";
+          case BlendFactor.OneMinusDestinationColor:
+            return "MTLBlendFactorOneMinusDestinationColor";
+          case BlendFactor.DestinationAlpha:
+            return "MTLBlendFactorDestinationAlpha";
+          case BlendFactor.OneMinusDestinationAlpha:
+            return "MTLBlendFactorOneMinusDestinationAlpha";
         }
       }
 
@@ -265,11 +343,20 @@ namespace NanoGraph {
         createPipelinesFunction.AddStatement($"  pipelineStateDescriptor.vertexFunction = vertexFunction;");
         createPipelinesFunction.AddStatement($"  pipelineStateDescriptor.fragmentFunction = fragmentFunction;");
         createPipelinesFunction.AddStatement($"  pipelineStateDescriptor.colorAttachments[0].pixelFormat = {bitDepthExpr};");
+        createPipelinesFunction.AddStatement($"  pipelineStateDescriptor.colorAttachments[0].blendingEnabled = {createPipelinesFunction.EmitLiteral(Node.BlendEnabled)};");
+        createPipelinesFunction.AddStatement($"  pipelineStateDescriptor.colorAttachments[0].alphaBlendOperation = {ToMetalBlendOperation(Node.AlphaBlendOperation)};");
+        createPipelinesFunction.AddStatement($"  pipelineStateDescriptor.colorAttachments[0].rgbBlendOperation = {ToMetalBlendOperation(Node.ColorBlendOperation)};");
+        createPipelinesFunction.AddStatement($"  pipelineStateDescriptor.colorAttachments[0].destinationAlphaBlendFactor = {ToMetalBlendFactor(Node.DestinationAlphaBlendFactor)};");
+        createPipelinesFunction.AddStatement($"  pipelineStateDescriptor.colorAttachments[0].destinationRGBBlendFactor = {ToMetalBlendFactor(Node.DestinationColorBlendFactor)};");
+        createPipelinesFunction.AddStatement($"  pipelineStateDescriptor.colorAttachments[0].sourceAlphaBlendFactor = {ToMetalBlendFactor(Node.SourceAlphaBlendFactor)};");
+        createPipelinesFunction.AddStatement($"  pipelineStateDescriptor.colorAttachments[0].sourceRGBBlendFactor = {ToMetalBlendFactor(Node.SourceColorBlendFactor)};");
+
         createPipelinesFunction.AddStatement($"  {pipelineStateIdentifier} = [device newRenderPipelineStateWithDescriptor:pipelineStateDescriptor error:&error];");
         createPipelinesFunction.AddStatement($"  MTLRenderPassDescriptor* renderPassDescriptor = [MTLRenderPassDescriptor new];");
         createPipelinesFunction.AddStatement($"  renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 0);");
         createPipelinesFunction.AddStatement($"  renderPassDescriptor.colorAttachments[0].loadAction = MTLLoadActionClear;");
         createPipelinesFunction.AddStatement($"  renderPassDescriptor.colorAttachments[0].storeAction = MTLStoreActionStore;");
+
         createPipelinesFunction.AddStatement($"  {renderPassDescriptorIdentifier} = renderPassDescriptor;");
         createPipelinesFunction.AddStatement($"}}");
       }
