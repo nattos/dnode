@@ -52,12 +52,8 @@ int main(int argc, const char* argv[]) {
     g_program->SetupParameters();
 
     std::unordered_map<std::string, int> parameterMap;
-    {
-      int parameterIndex = 0;
-      for (const auto& parameterDecl : g_program->GetParameterDecls()) {
-        parameterMap[parameterDecl.Name] = parameterIndex;
-        ++parameterIndex;
-      }
+    for (const auto& parameterDecl : g_program->GetParameterDecls()) {
+      parameterMap[parameterDecl.Name] = parameterDecl.Key;
     }
     std::unordered_map<std::string, NanoProgram::DebugSettableValue> debugValuesMap;
     {
@@ -71,6 +67,9 @@ int main(int argc, const char* argv[]) {
     @autoreleasepool {
       std::string input;
       std::getline(std::cin, input);
+      if (std::cin.eof()) {
+        break;
+      }
       if (input.length() == 0) {
         continue;
       }

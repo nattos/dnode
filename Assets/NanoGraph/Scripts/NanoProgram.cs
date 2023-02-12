@@ -456,6 +456,7 @@ namespace NanoGraph {
     public double DefaultValue;
     public double MinValue;
     public double MaxValue;
+    public int Key;
   }
 
   public class NanoProgram {
@@ -534,6 +535,7 @@ namespace NanoGraph {
         DefaultValue = defaultValue,
         MinValue = minValue,
         MaxValue = maxValue,
+        Key = index,
       });
       return index;
     }

@@ -178,6 +178,10 @@ static inline vector_float2 logE(vector_float2 a) { return vector_float2 { log(a
 static inline vector_float3 logE(vector_float3 a) { return vector_float3 { log(a.x), log(a.y), log(a.z) }; }
 static inline vector_float4 logE(vector_float4 a) { return vector_float4 { log(a.x), log(a.y), log(a.z), log(a.w) }; }
 
+template<typename T> static inline T pow_op(const T a, const T b) { return pow(a, b); }
+template<typename T> static inline T cos_op(const T value) { return cos(value); }
+template<typename T> static inline T sin_op(const T value) { return sin(value); }
+
 template<typename T>
 struct ValueAndBool {
   T Value;

@@ -1380,12 +1380,13 @@ namespace NanoGraph {
 
           var getParamsFunc = program.AddOverrideFunction($"GetParameterDecls", NanoProgram.CpuContext, NanoProgramType.MakeBuiltIn(program, "std::vector<ParameterDecl>"), modifiers: new[] { "virtual" });
           getParamsFunc.AddStatement("std::vector<ParameterDecl> parameters = {");
-          foreach (var valueInput in program.ValueInputs) {
+          foreach (var valueInput in program.ValueInputs.OrderBy(param => param.Name)) {
             getParamsFunc.AddStatement($"  ParameterDecl {{");
             getParamsFunc.AddStatement($"    .Name = {getParamsFunc.EmitLiteral(valueInput.Name)},");
             getParamsFunc.AddStatement($"    .DefaultValue = {getParamsFunc.EmitLiteral(valueInput.DefaultValue)},");
             getParamsFunc.AddStatement($"    .MinValue = {getParamsFunc.EmitLiteral(valueInput.MinValue)},");
             getParamsFunc.AddStatement($"    .MaxValue = {getParamsFunc.EmitLiteral(valueInput.MaxValue)},");
+            getParamsFunc.AddStatement($"    .Key = {getParamsFunc.EmitLiteral(valueInput.Key)},");
             getParamsFunc.AddStatement($"  }},");
           }
           getParamsFunc.AddStatement("};");

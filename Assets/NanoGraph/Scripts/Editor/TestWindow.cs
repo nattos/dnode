@@ -46,7 +46,9 @@ namespace NanoGraph {
     }
 
     public void OnDisable() {
-      Instance = null;
+      if (Instance == this) {
+        Instance = null;
+      }
       PluginService.Instance.TextureInputsNeedUpdating -= OnTextureInputsNeedUpdating;
       PluginService.Instance.TextureOutputsUpdated -= OnTextureOutputsUpdated;
     }
@@ -93,6 +95,7 @@ namespace NanoGraph {
     }
 
     public void OnGUI() {
+      Instance = this;
       Texture2D monitorTexture;
       string monitorDisplayString;
       if (Input) {

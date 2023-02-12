@@ -280,8 +280,11 @@ namespace NanoGraph.Plugin {
             }
           }
 
-          _threadFlag.WaitOne();
+          _threadFlag.WaitOne(1000);
           if (_terminateFlag.WaitOne(0)) {
+            return;
+          }
+          if (process.HasExited) {
             return;
           }
         }

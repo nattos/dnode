@@ -134,9 +134,11 @@ public:
     _program->SetupParameters();
 
     auto valueInputs = _program->GetParameterDecls();
+    _parameterIndexMap.resize(valueInputs.size());
     for (int i = 0; i < valueInputs.size(); ++i) {
       int index = i;
       const auto& valueInput = valueInputs[i];
+      _parameterIndexMap[i] = valueInput.Key;
       float defaultValue = (float)valueInput.DefaultValue;
       SetParamInfo(index, valueInput.Name.c_str(), FF_TYPE_STANDARD, defaultValue);
       //In FFGLPluginManager.cpp, line 274, SetParamInfo clamps the default value to 0...1 in case of FF_TYPE_STANDARD
@@ -226,7 +228,7 @@ public:
     if (valueInputIndex < 0 || valueInputIndex >= _program->GetValueInputCount()) {
       return FF_FAIL;
     }
-    _program->SetValueInput(valueInputIndex, value);
+    _program->SetValueInput(_parameterIndexMap[valueInputIndex], value);
     return FF_SUCCESS;
   }
 
@@ -235,7 +237,7 @@ public:
     if (valueInputIndex < 0 || valueInputIndex >= _program->GetValueInputCount()) {
       return 0.0f;
     }
-    return (float)_program->GetValueInput(valueInputIndex);
+    return (float)_program->GetValueInput(_parameterIndexMap[valueInputIndex]);
   }
 
 private:
@@ -253,6 +255,7 @@ private:
   AAPLOpenGLMetalInteropTexture* _outputTexture = nullptr;
 
   std::unique_ptr<NanoProgram> _program;
+  std::vector<int> _parameterIndexMap;
 };
 
 

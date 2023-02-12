@@ -15,6 +15,7 @@ public:
     double DefaultValue;
     double MinValue;
     double MaxValue;
+    int Key;
   };
 
   struct DebugValue {

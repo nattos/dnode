@@ -64,16 +64,20 @@ namespace NanoGraph.Plugin {
       _pluginBuilder = new PluginBuilder();
       _pluginWatcher = new PluginWatcher();
       _pluginWatcher.PluginBinaryChanged += () => {
-        if (EnableAutoReload && IsRendering) {
-          Debug.Log("Reloading plugin.");
-          StopRendering();
-          StartRendering();
-        }
+        EditorUtils.DelayCall += () => {
+          if (EnableAutoReload && IsRendering) {
+            Debug.Log("Reloading plugin.");
+            StopRendering();
+            StartRendering();
+          }
+        };
       };
       _pluginWatcher.PluginCodeChanged += () => {
-        if (EnableAutoReload) {
-          _pluginBuilder.MarkDirty();
-        }
+        EditorUtils.DelayCall += () => {
+          if (EnableAutoReload) {
+            _pluginBuilder.MarkDirty();
+          }
+        };
       };
       if (EnableAutoReload) {
         StartRendering();
