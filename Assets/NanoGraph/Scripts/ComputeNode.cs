@@ -148,13 +148,9 @@ namespace NanoGraph {
       public readonly IReadOnlyList<DataPlug> dependentComputeInputs;
 
       public IReadOnlyDictionary<DataPlug, CodeLocal> resultLocalMap { get; private set; }
-      public SortedDictionary<string, (DataPlug, CodeLocal)> SortedResutLocalMap {
+      public (DataPlug plug, CodeLocal result)[] SortedResutLocals {
         get {
-          SortedDictionary<string, (DataPlug, CodeLocal)> orderedResultLocalMap = new SortedDictionary<string, (DataPlug, CodeLocal)>();
-          foreach (var entry in resultLocalMap) {
-            orderedResultLocalMap.Add($"{entry.Key.Node.DebugId}.{entry.Key.FieldName}", (entry.Key, entry.Value));
-          }
-          return orderedResultLocalMap;
+          return resultLocalMap.OrderBy(entry => $"{entry.Key.Node.DebugId}.{entry.Key.FieldName}").Select(entry => (entry.Key, entry.Value)).ToArray();
         }
       }
 

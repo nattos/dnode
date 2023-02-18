@@ -214,7 +214,7 @@ namespace NanoGraph {
             return Array.Empty<string>();
           }
 
-          foreach ((DataPlug dataPlug, CodeLocal resultLocal) in SortedResutLocalMap.Values) {
+          foreach ((DataPlug dataPlug, CodeLocal resultLocal) in SortedResutLocals) {
             string extractDebugValueExpr;
             string[] valueExprs = GetExtractDebugValueExprs(resultLocal.Identifier, resultLocal.Type, limit: 4);
             if (valueExprs.Length == 1) {
@@ -321,7 +321,7 @@ namespace NanoGraph {
           {
             bool first = true;
             int resultIndex = 0;
-            foreach ((DataPlug dataPlug, CodeLocal resultLocal) in SortedResutLocalMap.Values) {
+            foreach ((DataPlug dataPlug, CodeLocal resultLocal) in SortedResutLocals) {
               string ifBranch = first ? "if (" : "} else if (";
               first = false;
               string thisKey = $"{dataPlug.Node.DebugId}.{dataPlug.FieldName}";
