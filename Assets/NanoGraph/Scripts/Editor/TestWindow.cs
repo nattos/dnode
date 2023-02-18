@@ -21,7 +21,6 @@ namespace NanoGraph {
     [SerializeField]
     public List<SelectedInput> SelectedInputs;
 
-    public bool Input;
     public bool Locked;
 
     private double _lastRenderTime;
@@ -98,10 +97,7 @@ namespace NanoGraph {
       Instance = this;
       Texture2D monitorTexture;
       string monitorDisplayString;
-      if (Input) {
-        monitorTexture = PluginService.Instance.GetTextureInput();
-        monitorDisplayString = "Input0";
-      } else if (!string.IsNullOrEmpty(PluginService.Instance.DebugOutputTextureKey)) {
+      if (!string.IsNullOrEmpty(PluginService.Instance.DebugOutputTextureKey)) {
         monitorTexture = PluginService.Instance.GetDebugOutputTexture();
         monitorDisplayString = _selectedOutputNode?.ShortName ?? "<unknown node>";
       } else {
@@ -170,7 +166,7 @@ namespace NanoGraph {
 
       using (new EditorGUILayout.HorizontalScope()) {
         bool isRendering = PluginService.Instance.IsRendering;
-        if (GUILayout.Button(isRendering ? "Stop" : "Start")) {
+        if (ColoredButton(isRendering ? "Stop" : "Start", Color.clear)) {
           EditorApplication.delayCall += () => {
             if (isRendering) {
               PluginService.Instance.StopRendering();
@@ -179,19 +175,29 @@ namespace NanoGraph {
             }
           };
         }
-        if (GUILayout.Button("Compile")) {
+        if (ColoredButton("▶️", PluginService.Instance.IsPaused ? Color.yellow : Color.clear)) {
+          PluginService.Instance.IsPaused = !PluginService.Instance.IsPaused;
+        }
+        if (ColoredButton("▶️I", Color.clear)) {
+          PluginService.Instance.IsPaused = true;
+          PluginService.Instance.RequestStepOnce = true;
+        }
+        if (ColoredButton("Out", Color.clear)) {
+          PluginService.Instance.DebugOutputTextureKey = null;
+        }
+        Locked = EditorGUILayout.ToggleLeft("Locked", Locked, GUILayout.Width(80));
+        PluginService.Instance.EnableAutoReload = EditorGUILayout.ToggleLeft("Auto Reload", PluginService.Instance.EnableAutoReload, GUILayout.Width(80));
+        PluginService.Instance.EnableDebug = EditorGUILayout.ToggleLeft("Debug", PluginService.Instance.EnableDebug, GUILayout.Width(80));
+        if (ColoredButton("Compile", Color.clear)) {
           EditorApplication.delayCall += () => {
             NanoGraph.DebugInstance?.CompileLater();
           };
         }
-        if (GUILayout.Button("Export Plugin")) {
+        if (ColoredButton("Export Plugin", Color.clear)) {
           EditorApplication.delayCall += () => {
             PluginService.Instance.ExportPlugin(NanoGraph.DebugInstance?.EffectName);
           };
         }
-        Input = EditorGUILayout.ToggleLeft("Show Input", Input);
-        Locked = EditorGUILayout.ToggleLeft("Locked", Locked);
-        PluginService.Instance.EnableAutoReload = EditorGUILayout.ToggleLeft("Auto Reload", PluginService.Instance.EnableAutoReload);
         EditorGUILayout.Space(0, expand: true);
       }
 
@@ -200,36 +206,53 @@ namespace NanoGraph {
         this.maximized = !this.maximized;
       }
 
-      if (!Locked) {
-        // Update the active debug node.
-        var graphWindow = global::NanoGraph.VisualScripting.GraphWindow.active;
-        var context = graphWindow?.context;
-        var selection = context?.selection;
-        bool hasSelection = selection?.Count > 0;
-        global::NanoGraph.VisualScripting.NodeBasedNode selectedBaseNode = selection?.FirstOrDefault() as global::NanoGraph.VisualScripting.NodeBasedNode;
-        if (hasSelection) {
-          string desiredDebugOutputTextureKey;
-          if (selectedBaseNode != null) {
-            string nodeDebugId = selectedBaseNode.DebugId ?? "";
-            string nodeDebugFieldKey = "";
-            foreach (var output in selectedBaseNode.outputs) {
-              if (string.IsNullOrEmpty(nodeDebugFieldKey)) {
-                nodeDebugFieldKey = output.key;
-              }
-              if (output.key == "Out") {
-                nodeDebugFieldKey = output.key;
-                break;
-              }
-            }
-            desiredDebugOutputTextureKey = $"{nodeDebugId}.{nodeDebugFieldKey}";
-            _selectedOutputNode = selectedBaseNode.Node;
-          } else {
-            desiredDebugOutputTextureKey = null;
-            _selectedOutputNode = null;
-          }
-          PluginService.Instance.DebugOutputTextureKey = desiredDebugOutputTextureKey;
-        }
+      UpdateMonitoredNode();
+    }
+
+    private void UpdateMonitoredNode() {
+      if (Locked) {
+        return;
       }
+      // Update the active debug node.
+      var graphWindow = global::NanoGraph.VisualScripting.GraphWindow.active;
+      var context = graphWindow?.context;
+      var selection = context?.selection;
+      bool hasSelection = selection?.Count > 0;
+      global::NanoGraph.VisualScripting.NodeBasedNode selectedBaseNode = selection?.FirstOrDefault() as global::NanoGraph.VisualScripting.NodeBasedNode;
+      if (!hasSelection) {
+        return;
+      }
+      string desiredDebugOutputTextureKey;
+      if (selectedBaseNode != null) {
+        if (_selectedOutputNode == selectedBaseNode.Node) {
+          return;
+        }
+        string nodeDebugId = selectedBaseNode.DebugId ?? "";
+        string nodeDebugFieldKey = "";
+        foreach (var output in selectedBaseNode.outputs) {
+          if (string.IsNullOrEmpty(nodeDebugFieldKey)) {
+            nodeDebugFieldKey = output.key;
+          }
+          if (output.key == "Out") {
+            nodeDebugFieldKey = output.key;
+            break;
+          }
+        }
+        desiredDebugOutputTextureKey = $"{nodeDebugId}.{nodeDebugFieldKey}";
+        _selectedOutputNode = selectedBaseNode.Node;
+      } else {
+        desiredDebugOutputTextureKey = null;
+        _selectedOutputNode = null;
+      }
+      PluginService.Instance.DebugOutputTextureKey = desiredDebugOutputTextureKey;
+    }
+
+    private static bool ColoredButton(string label, Color color) {
+      Color oldBackgroundColor = GUI.backgroundColor;
+      GUI.backgroundColor = color;
+      bool result = GUILayout.Button(label);
+      GUI.backgroundColor = oldBackgroundColor;
+      return result;
     }
 
     public static TestWindow Instance;

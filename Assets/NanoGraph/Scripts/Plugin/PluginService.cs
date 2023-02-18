@@ -50,6 +50,9 @@ namespace NanoGraph.Plugin {
     public Action TextureOutputsUpdated;
 
     public bool EnableAutoReload { get; set; } = true;
+    public bool EnableDebug { get; set; } = true;
+    public bool IsPaused { get; set; } = false;
+    public bool RequestStepOnce { get; set; } = false;
 
     public bool IsCompiling => _pluginWatcher.IsCompiling || _pluginBuilder.IsCompiling;
     public bool HasCompileError => _pluginBuilder.IsError;
@@ -149,7 +152,11 @@ namespace NanoGraph.Plugin {
         _queuedDebugSetValues.Clear();
       }
 
+      bool enableDebug = EnableDebug;
       int frameCount = _frameCount++;
+      bool isForceStep = RequestStepOnce;
+      bool shouldStep = !IsPaused || RequestStepOnce;
+      RequestStepOnce = false;
 
       _inFlightRenderRequest = Task.Run(async () => {
         if (queuedParameterValues != null) {
@@ -159,12 +166,12 @@ namespace NanoGraph.Plugin {
           await _server.DebugSetValues(queuedDebugSetValues.Select(entry => new DebugSetValuesRequest.Value { Key = entry.Key, Values = entry.Value }).ToArray());
         }
 
-        var response = await _server.ProcessTextures(_textureInputs, _textureOutputs, DebugOutputTextureKey);
-        bool updateDebugValues = (frameCount % 2) == 0;
+        ProcessTexturesResponse response = shouldStep ? await _server.ProcessTextures(_textureInputs, _textureOutputs, DebugOutputTextureKey) : null;
+        bool updateDebugValues = ((frameCount % 2) == 0 || isForceStep) && enableDebug;
         DebugGetWatchedValuesResponse debugValues = updateDebugValues ? await _server.DebugGetWatchedValues() : null;
 
         void PushResultsOnMainThread() {
-          if (response.DebugOutputTexture != 0 && response.DebugOutputTexture != _debugOutputTextureSurfaceId) {
+          if (response != null && response.DebugOutputTexture != 0 && response.DebugOutputTexture != _debugOutputTextureSurfaceId) {
             _debugOutputTextureSurfaceId = 0;
             _debugOutputTexture?.Dispose();
             _debugOutputTexture = null;
@@ -181,9 +188,13 @@ namespace NanoGraph.Plugin {
                 _debugValues[debugValue.Key] = debugValue.Values;
               }
             }
+          } else if (!enableDebug) {
+            _debugValues.Clear();
           }
 
-          TextureOutputsUpdated?.Invoke();
+          if (shouldStep) {
+            TextureOutputsUpdated?.Invoke();
+          }
         }
         return new RenderResult { PushResultsOnMainThread = PushResultsOnMainThread };
       });
