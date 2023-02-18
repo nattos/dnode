@@ -1040,8 +1040,12 @@ namespace NanoGraph {
 
       NanoProgramType debugCpuStateType = program.AddCustomType("DebugCpuState");
       NanoProgramType debugGpuStateType = program.AddCustomType("DebugGpuState");
+      NanoProgramType debugGpuWriteStateType = program.AddCustomType("DebugGpuWriteState");
       string debugCpuStateIdentifier = program.AddInstanceField(debugCpuStateType, "DebugCpuState");
       string debugGpuStateIdentifier = program.AddInstanceField(debugGpuStateType, "DebugGpuState");
+      string debugGpuWriteStateIdentifier = program.AddInstanceField(debugGpuWriteStateType, "DebugGpuWriteState");
+      string debugGpuWriteStateBufferIdentifier = program.AddInstanceField(program.MTLBuffer, "DebugGpuWriteStateBuffer");
+      createPipelinesFunction.AddStatement($"{debugGpuWriteStateBufferIdentifier} = [device newBufferWithLength:sizeof({debugGpuWriteStateType.Identifier}) options:MTLResourceStorageModeManaged];");
 
       var getDebugSettableValuesFunction = program.AddOverrideFunction("GetDebugSettableValues", NanoProgram.CpuContext, NanoProgramType.MakeBuiltIn(program, "std::vector<DebugSettableValue>"), modifiers: new[] { "virtual" });
       getDebugSettableValuesFunction.AddStatement("std::vector<DebugSettableValue> debugValues;");
@@ -1054,6 +1058,9 @@ namespace NanoGraph {
         DebugCpuStateIdentifier = debugCpuStateIdentifier,
         DebugGpuStateType = debugGpuStateType,
         DebugGpuStateIdentifier = debugGpuStateIdentifier,
+        DebugGpuWriteStateType = debugGpuWriteStateType,
+        DebugGpuWriteStateIdentifier = debugGpuWriteStateIdentifier,
+        DebugGpuWriteStateBufferIdentifier = debugGpuWriteStateBufferIdentifier,
       };
 
       // Prepare to traverse graph of compute nodes.
@@ -1172,6 +1179,10 @@ namespace NanoGraph {
               CodeLocal? inputLocal = resultLocalMap.GetOrNull(edge.Source);
               if (inputLocal == null) {
                 // TODO: Make error more precise for conditionals.
+                // HACK to silence this.
+                if (sourceNode is IConditionalNode) {
+                  continue;
+                }
                 CurrentGenerateState.AddError($"Input {field.Name} for {sourceNode} is not defined.");
                 continue;
               }
@@ -1232,8 +1243,9 @@ namespace NanoGraph {
                 codeGenerator.EmitCode(context);
               }
               bool debugEnabled = DebugEnabled && (codeGenerator.SourceNode as DataNode)?.DebugEnabled != false;
-              if (debugEnabled && !(func.Context is NanoGpuContext)) {
+              if (debugEnabled) {
                 getDebugValuesFunction.AddStatement($"#if defined(DEBUG)");
+                func.AddStatement($"#if defined(DEBUG)");
                 string debugId = codeGenerator.SourceNode.DebugId;
                 for (int i = 0; i < outputLocals.Count; ++i) {
                   string fieldName = outputFieldNames[i];
@@ -1244,40 +1256,43 @@ namespace NanoGraph {
                       List<string> resultExprs = new List<string>();
                       int arrayIndex = 0;
                       while (resultExprs.Count < limit) {
+                        int oldCount = resultExprs.Count;
                         string elementInputExpr = func.Context.EmitSampleBuffer(inputExpr, func.EmitLiteral(arrayIndex));
                         string[] elementExprs = GetExtractDebugValueExprs(elementInputExpr, type.ElementSpec, limit);
-                        if (elementExprs.Length == 0) {
-                          break;
-                        }
                         foreach (string elementExpr in elementExprs) {
                           if (!(func.Context is NanoGpuContext)) {
                             resultExprs.Add($"({arrayIndex} < GetDebugLength({inputExpr}) ? ({elementExpr}) : (0.0))");
                           }
                         }
+                        if (oldCount == resultExprs.Count) {
+                          break;
+                        }
                         ++arrayIndex;
                       }
                       return resultExprs.ToArray();
                     }
+                    NanoProgramType debugElementType = (func.Context is NanoGpuContext) ? program.FloatType : program.DoubleType;
+                    string debugElementTypeIdentifier = func.GetTypeIdentifier(debugElementType);
                     if (type.Primitive != null) {
                       switch (type.Primitive.Value) {
                         case PrimitiveType.Bool:
                           return new[] { $"(({inputExpr}) ? 1.0 : 0.0)" };
                         case PrimitiveType.Int:
-                          return new[] { $"((double)({inputExpr}))" };
+                          return new[] { $"(({debugElementTypeIdentifier})({inputExpr}))" };
                         case PrimitiveType.Uint:
-                          return new[] { $"((double)({inputExpr}))" };
+                          return new[] { $"(({debugElementTypeIdentifier})({inputExpr}))" };
                         case PrimitiveType.Uint2:
-                          return new[] { $"((double)(({inputExpr}).x))", $"((double)(({inputExpr}).y))" };
+                          return new[] { $"(({debugElementTypeIdentifier})(({inputExpr}).x))", $"(({debugElementTypeIdentifier})(({inputExpr}).y))" };
                         case PrimitiveType.Double:
-                          return new[] { $"((double)({inputExpr}))" };
+                          return new[] { $"(({debugElementTypeIdentifier})({inputExpr}))" };
                         case PrimitiveType.Float:
-                          return new[] { $"((double)({inputExpr}))" };
+                          return new[] { $"(({debugElementTypeIdentifier})({inputExpr}))" };
                         case PrimitiveType.Float2:
-                          return new[] { $"((double)(({inputExpr}).x))", $"((double)(({inputExpr}).y))" };
+                          return new[] { $"(({debugElementTypeIdentifier})(({inputExpr}).x))", $"(({debugElementTypeIdentifier})(({inputExpr}).y))" };
                         case PrimitiveType.Float3:
-                          return new[] { $"((double)(({inputExpr}).x))", $"((double)(({inputExpr}).y))", $"((double)(({inputExpr}).z))" };
+                          return new[] { $"(({debugElementTypeIdentifier})(({inputExpr}).x))", $"(({debugElementTypeIdentifier})(({inputExpr}).y))", $"(({debugElementTypeIdentifier})(({inputExpr}).z))" };
                         case PrimitiveType.Float4:
-                          return new[] { $"((double)(({inputExpr}).x))", $"((double)(({inputExpr}).y))", $"((double)(({inputExpr}).z))", $"((double)(({inputExpr}).w))" };
+                          return new[] { $"(({debugElementTypeIdentifier})(({inputExpr}).x))", $"(({debugElementTypeIdentifier})(({inputExpr}).y))", $"(({debugElementTypeIdentifier})(({inputExpr}).z))", $"(({debugElementTypeIdentifier})(({inputExpr}).w))" };
                         default:
                           return Array.Empty<string>();
                       }
@@ -1292,11 +1307,13 @@ namespace NanoGraph {
                     return Array.Empty<string>();
                   }
 
+                  NanoProgramType debugType = (func.Context is NanoGpuContext) ? program.Float4Type : program.Double4Type;
+
                   string extractDebugValueExpr = null;
                   string valueLengthExpr = null;
                   string[] valueExprs = GetExtractDebugValueExprs(outputLocal.Identifier, outputLocal.Type, limit: 4);
                   if (valueExprs.Length > 0) {
-                    extractDebugValueExpr = $"vector_double4 {{ {string.Join(", ", valueExprs.Take(4))} }}";
+                    extractDebugValueExpr = $"{func.GetTypeIdentifier(debugType)} {{ {string.Join(", ", valueExprs.Take(4))} }}";
                     valueLengthExpr = getDebugValuesFunction.EmitLiteral(Math.Min(4, valueExprs.Length));
                   }
 
@@ -1304,11 +1321,22 @@ namespace NanoGraph {
                     continue;
                   }
                   string debugValueKey = $"{debugId}.{fieldName}";
-                  string debugIdentifier = program.AddInstanceField(program.Double4Type, debugValueKey);
-                  func.AddStatement($"{debugIdentifier} = {extractDebugValueExpr};");
-                  getDebugValuesFunction.AddStatement($"debugValues.push_back(DebugValue {{ .Key = {getDebugValuesFunction.EmitLiteral(debugValueKey)}, .Length = {valueLengthExpr}, .Value = {debugIdentifier} }});");
+                  string loadDebugValueExpr;
+                  if (func.Context is NanoGpuContext) {
+                    string debugIdentifier = debugState.DebugGpuWriteStateType.AddField(debugType, debugValueKey);
+                    func.AddStatement($"if (isDebugThread) {{");
+                    func.AddStatement($"  debugWriteState->{debugIdentifier} = {extractDebugValueExpr};");
+                    func.AddStatement($"}}");
+                    loadDebugValueExpr = $"{debugState.DebugGpuWriteStateIdentifier}.{debugIdentifier}";
+                  } else {
+                    string debugIdentifier = program.AddInstanceField(debugType, debugValueKey);
+                    func.AddStatement($"{debugIdentifier} = {extractDebugValueExpr};");
+                    loadDebugValueExpr = debugIdentifier;
+                  }
+                  getDebugValuesFunction.AddStatement($"debugValues.push_back(DebugValue {{ .Key = {getDebugValuesFunction.EmitLiteral(debugValueKey)}, .Length = {valueLengthExpr}, .Value = {getDebugValuesFunction.EmitConvert(debugType, program.Double4Type, loadDebugValueExpr)} }});");
                 }
                 getDebugValuesFunction.AddStatement($"#endif // defined(DEBUG)");
+                func.AddStatement($"#endif // defined(DEBUG)");
               }
             }
             MarkGenerateNodeScopeExited();
@@ -1354,6 +1382,13 @@ namespace NanoGraph {
         }
         MarkGenerateNodeScopeExited();
       }
+
+      executeFunction.AddStatement($"#if defined(DEBUG)");
+      executeFunction.AddStatement($"std::memcpy(&{debugState.DebugGpuWriteStateIdentifier}, {debugState.DebugGpuWriteStateBufferIdentifier}.contents, sizeof({debugState.DebugGpuWriteStateIdentifier}));");
+      executeFunction.AddStatement($"id<MTLBlitCommandEncoder> encoder = [GetCurrentCommandBuffer() blitCommandEncoder];");
+      executeFunction.AddStatement($"[encoder synchronizeResource:{debugState.DebugGpuWriteStateBufferIdentifier}];");
+      executeFunction.AddStatement($"[encoder endEncoding];");
+      executeFunction.AddStatement($"#endif // defined(DEBUG)");
 
       // Store final outputs.
       int finalOutputIndex = 0;

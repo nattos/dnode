@@ -113,9 +113,6 @@ namespace NanoGraph {
         }
         this.vertexProgramType = vertexOp.resultType;
 
-        // Add a parameter that takes the vertex shader output.
-        func.AddParam(Array.Empty<string>(), vertexProgramType, $"vertexData", "[[stage_in]]");
-
         // Bind all other dependencies as buffers.
         int bufferIndex = 0;
         int inputIndex = 0;
@@ -127,6 +124,15 @@ namespace NanoGraph {
           AddGpuFuncInput(func, computeInput, $"input{inputIndex++}", gpuInputBuffers, ref bufferIndex);
         }
         AddDebugGpuFuncInputs(func, gpuInputBuffers, ref bufferIndex);
+        func.AddStatement($"#if defined(DEBUG)");
+        func.AddStatement($"{func.GetTypeIdentifier(PrimitiveType.Bool)} isDebugThread = primitive_id == 0 && sample_id == 0;");
+        func.AddStatement($"#endif // defined(DEBUG)");
+
+        func.AddParam(Array.Empty<string>(), program.UintType, $"primitive_id", "[[primitive_id]]", new NanoParameterOptions { IsDebugOnly = true });
+        func.AddParam(Array.Empty<string>(), program.UintType, $"sample_id", "[[sample_id]]", new NanoParameterOptions { IsDebugOnly = true });
+
+        // Add a parameter that takes the vertex shader output.
+        func.AddParam(Array.Empty<string>(), vertexProgramType, $"vertexData", "[[stage_in]]");
       }
 
       public override void EmitFunctionReturn(out CodeCachedResult? result) {
@@ -236,6 +242,42 @@ namespace NanoGraph {
         IReadOnlyList<NanoGpuBufferRef> gpuVertexInputBuffers = vertexOp.gpuInputBuffers;
         IReadOnlyList<NanoGpuBufferRef> gpuFragmentInputBuffers = fragmentOp.gpuInputBuffers;
 
+        string EmitThreadCountExpr() {
+          string VertexInputExpr() {
+            string fieldName = vertexNode.VertexCountFields[0].Name;
+            var edge = graph.GetEdgeToDestinationOrNull(vertexNode, fieldName);
+            if (edge == null) {
+              return null;
+            }
+            if (!(edge.Source.Node is IComputeNode sourceComputeNode)) {
+              NanoGraph.CurrentGenerateState.AddError($"Node {vertexNode} depends on an output that is not a compute node ({edge.Source.Node}).");
+              return null;
+            }
+            CodeCachedResult? sourceCachedResult = vertexOp.dependentComputeNodes.FirstOrNull(dependency => dependency.Node == sourceComputeNode)?.Result;
+            if (sourceCachedResult == null) {
+              NanoGraph.CurrentGenerateState.AddError($"Node {vertexNode} depends on a compute node that is not yet ready ({edge.Source.Node}).");
+              return null;
+            }
+
+            return $"{sourceCachedResult?.Result.Identifier}.{sourceCachedResult?.ResultType.GetField(edge.Source.FieldName)}";
+          }
+          switch (vertexNode.VertexCountMode) {
+            case VertexCountMode.Auto: {
+              NanoGpuBufferRef primaryVertexBuffer = gpuVertexInputBuffers.FirstOrDefault(buffer => buffer.Type.IsArray);
+              if (primaryVertexBuffer.Expression == null) {
+                NanoGraph.CurrentGenerateState.AddError($"Cannot determine the number of vertices for {fragmentNode}. Its vertex shader should have an array input.");
+                return null;
+              }
+              return $"GetLength({primaryVertexBuffer.Expression})";
+            }
+            case VertexCountMode.Integer:
+              return VertexInputExpr();
+            case VertexCountMode.ArraySize:
+            default:
+              return $"GetLength({VertexInputExpr()})";
+          }
+        }
+
         validateCacheFunction.AddStatement($"{vertexOp.validateCacheFunction.Identifier}();");
 
         int sizeNumerator;
@@ -276,14 +318,11 @@ namespace NanoGraph {
 
         // Count number of input vertices.
         string vertexCountLocal = validateCacheFunction.AllocLocal("VertexCount");
-        string vertexCountExpr;
-        // TODO: Support other vertex count methods. For now just look at the first buffer input of the vertex shader.
-        NanoGpuBufferRef primaryVertexBuffer = gpuVertexInputBuffers.FirstOrDefault(buffer => buffer.Type.IsArray);
-        if (primaryVertexBuffer.Expression == null) {
-          NanoGraph.CurrentGenerateState.AddError($"Cannot determine the number of vertices for {fragmentNode}. Its vertex shader should have an array input.");
+        string rawVertexCountExpr = EmitThreadCountExpr();
+        if (rawVertexCountExpr == null) {
           return;
         }
-        vertexCountExpr = $"GetLength({primaryVertexBuffer.Expression}) * {validateCacheFunction.EmitLiteral(vertexNode.VertexMultiplier)}";
+        string vertexCountExpr = $"({rawVertexCountExpr}) * {validateCacheFunction.EmitLiteral(vertexNode.VertexMultiplier)}";
 
         // Set up render target if necessary.
         // TODO: Allow configuration of texture sizes.

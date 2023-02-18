@@ -73,8 +73,12 @@ namespace NanoGraph {
 
     public void EnsureDebugId() {
       if (string.IsNullOrEmpty(DebugId)) {
-        DebugId = Guid.NewGuid().ToString();
+        RegenerateDebugId();
       }
+    }
+
+    public void RegenerateDebugId() {
+      DebugId = Guid.NewGuid().ToString();
     }
 
     public override string ToString() {

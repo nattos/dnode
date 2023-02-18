@@ -16,6 +16,9 @@ namespace NanoGraph {
     public string DebugCpuStateIdentifier;
     public NanoProgramType DebugGpuStateType;
     public string DebugGpuStateIdentifier;
+    public NanoProgramType DebugGpuWriteStateType;
+    public string DebugGpuWriteStateIdentifier;
+    public string DebugGpuWriteStateBufferIdentifier;
   }
 
   public struct CodeContext {

@@ -106,6 +106,9 @@ namespace NanoGraph {
 
         func.AddParam(Array.Empty<string>(), program.GetPrimitiveType(PrimitiveType.Uint), $"gid_uint", "[[thread_position_in_grid]]");
         func.AddStatement($"{func.GetTypeIdentifier(PrimitiveType.Int)} gid = gid_uint;");
+        func.AddStatement($"#if defined(DEBUG)");
+        func.AddStatement($"{func.GetTypeIdentifier(PrimitiveType.Bool)} isDebugThread = gid == 0;");
+        func.AddStatement($"#endif // defined(DEBUG)");
       }
 
       public override void EmitFunctionReturn(out CodeCachedResult? result) {

@@ -129,6 +129,7 @@ namespace NanoGraph.Plugin {
     }
 
     float phase = 0.0f;
+    int _frameCount = 0;
     private void BeginRenderRequest() {
       if (_server == null) {
         return;
@@ -148,6 +149,8 @@ namespace NanoGraph.Plugin {
         _queuedDebugSetValues.Clear();
       }
 
+      int frameCount = _frameCount++;
+
       _inFlightRenderRequest = Task.Run(async () => {
         if (queuedParameterValues != null) {
           await _server.SetParametersRequest(queuedParameterValues);
@@ -157,7 +160,8 @@ namespace NanoGraph.Plugin {
         }
 
         var response = await _server.ProcessTextures(_textureInputs, _textureOutputs, DebugOutputTextureKey);
-        DebugGetWatchedValuesResponse debugValues = await _server.DebugGetWatchedValues();
+        bool updateDebugValues = (frameCount % 2) == 0;
+        DebugGetWatchedValuesResponse debugValues = updateDebugValues ? await _server.DebugGetWatchedValues() : null;
 
         void PushResultsOnMainThread() {
           if (response.DebugOutputTexture != 0 && response.DebugOutputTexture != _debugOutputTextureSurfaceId) {
@@ -170,10 +174,12 @@ namespace NanoGraph.Plugin {
             }
           }
 
-          _debugValues.Clear();
-          if (debugValues?.Values?.Length > 0) {
-            foreach (var debugValue in debugValues.Values) {
-              _debugValues[debugValue.Key] = debugValue.Values;
+          if (updateDebugValues) {
+            _debugValues.Clear();
+            if (debugValues?.Values?.Length > 0) {
+              foreach (var debugValue in debugValues.Values) {
+                _debugValues[debugValue.Key] = debugValue.Values;
+              }
             }
           }
 

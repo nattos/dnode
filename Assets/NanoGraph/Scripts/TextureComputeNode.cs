@@ -132,6 +132,9 @@ namespace NanoGraph {
         func.AddStatement($"{func.GetTypeIdentifier(PrimitiveType.Int)} gid = gid_uint;");
         func.AddStatement($"vector_int2 gid_xy = vector_int2(gid_xy_uint);");
         func.AddStatement($"{func.GetTypeIdentifier(PrimitiveType.Float2)} gid_xy_norm = (float2(gid_xy_uint) + 0.5) / float2(size_xy_uint);");
+        func.AddStatement($"#if defined(DEBUG)");
+        func.AddStatement($"{func.GetTypeIdentifier(PrimitiveType.Bool)} isDebugThread = gid == 0;");
+        func.AddStatement($"#endif // defined(DEBUG)");
       }
 
       public override void EmitFunctionReturn(out CodeCachedResult? result) {

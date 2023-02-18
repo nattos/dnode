@@ -54,6 +54,7 @@ namespace NanoGraph {
     public int Index;
     public NanoProgramType Type;
     public bool IsDebugOnly;
+    public bool ForceIsRawBuffer;
   }
 
   public class NanoGpuContext : INanoCodeContext {
@@ -108,6 +109,7 @@ namespace NanoGraph {
   public struct NanoParameterOptions {
     public bool IsConst;
     public bool IsReference;
+    public bool IsPointer;
     public bool IsDebugOnly;
     public bool IsAtomic;
   }
@@ -171,7 +173,7 @@ namespace NanoGraph {
           if (type.IsArray) {
             typeIdentifier = options.IsConst ? Context.EmitBufferType(type.ElementType) : Context.EmitWritableBufferType(type.ElementType, isAtomic: options.IsAtomic);
           } else {
-            typeIdentifier = GetTypeIdentifier(type) + (options.IsReference ? "&" : "");
+            typeIdentifier = GetTypeIdentifier(type) + (options.IsPointer ? "*" : options.IsReference ? "&" : "");
           }
           parts.Add(typeIdentifier);
           parts.Add(identifier);
@@ -500,6 +502,7 @@ namespace NanoGraph {
     public readonly NanoProgramType MTLComputePipelineStateType;
     public readonly NanoProgramType MTLRenderPipelineState;
     public readonly NanoProgramType MTLRenderPassDescriptor;
+    public readonly NanoProgramType MTLBuffer;
 
     public NanoProgram(string name) {
       Identifier = $"Program_{SanitizeIdentifierFragment(name)}";
@@ -520,6 +523,7 @@ namespace NanoGraph {
       _types.Add(MTLComputePipelineStateType = NanoProgramType.MakeBuiltIn(this, "id<MTLComputePipelineState>"));
       _types.Add(MTLRenderPipelineState = NanoProgramType.MakeBuiltIn(this, "id<MTLRenderPipelineState>"));
       _types.Add(MTLRenderPassDescriptor = NanoProgramType.MakeBuiltIn(this, "MTLRenderPassDescriptor*"));
+      _types.Add(MTLBuffer = NanoProgramType.MakeBuiltIn(this, "id<MTLBuffer>"));
     }
 
     public int AllocateTextureInput() {

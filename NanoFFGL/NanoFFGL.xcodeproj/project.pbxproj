@@ -64,6 +64,7 @@
 		0C5E928F2972D88E00DD1FEC /* CoreVideo.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreVideo.framework; path = System/Library/Frameworks/CoreVideo.framework; sourceTree = SDKROOT; };
 		0C5E92912972DBE000DD1FEC /* FFGLSDK.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = FFGLSDK.cpp; path = lib/FFGLSDK.cpp; sourceTree = "<group>"; };
 		0CA86911294DF9B60040333B /* Generated */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Generated; sourceTree = "<group>"; };
+		0CBAE510299AF500009510A5 /* Prefix.pch */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Prefix.pch; sourceTree = "<group>"; };
 		0CF2DE73296F9B3100E7E950 /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
@@ -147,6 +148,7 @@
 				0C518A3C294BD18F00E31962 /* Base64.h */,
 				0C518A3D294BD2CF00E31962 /* json.hpp */,
 				0C5E92882972D7E900DD1FEC /* Plugin.mm */,
+				0CBAE510299AF500009510A5 /* Prefix.pch */,
 				0C5E92912972DBE000DD1FEC /* FFGLSDK.cpp */,
 			);
 			path = NanoFFGL;
@@ -326,6 +328,9 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				EXECUTABLE_PREFIX = lib;
+				GCC_INCREASE_PRECOMPILED_HEADER_SHARING = YES;
+				GCC_PRECOMPILE_PREFIX_HEADER = YES;
+				GCC_PREFIX_HEADER = NanoFFGL/Prefix.pch;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 			};
@@ -336,6 +341,9 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				EXECUTABLE_PREFIX = lib;
+				GCC_INCREASE_PRECOMPILED_HEADER_SHARING = YES;
+				GCC_PRECOMPILE_PREFIX_HEADER = YES;
+				GCC_PREFIX_HEADER = NanoFFGL/Prefix.pch;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 			};

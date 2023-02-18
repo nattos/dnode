@@ -1,13 +1,4 @@
-#import "Foundation/Foundation.h"
-#import "simd/simd.h"
-#import "MetalKit/MetalKit.h"
-
-#include <map>
-#include <memory>
-#include <string>
-#include <vector>
-
-#include "NanoProgram.h"
+#include "Prefix.pch"
 
 namespace {
   id<MTLDevice> NanoProgramGetCurrentMTLDevice();
@@ -337,6 +328,10 @@ NanoProgram* NanoProgram::GetCurrentInstance() {
     return vector_int4 { Convert<float, int>(value.x), Convert<float, int>(value.y), Convert<float, int>(value.z), Convert<float, int>(value.w) };
   }
 
+  template<> inline vector_double4 Convert<vector_float4, vector_double4>(vector_float4 value) {
+    return vector_double4 { Convert<float, double>(value.x), Convert<float, double>(value.y), Convert<float, double>(value.z), Convert<float, double>(value.w) };
+  }
+
   template<> vector_float2 inline Convert<float, vector_float2>(float value) {
     return vector_float2 { value, value };
   }
@@ -378,6 +373,15 @@ NanoProgram* NanoProgram::GetCurrentInstance() {
   }
 
 
+
+  template<typename TFrom, typename TTo> static inline std::shared_ptr<NanoTypedBuffer<TTo>> ConvertArray(const std::shared_ptr<NanoTypedBuffer<TFrom>>& value) {
+    int32_t elementCount = (int32_t)(value.get())->GetElementCount();
+    std::shared_ptr<NanoTypedBuffer<TTo>> result(NanoTypedBuffer<TTo>::Allocate(elementCount));
+    for (int i = 0; i < elementCount; ++i) {
+      (*result)[i] = Convert<TFrom, TTo>((*value)[i]);
+    }
+    return result;
+  }
 
   template<typename TFrom, typename TTo> static inline std::shared_ptr<NanoTypedBuffer<TTo>> ConvertArray(const TFrom& value) {
     std::shared_ptr<NanoTypedBuffer<TTo>> result(NanoTypedBuffer<TTo>::Allocate(1));
@@ -561,6 +565,8 @@ NanoProgram* NanoProgram::GetCurrentInstance() {
 
   template<typename T> static T random_next();
   template<> float random_next<float>() { return std::rand() / (float) RAND_MAX; } // TODO: Re-evaluate random function.
+  template<> double random_next<double>() { return std::rand() / (double) RAND_MAX; } // TODO: Re-evaluate random function.
+  template<> int32_t random_next<int32_t>() { return std::rand(); } // TODO: Re-evaluate random function.
   template<> vector_float2 random_next<vector_float2>() { return vector_float2 { random_next<float>(), random_next<float>() }; }
   template<> vector_float3 random_next<vector_float3>() { return vector_float3 { random_next<float>(), random_next<float>(), random_next<float>() }; }
   template<> vector_float4 random_next<vector_float4>() { return vector_float4 { random_next<float>(), random_next<float>(), random_next<float>(), random_next<float>() }; }

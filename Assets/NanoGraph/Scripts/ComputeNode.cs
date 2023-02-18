@@ -398,7 +398,8 @@ namespace NanoGraph {
         if (!(graph.DebugEnabled && computeNode.DebugEnabled)) {
           return;
         }
-        AddGpuFuncInput(func, "debugState", debugState.DebugGpuStateType, debugState.DebugGpuStateIdentifier, "debugState", gpuInputBuffers, ref bufferIndex, isReadWrite: false);
+        AddGpuFuncInput(func, "debugState", debugState.DebugGpuStateType, debugState.DebugGpuStateIdentifier, "debugState", gpuInputBuffers, ref bufferIndex, isReadWrite: false, isDebugOnly: true);
+        AddGpuFuncInput(func, "debugWriteState", debugState.DebugGpuWriteStateType, debugState.DebugGpuWriteStateBufferIdentifier, "debugWriteState", gpuInputBuffers, ref bufferIndex, isReadWrite: true, forceIsBuffer: true, isDebugOnly: true);
       }
 
       protected static void AddGpuFuncInput(NanoFunction func, ComputeInput input, string paramName, List<NanoGpuBufferRef> gpuInputBuffers, ref int bufferIndex, bool isDebugOnly = false) {
@@ -410,7 +411,7 @@ namespace NanoGraph {
         AddGpuFuncInput(func, field.Name, fieldType, inputExpression, paramName, gpuInputBuffers, ref bufferIndex, isReadWrite: isReadWrite, isDebugOnly: isDebugOnly);
       }
 
-      protected static void AddGpuFuncInput(NanoFunction func, string fieldName, NanoProgramType fieldType, string inputExpression, string paramName, List<NanoGpuBufferRef> gpuInputBuffers, ref int bufferIndex, bool isReadWrite = false, bool isDebugOnly = false) {
+      protected static void AddGpuFuncInput(NanoFunction func, string fieldName, NanoProgramType fieldType, string inputExpression, string paramName, List<NanoGpuBufferRef> gpuInputBuffers, ref int bufferIndex, bool isReadWrite = false, bool forceIsBuffer = false, bool isDebugOnly = false) {
         gpuInputBuffers.Add(new NanoGpuBufferRef {
           FieldName = fieldName,
           Expression = inputExpression,
@@ -418,10 +419,12 @@ namespace NanoGraph {
           Index = bufferIndex,
           Type = fieldType,
           IsDebugOnly = isDebugOnly,
+          ForceIsRawBuffer = forceIsBuffer,
         });
         string[] modifiers = { "constant", "const" };
         string suffix = $"[[buffer({bufferIndex})]]";
         bool isReference = true;
+        bool isPointer = false;
         if (fieldType.IsArray) {
           modifiers = Array.Empty<string>();
           isReference = false;
@@ -429,8 +432,12 @@ namespace NanoGraph {
           suffix = $"[[texture({bufferIndex})]]";
           modifiers = Array.Empty<string>();
           isReference = false;
+        } else if (isReadWrite) {
+          modifiers = new[] { "device" };
+          isPointer = true;
+          isReference = false;
         }
-        func.AddParam(modifiers, fieldType, paramName, suffix, new NanoParameterOptions { IsConst = !isReadWrite, IsReference = isReference, IsDebugOnly = isDebugOnly });
+        func.AddParam(modifiers, fieldType, paramName, suffix, new NanoParameterOptions { IsConst = !isReadWrite, IsReference = isReference, IsPointer = isPointer, IsDebugOnly = isDebugOnly });
         bufferIndex++;
       }
 
@@ -531,7 +538,9 @@ namespace NanoGraph {
           }
           string expression = inputBuffer.Expression;
           int bufferIndex = inputBuffer.Index;
-          if (inputBuffer.Type.IsArray) {
+          if (inputBuffer.ForceIsRawBuffer) {
+            func.AddStatement($"[encoder set{variant}Buffer:{expression} offset:0 atIndex:{bufferIndex}];");
+          } else if (inputBuffer.Type.IsArray) {
             func.AddStatement($"[encoder set{variant}Buffer:{expression}->GetGpuBuffer() offset:0 atIndex:{bufferIndex}];");
           } else if (inputBuffer.Type == func.Program.Texture) {
             func.AddStatement($"[encoder set{variant}Texture:{expression} atIndex:{bufferIndex}];");

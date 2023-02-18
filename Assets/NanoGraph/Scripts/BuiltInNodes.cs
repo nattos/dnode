@@ -1080,7 +1080,11 @@ namespace NanoGraph {
           }
           context.DebugState.GetDebugSettableValuesFunction.AddStatement($"#endif // defined(DEBUG)");
         }
+        context.Function.AddStatement($"#if defined(DEBUG)");
         context.Function.AddStatement($"{context.Function.GetTypeIdentifier(type)} {context.OutputLocals[0].Identifier} = {valueExpr};");
+        context.Function.AddStatement($"#else // defined(DEBUG)");
+        context.Function.AddStatement($"{context.Function.GetTypeIdentifier(type)} {context.OutputLocals[0].Identifier} = {internalValueExpr};");
+        context.Function.AddStatement($"#endif // defined(DEBUG)");
       } else {
         context.Function.AddStatement($"{context.Function.GetTypeIdentifier(type)} {context.OutputLocals[0].Identifier} = {context.InputLocals[0].Identifier};");
       }

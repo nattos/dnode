@@ -30,6 +30,12 @@ namespace NanoGraph {
       return fields.Select(FromTypeField).ToArray();
     }
 
+    public DataField ToCompileTimeOnly() {
+      DataField copy = this;
+      copy.IsCompileTimeOnly = true;
+      return copy;
+    }
+
     public override string ToString() {
       string result = $"{Type} {Name}";
       if (IsCompileTimeOnly) {

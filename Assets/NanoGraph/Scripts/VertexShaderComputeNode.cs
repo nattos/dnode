@@ -13,15 +13,47 @@ namespace NanoGraph {
     TriangleStrip,
   }
 
+  public enum VertexCountMode {
+    Auto,
+    Integer,
+    ArraySize,
+  }
+
   // A vertex shader requires exactly one input compute dependency, and it must be on an array input.
   // TODO: Allow vertex shaders to depend on other parameters (ie. as constants).
-  public class VertexShaderComputeNode : ComputeNode {
+  public class VertexShaderComputeNode : ComputeNode, IAutoTypeNode {
     public override INanoCodeContext CodeContext => NanoProgram.GpuContext;
 
     [EditableAttribute]
     public GeometryType GeometryType = GeometryType.Triangle;
     [EditableAttribute]
     public int VertexMultiplier = 1;
+
+    [EditableAttribute]
+    public VertexCountMode VertexCountMode = VertexCountMode.Auto;
+    [EditableAttribute]
+    public AutoType VertexCountFromArrayAutoType = AutoType.Auto;
+    public TypeSpec VertexCountFromArrayElementType;
+
+    public override DataSpec InputSpec => DataSpec.ExtendWithFields(VertexCountFields, base.InputSpec);
+
+    public void UpdateTypesFromInputs() {
+      AutoTypeUtils.UpdateAutoType(Graph.GetEdgeToDestinationOrNull(this, "VertexCountFromArray"), ref VertexCountFromArrayElementType, forceIsArray: false);
+    }
+
+    public DataField[] VertexCountFields {
+      get {
+        switch (VertexCountMode) {
+          case VertexCountMode.Integer:
+            return new[] { DataField.MakePrimitive("ThreadCount", PrimitiveType.Int) };
+          default:
+          case VertexCountMode.Auto:
+            return Array.Empty<DataField>();
+          case VertexCountMode.ArraySize:
+            return new[] { DataField.MakeType("ThreadCountFromArray", TypeSpec.MakeArray(VertexCountFromArrayElementType)) };
+        }
+      }
+    }
 
     public override DataSpec OutputSpec {
       get {
@@ -46,14 +78,17 @@ namespace NanoGraph {
         string[] functionModifiers = { "vertex" };
         this.func = func = program.AddFunction(computeNode.ShortName, computeNode.CodeContext, resultType, functionModifiers);
 
-        func.AddParam(Array.Empty<string>(), program.GetPrimitiveType(PrimitiveType.Uint), $"gid_uint", "[[vertex_id]]");
-        func.AddStatement($"{func.GetTypeIdentifier(PrimitiveType.Int)} gid = gid_uint;");
-
         // Load inputs.
         // Note: Only load inputs that we really read.
         int bufferIndex = 0;
         AddGpuFuncInputs(func, CollectComputeInputs(DependentComputeInputsToLoad), gpuInputBuffers, ref bufferIndex);
         AddDebugGpuFuncInputs(func, gpuInputBuffers, ref bufferIndex);
+
+        func.AddParam(Array.Empty<string>(), program.GetPrimitiveType(PrimitiveType.Uint), $"gid_uint", "[[vertex_id]]");
+        func.AddStatement($"{func.GetTypeIdentifier(PrimitiveType.Int)} gid = gid_uint;");
+        func.AddStatement($"#if defined(DEBUG)");
+        func.AddStatement($"{func.GetTypeIdentifier(PrimitiveType.Bool)} isDebugThread = gid == 0;");
+        func.AddStatement($"#endif // defined(DEBUG)");
       }
 
       public override void EmitFunctionReturn(out CodeCachedResult? result) {

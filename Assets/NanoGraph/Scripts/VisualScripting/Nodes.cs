@@ -8,8 +8,6 @@ using Unity.VisualScripting;
 
 namespace NanoGraph.VisualScripting {
   public abstract class BaseNode : Unit, IDCustomInspectorDataProvider, IValueEditedHandler {
-    // [Serialize]
-    // public IDataNode Node;
     public abstract NanoGraph Graph { get; }
     public abstract string DebugId { get; }
     public abstract DataSpec NodeInputSpec { get; }
@@ -237,6 +235,12 @@ namespace NanoGraph.VisualScripting {
       }
 
       _didConnectSerializedLiteralNodes = true;
+    }
+
+    public void RegenerateInternalNodeDebugIds() {
+      foreach (var entry in _fieldNameToLiteralNodes) {
+        entry.Value.RegenerateDebugId();
+      }
     }
 
     private void ClearLiteralNodes() {
@@ -542,6 +546,8 @@ namespace NanoGraph.VisualScripting {
   public abstract class NodeBasedNode : BaseNode {
     [Serialize]
     public IDataNode Node;
+    [Serialize]
+    public string SerializedDebugId;
     public override NanoGraph Graph => Node?.Graph;
     public override string DebugId => Node?.DebugId;
     public override IEditableAttributeProvider EditableAttributeProvider => Node as IEditableAttributeProvider;
@@ -619,6 +625,12 @@ namespace NanoGraph.VisualScripting {
     protected override void Definition() {
       base.Definition();
       Node.DebugId = this.guid.ToString();
+
+      if (SerializedDebugId != Node.DebugId) {
+        SerializedDebugId = Node.DebugId;
+        RegenerateInternalNodeDebugIds();
+      }
+
       Node.Graph.MarkNodeDirty(Node);
       Node.Graph.ValidateLater();
     }
