@@ -2,7 +2,6 @@
 
 
 
-constexpr int MaxSteps = 32;
 auto outCounter = output0;
 auto outVertex = output1;
 auto outInitPos = output2;
@@ -12,6 +11,7 @@ auto outTime = output4;
 float4 prandom = random[abs(gid * 163495671 + poffset) % 1048576];
 float pGeneratorSeed = prandom.x;
 float pNextStepDistance = prandom.y;
+float pRandomGlitch = prandom.z;
 
 
 float2 initPos = SampleBuffer(outInitPos, gid);
@@ -29,6 +29,10 @@ float StepSpeed = Params._StepSpeed_005;
 int RejectionSampleTries = Params._RejectionSampleTries_006;
 float TimeDecay = Params._TimeDecay_007;
 float TimeStopDecay = Params._TimeStopDecay_008;
+int StepCount = Params._StepCount_009;
+float AdvStepSpeed = Params._AdvStepSpeed_010;
+float AdvMomentum = Params._AdvMomentum_011;
+float GlitchFactor = Params._GlitchFactor_012;
 
 
 
@@ -74,11 +78,14 @@ bool didStop = false;
   if (dotValue < 0.00001) {
     tangentDir = -tangentDir;
   }
-  nextNextDir = initDir = normalize(mix(tangentDir, initDir, MomentumFactor));
+  nextNextDir = normalize(mix(tangentDir, initDir, AdvMomentum));
+  initDir = nextNextDir;
 }
 
 
-for (int i = 0; i < MaxSteps; ++i) {
+int glitchVertexOffset = (int)round(GlitchFactor * vertexOffset);
+
+for (int i = 0; i < StepCount; ++i) {
   float2 normal = float2(dir.y, -dir.x);
 
   float value01;
@@ -121,7 +128,7 @@ for (int i = 0; i < MaxSteps; ++i) {
   float2 nextDir = normalize(mix(mix(tangentDir, gradDir, GradientDescentFactor), dir, MomentumFactor));
   float2 nextPos = pos + nextDir * StepSpeed;
 
-  int writeIndex = atomic_fetch_add_explicit(&(outCounter[0]), 1, memory_order_relaxed) + vertexOffset;
+  int writeIndex = atomic_fetch_add_explicit(&(outCounter[0]), 1, memory_order_relaxed) + glitchVertexOffset;
   WriteBuffer(outVertex, (writeIndex * 2 + 0), pos);
   WriteBuffer(outVertex, (writeIndex * 2 + 1), nextPos);
 
@@ -131,7 +138,7 @@ for (int i = 0; i < MaxSteps; ++i) {
 
 pos = initPos;
 dir = -initDir;
-for (int i = 0; i < MaxSteps; ++i) {
+for (int i = 0; i < StepCount; ++i) {
   float2 normal = float2(dir.y, -dir.x);
 
   float value01;
@@ -174,7 +181,7 @@ for (int i = 0; i < MaxSteps; ++i) {
   float2 nextDir = normalize(mix(mix(tangentDir, gradDir, GradientDescentFactor), dir, MomentumFactor));
   float2 nextPos = pos + nextDir * StepSpeed;
 
-  int writeIndex = atomic_fetch_add_explicit(&(outCounter[0]), 1, memory_order_relaxed) + vertexOffset;
+  int writeIndex = atomic_fetch_add_explicit(&(outCounter[0]), 1, memory_order_relaxed) + glitchVertexOffset;
   WriteBuffer(outVertex, (writeIndex * 2 + 0), pos);
   WriteBuffer(outVertex, (writeIndex * 2 + 1), nextPos);
 
@@ -182,12 +189,18 @@ for (int i = 0; i < MaxSteps; ++i) {
   dir = nextDir;
 }
 
+
+// Check if thread has decayed.
 time -= TimeDecay;
 if (didStop) {
+  // Determine if we should bounce back.
   time -= TimeStopDecay;
   nextNextDir = -nextNextDir;
 }
-nextNextPos = initPos + nextNextDir * StepSpeed * pNextStepDistance;
+nextNextPos = initPos + nextNextDir * AdvStepSpeed * pNextStepDistance;
+
+
+
 if (time <= 0) {
   uint pGenerator = ((uint)(pGeneratorSeed * 0xFFFFFFFF)) * 22695477 + 1;
   pGenerator = pGenerator * 22695477 + 1;
