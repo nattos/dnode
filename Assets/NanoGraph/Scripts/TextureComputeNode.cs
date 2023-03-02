@@ -86,6 +86,7 @@ namespace NanoGraph {
       }
 
       public List<NanoGpuBufferRef> gpuInputBuffers = new List<NanoGpuBufferRef>();
+      public List<NanoGpuExternalBufferRef> gpuExternalInputBuffers = new List<NanoGpuExternalBufferRef>();
       public List<NanoGpuBufferRef> gpuOutputBuffers = new List<NanoGpuBufferRef>();
       public CodeCachedResult codeCachedResult;
       private ComputeInput? autoSizeModeInput = null;
@@ -119,12 +120,12 @@ namespace NanoGraph {
         // Load inputs.
         // Note: Only load inputs that we really read.
         int bufferIndex = 0;
-        AddGpuFuncInputs(func, computeInputs, gpuInputBuffers, ref bufferIndex);
+        AddGpuFuncInputs(func, computeInputs, gpuInputBuffers, gpuExternalInputBuffers, ref bufferIndex);
         AddDebugGpuFuncInputs(func, gpuInputBuffers, ref bufferIndex);
-        AddGpuFuncOutputs(func, computeOutputSpec.Fields, gpuOutputBuffers, ref bufferIndex);
+        AddGpuFuncOutputs(func, computeOutputSpec.Fields, gpuOutputBuffers, gpuExternalInputBuffers, ref bufferIndex);
         if (graph.DebugEnabled && Node.DebugEnabled) {
           AddGpuFuncInput(func, "debugOutputNodeIndex", program.IntType, "debugOutputNodeIndex", "debugOutputNodeIndex", gpuInputBuffers, ref bufferIndex, isReadWrite: false, isDebugOnly: true);
-          AddGpuFuncOutput(func, "debugOutputTexture", program.Texture, "debugOutputTexture", "debugOutputTexture", gpuOutputBuffers, ref bufferIndex, isDebugOnly: true);
+          AddGpuFuncOutput(func, "debugOutputTexture", program.Texture, "debugOutputTexture", "debugOutputTexture", gpuOutputBuffers, gpuExternalInputBuffers, ref bufferIndex, isDebugOnly: true);
         }
         func.AddParam(Array.Empty<string>(), program.GetPrimitiveType(PrimitiveType.Uint2), $"gid_xy_uint", "[[thread_position_in_grid]]");
         func.AddParam(Array.Empty<string>(), program.GetPrimitiveType(PrimitiveType.Uint2), $"size_xy_uint", "[[threads_per_grid]]");
@@ -313,7 +314,7 @@ namespace NanoGraph {
         string gridSizeYExpr = gridSizeYLocal;
         string totalThreadCountExpr = $"(({gridSizeXExpr}) * ({gridSizeYExpr}))";
 
-        AllocateGpuFuncOutputs(validateCacheFunction, computeOutputSpec.Fields, totalThreadCountExpr);
+        AllocateGpuFuncOutputs(validateCacheFunction, computeOutputSpec.Fields, totalThreadCountExpr, gpuExternalInputBuffers);
         if (graph.DebugEnabled && Node.DebugEnabled) {
           validateCacheFunction.AddStatement($"#if defined(DEBUG)");
           validateCacheFunction.AddStatement($"const std::string& debugOutputTextureKey = DebugGetOutputTextureKey();");

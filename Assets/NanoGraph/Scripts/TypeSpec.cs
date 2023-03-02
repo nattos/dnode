@@ -54,6 +54,7 @@ namespace NanoGraph {
     Float3,
     Float4,
     Texture,
+    Auto,
     TypeDecl,
     Vertices,
     BufferRef,

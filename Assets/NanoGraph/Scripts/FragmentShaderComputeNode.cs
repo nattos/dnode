@@ -87,8 +87,9 @@ namespace NanoGraph {
       public TypeDecl vertexType;
       public NanoProgramType vertexProgramType;
       public List<NanoGpuBufferRef> gpuInputBuffers = new List<NanoGpuBufferRef>();
+      public List<NanoGpuExternalBufferRef> gpuExternalInputBuffers = new List<NanoGpuExternalBufferRef>();
 
-      protected override IEnumerable<DataPlug> DependentComputeInputsToLoad => dependentComputeInputs.Where(plug => !(plug.Node == vertexNode && plug.FieldName == "Verts"));
+      protected override IReadOnlyList<DataEdge> DependentComputeInputsToLoad => dependentComputeInputs.Where(edge => !(edge.Source.Node == vertexNode && edge.Source.FieldName == "Verts")).ToArray();
 
       public override void EmitFunctionPreamble(out NanoFunction func) {
         // Begin generating the main results function.
@@ -121,7 +122,7 @@ namespace NanoGraph {
             inputIndex++;
             continue;
           }
-          AddGpuFuncInput(func, computeInput, $"input{inputIndex++}", gpuInputBuffers, ref bufferIndex);
+          AddGpuFuncInput(func, computeInput, $"input{inputIndex}", gpuInputBuffers, gpuExternalInputBuffers, ref inputIndex, ref bufferIndex);
         }
         AddDebugGpuFuncInputs(func, gpuInputBuffers, ref bufferIndex);
         func.AddStatement($"#if defined(DEBUG)");

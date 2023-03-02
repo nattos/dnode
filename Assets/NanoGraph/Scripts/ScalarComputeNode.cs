@@ -16,6 +16,7 @@ namespace NanoGraph {
     Float3,
     Float4,
     Texture,
+    Auto,
   }
 
   public static class BasicOutputTypeExtensions {
@@ -33,6 +34,7 @@ namespace NanoGraph {
         case BasicOutputType.Float3: return PrimitiveType.Float3;
         case BasicOutputType.Float4: return PrimitiveType.Float4;
         case BasicOutputType.Texture: return PrimitiveType.Texture;
+        case BasicOutputType.Auto: return PrimitiveType.Auto;
       }
     }
   }
@@ -118,7 +120,7 @@ namespace NanoGraph {
           switch (Node.OutputPortsMode) {
             case FieldPortsMode.Combined: {
               TypeSpec combinedOutType = computeOutputSpec.Fields.First(node => node.Name == "Out").Type;
-              NanoProgramType programOutType = program.GetProgramType(combinedOutType);
+              NanoProgramType programOutType = program.GetProgramType(combinedOutType, "Out");
               if (Node.IsArray) {
                 outputExpr = $"{returnLocal}.{resultType.GetField("Out")}";
               } else {

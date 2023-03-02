@@ -56,8 +56,8 @@ namespace NanoGraph {
     public NanoFunction createPipelinesFunction;
 
     public IReadOnlyList<ComputeNodeResultEntry> dependentComputeNodes;
-    public IReadOnlyList<DataPlug> dependentComputeInputs;
-    public Dictionary<IComputeNode, CodeCachedResult> bufferRefTokens;
+    public IReadOnlyList<DataEdge> dependentComputeInputs;
+    public Dictionary<DataPlug, CodeCachedResult> bufferRefTokens;
   }
 
   public interface IComputeNodeEmitCodeOperation {

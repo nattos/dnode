@@ -1,0 +1,260 @@
+
+if (gid >= spawnOffset) {
+  return;
+}
+
+
+
+
+// constexpr float CollisionThreshold = 0.25;
+// constexpr float CollisionRate = 0.6;
+// constexpr float CollisionDeflection = 1.5;
+// constexpr float CollisionDeflectionSquash = 10;
+// constexpr float CollisionEnergyLossMax = 0.2;
+// constexpr float CollisionEnergyLossMin = 0.5;
+// constexpr float ContinueAfterCollisionRate = 0.2;
+// constexpr float RandomWalkStrength = 2.0;
+// constexpr float EnergyThreshold = 0.001;
+// constexpr float EnergyDecayLinear = 0.00001;
+// constexpr float EnergyDecayFactor = 0.984;
+// constexpr float Scale = 2;
+float CollisionThreshold = Params._CollisionThreshold_000;
+float CollisionRate = Params._CollisionRate_001;
+float CollisionDeflection = Params._CollisionDeflection_002;
+float CollisionDeflectionSquash = Params._CollisionDeflectionSquash_003;
+float CollisionEnergyLossMax = Params._CollisionEnergyLossMax_004;
+float CollisionEnergyLossMin = Params._CollisionEnergyLossMin_005;
+float ContinueAfterCollisionRate = Params._ContinueAfterCollisionRate_006;
+float RandomWalkStrength = Params._RandomWalkStrength_007;
+float EnergyThreshold = Params._EnergyThreshold_008;
+float EnergyDecayLinear = Params._EnergyDecayLinear_009;
+float EnergyDecayFactor = Params._EnergyDecayFactor_010;
+float Scale = Params._Scale_011;
+float PassSameModeRate = Params._PassSameModeRate_012;
+
+constexpr int MaxSteps = 1024;
+auto outCounter = output0;
+auto outVertex = output1;
+auto outType = output2;
+auto outInitPos = output3;
+auto outInitDir = output4;
+auto outEnergy = output5;
+
+
+
+float4 prandom = random[abs(gid * 163495671 + poffset) % 1048576];
+float pNextSpawnCase = prandom.x;
+uint pCollisionThresholdGenerator = (uint)(prandom.y * 0xFFFFFFFF);
+uint pCollisionRateGenerator = (uint)(prandom.z * 0xFFFFFFFF);
+float pCollisionNextDirection = (prandom.w - 0.5) * 2.0;
+
+pCollisionThresholdGenerator = pCollisionThresholdGenerator * 22695477 + 1;
+pCollisionRateGenerator = pCollisionRateGenerator * 22695477 + 1;
+
+
+float charge;
+float basicMass;
+float basicVelocity;
+
+switch (Type) {
+  default:
+  case 0:
+    return;
+  case 1:
+    charge = 0.1;
+    basicMass = 1.0;
+    basicVelocity = 0.1;
+    break;
+  case 2:
+    charge = -1.0;
+    basicMass = 1.0;
+    basicVelocity = 0.1;
+    break;
+  case 3:
+    charge = 1.0;
+    basicMass = 1.0;
+    basicVelocity = 1.0;
+    break;
+  case 4:
+    charge = -1.0;
+    basicMass = 1.0;
+    basicVelocity = 1.0;
+    break;
+}
+
+
+float energy = Energy;
+int length = min((int)(basicMass * energy * basicVelocity * Scale * 128), MaxSteps);
+
+
+float2 pos = InitPos;
+float2 dir = InitDir;
+int i = 0;
+bool wasCollision = false;
+bool useSecondPhase = false;
+for (; i < length; ++i) {
+  float mass = basicMass * energy * Scale;
+  int writeIndex = atomic_fetch_add_explicit(&(outCounter[0]), 1, memory_order_relaxed) + vertexOffset;
+  float curl = 0.1 * charge / mass / Scale;
+  float curlCos = cos(curl);
+  float curlSin = sin(curl);
+
+  float2 normal = float2(dir.y, -dir.x);
+  float4 p = random[(i + gid * 7651) % 1048576];
+  float2 nextPos = pos + dir * 0.03;
+  float2 nextDir = float2(dir.x * curlCos + dir.y * curlSin, dir.y * curlCos - dir.x * curlSin);
+  float nextEnergy = energy * EnergyDecayFactor - EnergyDecayLinear;
+  if (nextEnergy < EnergyThreshold) {
+    return;
+  }
+
+  float2 uv = nextPos * float2(9.0 / 16.0, 1) * 0.5 + 0.5;
+  float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(textureInput, uv);
+  float value = max(textureSample.r, max(textureSample.g, textureSample.b));
+
+  pCollisionRateGenerator = pCollisionRateGenerator * 22695477 + 1;
+  float pRandomWalk = ((float)(pCollisionRateGenerator & 0x7FFFFFFF)) / ((float)0x7FFFFFFF);
+  nextDir += normal * ((pRandomWalk - 0.5) * value * (1.0 / (energy + 4.0)) * RandomWalkStrength);
+
+  pCollisionThresholdGenerator = pCollisionThresholdGenerator * 22695477 + 1;
+  float pCollisionThreshold = mix(((float)(pCollisionThresholdGenerator & 0x7FFFFFFF)) / ((float)0x7FFFFFFF), 1.0, CollisionThreshold);
+  pCollisionRateGenerator = pCollisionRateGenerator * 22695477 + 1;
+  float pCollisionRate = ((float)(pCollisionRateGenerator & 0x7FFFFFFF)) / ((float)0x7FFFFFFF);
+  if (Type == 1 && value > pCollisionThreshold && pCollisionRate < CollisionRate) {
+    dir += normal * (atan(pCollisionNextDirection * CollisionDeflectionSquash) / 3.141596 * CollisionDeflection);
+    dir = normalize(dir);
+
+    pCollisionRateGenerator = pCollisionRateGenerator * 22695477 + 1;
+    float pUseSecondPhase = ((float)(pCollisionRateGenerator & 0x7FFFFFFF)) / ((float)0x7FFFFFFF);
+    useSecondPhase = pUseSecondPhase < ContinueAfterCollisionRate;
+
+    pCollisionRateGenerator = pCollisionRateGenerator * 22695477 + 1;
+    float pCollisionEnergyLossAlpha = ((float)(pCollisionRateGenerator & 0x7FFFFFFF)) / ((float)0x7FFFFFFF);
+    energy *= mix(CollisionEnergyLossMax, CollisionEnergyLossMin, pCollisionEnergyLossAlpha);
+    wasCollision = true;
+    break;
+  }
+  nextDir = normalize(nextDir);
+
+  WriteBuffer(outVertex, (writeIndex * 2 + 0), pos);
+  WriteBuffer(outVertex, (writeIndex * 2 + 1), nextPos);
+  pos = nextPos;
+  dir = nextDir;
+  energy = nextEnergy;
+}
+if (useSecondPhase) {
+  for (; i < length; ++i) {
+    float mass = basicMass * energy * Scale;
+    int writeIndex = atomic_fetch_add_explicit(&(outCounter[0]), 1, memory_order_relaxed) + vertexOffset;
+    float curl = 0.1 * charge / mass / Scale;
+    float curlCos = cos(curl);
+    float curlSin = sin(curl);
+
+    float4 p = random[(i + gid * 7651) % 1048576];
+    float2 nextPos = pos + dir * 0.03;
+    float2 nextDir = float2(dir.x * curlCos + dir.y * curlSin, dir.y * curlCos - dir.x * curlSin);
+    float nextEnergy = energy * EnergyDecayFactor - EnergyDecayLinear;
+    if (nextEnergy < EnergyThreshold) {
+      return;
+    }
+
+    float2 uv = nextPos * 0.5 + 0.5;
+    float4 textureSample = SampleTexture<filter::linear, address::clamp_to_edge>(textureInput, uv);
+    float value = max(textureSample.r, max(textureSample.g, textureSample.b));
+    nextPos.y += value * 0.01;
+
+    WriteBuffer(outVertex, (writeIndex * 2 + 0), pos);
+    WriteBuffer(outVertex, (writeIndex * 2 + 1), nextPos);
+    pos = nextPos;
+    dir = nextDir;
+    energy = nextEnergy;
+  }
+}
+
+
+
+
+float energyScale = 1.0f;
+int nextSpawnCase = max(0, min(9, (int)(pNextSpawnCase * 10)));
+if (!wasCollision) {
+  pCollisionRateGenerator = pCollisionRateGenerator * 22695477 + 1;
+  float pContinueWithSameMode = ((float)(pCollisionRateGenerator & 0x7FFFFFFF)) / ((float)0x7FFFFFFF);
+  if (pContinueWithSameMode < PassSameModeRate) {
+    nextSpawnCase = 1;
+  }
+}
+switch (nextSpawnCase) {
+  default:
+  case 0: {
+    int spawnWriteIndex = atomic_fetch_add_explicit(&(outCounter[1]), 1, memory_order_relaxed);
+    WriteBuffer(outType, spawnWriteIndex, 0);
+    WriteBuffer(outInitPos, spawnWriteIndex, pos);
+    WriteBuffer(outInitDir, spawnWriteIndex, dir);
+    WriteBuffer(outEnergy, spawnWriteIndex, energy);
+    break;
+  }
+  case 1:
+  case 4:
+  case 5: {
+    int spawnWriteIndex = atomic_fetch_add_explicit(&(outCounter[1]), 1, memory_order_relaxed);
+    WriteBuffer(outType, spawnWriteIndex, Type);
+    WriteBuffer(outInitPos, spawnWriteIndex, pos);
+    WriteBuffer(outInitDir, spawnWriteIndex, dir);
+    WriteBuffer(outEnergy, spawnWriteIndex, energy);
+    break;
+  }
+  case 6: {
+    int spawnWriteIndex = atomic_fetch_add_explicit(&(outCounter[1]), 1, memory_order_relaxed);
+    WriteBuffer(outType, spawnWriteIndex, Type == 1 ? 1 : 2);
+    WriteBuffer(outInitPos, spawnWriteIndex, pos);
+    WriteBuffer(outInitDir, spawnWriteIndex, dir);
+    WriteBuffer(outEnergy, spawnWriteIndex, energy);
+    break;
+  }
+  case 2:
+    energyScale = 0.5f;
+  case 7: {
+    int spawnWriteIndex = atomic_fetch_add_explicit(&(outCounter[1]), 1, memory_order_relaxed);
+    WriteBuffer(outType, spawnWriteIndex, 3);
+    WriteBuffer(outInitPos, spawnWriteIndex, pos);
+    WriteBuffer(outInitDir, spawnWriteIndex, dir);
+    WriteBuffer(outEnergy, spawnWriteIndex, energy * energyScale);
+    break;
+  }
+  case 3:
+    energyScale = 0.5f;
+  case 8: {
+    int spawnWriteIndex = atomic_fetch_add_explicit(&(outCounter[1]), 1, memory_order_relaxed);
+    WriteBuffer(outType, spawnWriteIndex, 4);
+    WriteBuffer(outInitPos, spawnWriteIndex, pos);
+    WriteBuffer(outInitDir, spawnWriteIndex, dir);
+    WriteBuffer(outEnergy, spawnWriteIndex, energy * energyScale);
+    break;
+  }
+  case 9: {
+    {
+      int spawnWriteIndex = atomic_fetch_add_explicit(&(outCounter[1]), 1, memory_order_relaxed);
+      WriteBuffer(outType, spawnWriteIndex, 3);
+      WriteBuffer(outInitPos, spawnWriteIndex, pos);
+      WriteBuffer(outInitDir, spawnWriteIndex, dir);
+      WriteBuffer(outEnergy, spawnWriteIndex, energy);
+    }
+    {
+      int spawnWriteIndex = atomic_fetch_add_explicit(&(outCounter[1]), 1, memory_order_relaxed);
+      WriteBuffer(outType, spawnWriteIndex, 4);
+      WriteBuffer(outInitPos, spawnWriteIndex, pos);
+      WriteBuffer(outInitDir, spawnWriteIndex, dir);
+      WriteBuffer(outEnergy, spawnWriteIndex, energy);
+    }
+    break;
+  }
+}
+
+
+placeholder = pos;
+
+
+
+
+
+

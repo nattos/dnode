@@ -55,6 +55,12 @@ namespace NanoGraph {
     public NanoProgramType Type;
     public bool IsDebugOnly;
     public bool ForceIsRawBuffer;
+    public bool IsExternalBufferRef;
+  }
+
+  public struct NanoGpuExternalBufferRef {
+    public string FieldName;
+    public string Expression;
   }
 
   public class NanoGpuContext : INanoCodeContext {
@@ -334,7 +340,7 @@ namespace NanoGraph {
     }
 
     public bool RequiresConvert(NanoProgramType fromType, NanoProgramType toType) {
-      if (fromType == toType) {
+      if (fromType == toType || toType == Program.AutoType) {
         return false;
       }
       return true;
@@ -345,7 +351,7 @@ namespace NanoGraph {
     }
 
     public string EmitConvert(NanoProgramType fromType, NanoProgramType toType, string expr) {
-      if (fromType == toType) {
+      if (fromType == toType || toType == Program.AutoType) {
         return expr;
       }
       if (fromType.IsArray || toType.IsArray) {
@@ -503,6 +509,7 @@ namespace NanoGraph {
     public readonly NanoProgramType MTLRenderPipelineState;
     public readonly NanoProgramType MTLRenderPassDescriptor;
     public readonly NanoProgramType MTLBuffer;
+    public readonly NanoProgramType AutoType;
 
     public NanoProgram(string name) {
       Identifier = $"Program_{SanitizeIdentifierFragment(name)}";
@@ -524,6 +531,7 @@ namespace NanoGraph {
       _types.Add(MTLRenderPipelineState = NanoProgramType.MakeBuiltIn(this, "id<MTLRenderPipelineState>"));
       _types.Add(MTLRenderPassDescriptor = NanoProgramType.MakeBuiltIn(this, "MTLRenderPassDescriptor*"));
       _types.Add(MTLBuffer = NanoProgramType.MakeBuiltIn(this, "id<MTLBuffer>"));
+      _types.Add(AutoType = NanoProgramType.MakeBuiltIn(this, "auto"));
     }
 
     public int AllocateTextureInput() {
@@ -667,6 +675,8 @@ namespace NanoGraph {
           return Float4Type;
         case PrimitiveType.Texture:
           return Texture;
+        case PrimitiveType.Auto:
+          return AutoType;
       }
       return null;
     }
@@ -750,6 +760,9 @@ namespace NanoGraph {
     private static readonly System.Text.RegularExpressions.Regex _allowedIdentifierPattern = new System.Text.RegularExpressions.Regex(@"[A-z0-9_]");
 
     public static string SanitizeIdentifierFragment(string identifier) {
+      if (identifier == null) {
+        return "Unknown";
+      }
       string output = "";
       foreach (char c in identifier) {
         if (_allowedIdentifierPattern.IsMatch(c.ToString())) {

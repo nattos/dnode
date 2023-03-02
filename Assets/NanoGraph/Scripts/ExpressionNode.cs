@@ -12,7 +12,11 @@ namespace NanoGraph {
     Resource,
   }
 
-  public class ExpressionNode : DataNode, ICodeNode {
+  public interface IResourceDepsNode {
+    string[] DependentAssetPaths { get; }
+  }
+
+  public class ExpressionNode : DataNode, ICodeNode, IResourceDepsNode {
     [EditableAttribute]
     public ExpressionSource Source;
     [EditableAttribute]
@@ -30,6 +34,22 @@ namespace NanoGraph {
     public override DataSpec InputSpec => DataSpec.FromTypeFields(InputFields?.AsTypeFields() ?? Array.Empty<TypeField>());
     public override DataSpec OutputSpec => DataSpec.FromTypeFields(OutputFields?.AsTypeFields() ?? Array.Empty<TypeField>());
 
+    public string[] DependentAssetPaths {
+      get {
+        switch (Source) {
+          default:
+          case ExpressionSource.InlineBlock:
+          case ExpressionSource.InlineExpression:
+            return Array.Empty<string>();
+          case ExpressionSource.Resource:
+            if (Resource == null) {
+              return null;
+            }
+            return new[] { UnityEditor.AssetDatabase.GetAssetPath(Resource) };
+        }
+      }
+    }
+
     public string SourceExpr {
       get {
         switch (Source) {
@@ -38,7 +58,7 @@ namespace NanoGraph {
           case ExpressionSource.InlineExpression:
             return InlineExpression;
           case ExpressionSource.Resource:
-            return Resource == null ? null : Resource.text;
+            return Resource == null ? null : System.IO.File.ReadAllText(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(Application.dataPath), UnityEditor.AssetDatabase.GetAssetPath(Resource)));
         }
       }
     }

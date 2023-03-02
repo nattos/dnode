@@ -557,6 +557,10 @@ namespace NanoGraph.VisualScripting {
 
     private bool _isRegisteredAsOutputNode;
 
+    private HashSet<string> _cachedResourceDeps = new HashSet<string>();
+    private bool _resourceDepsListenerAdded = false;
+    private Action<string> _resourceDepsListener;
+
     protected abstract IDataNode CreateNode();
     protected override DataEdge[] GetAllInputDataEdges() => Graph.GetInputEdges(Node);
     protected override IDataNode GetNodeConnectedToInputPort(string fieldName, out string actualFieldName) {
@@ -578,6 +582,12 @@ namespace NanoGraph.VisualScripting {
       // TODO: Remove node.
       Node?.Graph?.RemoveNode(Node);
       Node?.Graph?.RemoveNodeInvalidatedHandler(Node, _nodeInvalidatedHandler);
+      EditorUtils.DelayCall += RemoveResourceDeps;
+    }
+
+    public override void Dispose() {
+      base.Dispose();
+      EditorUtils.DelayCall += RemoveResourceDeps;
     }
 
     public override void NotifyInputConnectionsChanged() {
@@ -633,6 +643,10 @@ namespace NanoGraph.VisualScripting {
 
       Node.Graph.MarkNodeDirty(Node);
       Node.Graph.ValidateLater();
+
+      if (Node is IResourceDepsNode resourceDepsNode) {
+        EditorUtils.DelayCall += AddResourceDeps;
+      }
     }
 
     protected override void EnsureNode() {
@@ -646,6 +660,36 @@ namespace NanoGraph.VisualScripting {
       Node = CreateNode();
       Node.DebugId = this.guid.ToString();
       NanoGraph.DebugInstance.AddNode(Node);
+    }
+
+    private void AddResourceDeps() {
+      if (!(Node is IResourceDepsNode resourceDepsNode)) {
+        return;
+      }
+      _cachedResourceDeps = new HashSet<string>(resourceDepsNode.DependentAssetPaths);
+      if (_resourceDepsListenerAdded) {
+        return;
+      }
+      _resourceDepsListenerAdded = true;
+
+      _resourceDepsListener = path => {
+        if (_cachedResourceDeps.Contains(path)) {
+          NanoGraph.DebugInstance?.CompileLater();
+        }
+      };
+      AssetChangeDetector.Instance.AssetPathChanged += _resourceDepsListener;
+    }
+
+    private void RemoveResourceDeps() {
+      if (!_resourceDepsListenerAdded) {
+        return;
+      }
+      _resourceDepsListenerAdded = false;
+      if (_resourceDepsListener == null) {
+        return;
+      }
+      AssetChangeDetector.Instance.AssetPathChanged -= _resourceDepsListener;
+      _resourceDepsListener = null;
     }
   }
 
@@ -814,6 +858,7 @@ namespace NanoGraph.VisualScripting {
         string name = $"{names[i]}Literal";
         PrimitiveType value = values[i];
         if (value == PrimitiveType.Texture ||
+            value == PrimitiveType.Auto ||
             value == PrimitiveType.TypeDecl ||
             value == PrimitiveType.Vertices ||
             value == PrimitiveType.BufferRef) {

@@ -526,6 +526,15 @@ NanoProgram* NanoProgram::GetCurrentInstance() {
   static inline vector_float3 log10_op(vector_float3 a) { return vector_float3 { std::log10(a.x), std::log10(a.y), std::log10(a.z) }; }
   static inline vector_float4 log10_op(vector_float4 a) { return vector_float4 { std::log10(a.x), std::log10(a.y), std::log10(a.z), std::log10(a.w) }; }
 
+  static inline float magnitude_op(float a) { return a; }
+  static inline vector_float2 magnitude_op(vector_float2 a) { return std::sqrt(a.x * a.x + a.y * a.y); }
+  static inline vector_float3 magnitude_op(vector_float3 a) { return std::sqrt(a.x * a.x + a.y * a.y + a.z * a.z); }
+  static inline vector_float4 magnitude_op(vector_float4 a) { return std::sqrt(a.x * a.x + a.y * a.y + a.z * a.z + a.w * a.w); }
+  static inline float normalize_op(float a) { return sign_op(a); }
+  static inline vector_float2 normalize_op(vector_float2 a) { return a / magnitude_op(a); }
+  static inline vector_float3 normalize_op(vector_float3 a) { return a / magnitude_op(a); }
+  static inline vector_float4 normalize_op(vector_float4 a) { return a / magnitude_op(a); }
+
   template<typename T>
   struct ValueAndBool {
     T Value;

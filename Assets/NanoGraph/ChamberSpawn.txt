@@ -1,0 +1,235 @@
+
+
+
+
+constexpr int MaxSteps = 32;
+auto outCounter = output0;
+auto outVertex = output1;
+auto outInitPos = output2;
+auto outInitDir = output3;
+auto outTime = output4;
+
+float4 prandom = random[abs(gid * 163495671 + poffset) % 1048576];
+float pGeneratorSeed = prandom.x;
+float pNextStepDistance = prandom.y;
+
+
+float2 initPos = SampleBuffer(outInitPos, gid);
+float2 initDir = SampleBuffer(outInitDir, gid);
+float time = SampleBuffer(outTime, gid);
+
+
+
+float SamplingDistance = Params._SamplingDistance_000;
+float ValueStopThreshold = Params._ValueStopThreshold_001;
+float GradStopThreshold = Params._GradStopThreshold_002;
+float MomentumFactor = Params._MomentumFactor_003;
+float GradientDescentFactor = Params._GradientDescentFactor_004;
+float StepSpeed = Params._StepSpeed_005;
+int RejectionSampleTries = Params._RejectionSampleTries_006;
+float TimeDecay = Params._TimeDecay_007;
+float TimeStopDecay = Params._TimeStopDecay_008;
+
+
+
+
+
+float2 pos = initPos;
+float2 dir = initDir;
+float2 nextNextDir;
+float2 nextNextPos;
+
+bool didStop = false;
+{
+  float2 normal = float2(dir.y, -dir.x);
+  float value01;
+  float value21;
+  float value10;
+  float value12;
+  {
+    float2 uv = (pos + dir * -SamplingDistance) * float2(9.0 / 16.0, -1) * 0.5 + 0.5;
+    float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(textureInput, uv);
+    value10 = max(textureSample.r, max(textureSample.g, textureSample.b));
+  }
+  {
+    float2 uv = (pos + dir * SamplingDistance) * float2(9.0 / 16.0, -1) * 0.5 + 0.5;
+    float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(textureInput, uv);
+    value12 = max(textureSample.r, max(textureSample.g, textureSample.b));
+  }
+  {
+    float2 uv = (pos + normal * -SamplingDistance) * float2(9.0 / 16.0, -1) * 0.5 + 0.5;
+    float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(textureInput, uv);
+    value01 = max(textureSample.r, max(textureSample.g, textureSample.b));
+  }
+  {
+    float2 uv = (pos + normal * SamplingDistance) * float2(9.0 / 16.0, -1) * 0.5 + 0.5;
+    float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(textureInput, uv);
+    value21 = max(textureSample.r, max(textureSample.g, textureSample.b));
+  }
+  float2 grad = float2(value12 - value10, value21 - value01);
+
+  float2 gradDir = dir * grad.x + normal * grad.y;
+  float2 tangentDir = float2(gradDir.y, -gradDir.x);
+  float dotValue = dot(tangentDir, dir);
+  if (dotValue < 0.00001) {
+    tangentDir = -tangentDir;
+  }
+  nextNextDir = initDir = normalize(mix(tangentDir, initDir, MomentumFactor));
+}
+
+
+for (int i = 0; i < MaxSteps; ++i) {
+  float2 normal = float2(dir.y, -dir.x);
+
+  float value01;
+  float value21;
+  float value10;
+  float value12;
+  {
+    float2 uv = (pos + dir * -SamplingDistance) * float2(9.0 / 16.0, -1) * 0.5 + 0.5;
+    float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(textureInput, uv);
+    value10 = max(textureSample.r, max(textureSample.g, textureSample.b));
+  }
+  {
+    float2 uv = (pos + dir * SamplingDistance) * float2(9.0 / 16.0, -1) * 0.5 + 0.5;
+    float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(textureInput, uv);
+    value12 = max(textureSample.r, max(textureSample.g, textureSample.b));
+  }
+  {
+    float2 uv = (pos + normal * -SamplingDistance) * float2(9.0 / 16.0, -1) * 0.5 + 0.5;
+    float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(textureInput, uv);
+    value01 = max(textureSample.r, max(textureSample.g, textureSample.b));
+  }
+  {
+    float2 uv = (pos + normal * SamplingDistance) * float2(9.0 / 16.0, -1) * 0.5 + 0.5;
+    float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(textureInput, uv);
+    value21 = max(textureSample.r, max(textureSample.g, textureSample.b));
+  }
+  float2 grad = float2(value12 - value10, value21 - value01);
+
+  float2 gradDir = dir * grad.x + normal * grad.y;
+  float2 tangentDir = float2(gradDir.y, -gradDir.x);
+  float dotValue = dot(tangentDir, dir);
+  if (dotValue < 0.00001) {
+    tangentDir = -tangentDir;
+  }
+  if (value12 < ValueStopThreshold || grad.x < GradStopThreshold) {
+    didStop = true;
+    break;
+  }
+
+  float2 nextDir = normalize(mix(mix(tangentDir, gradDir, GradientDescentFactor), dir, MomentumFactor));
+  float2 nextPos = pos + nextDir * StepSpeed;
+
+  int writeIndex = atomic_fetch_add_explicit(&(outCounter[0]), 1, memory_order_relaxed) + vertexOffset;
+  WriteBuffer(outVertex, (writeIndex * 2 + 0), pos);
+  WriteBuffer(outVertex, (writeIndex * 2 + 1), nextPos);
+
+  pos = nextPos;
+  dir = nextDir;
+}
+
+pos = initPos;
+dir = -initDir;
+for (int i = 0; i < MaxSteps; ++i) {
+  float2 normal = float2(dir.y, -dir.x);
+
+  float value01;
+  float value21;
+  float value10;
+  float value12;
+  {
+    float2 uv = (pos + dir * -SamplingDistance) * float2(9.0 / 16.0, -1) * 0.5 + 0.5;
+    float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(textureInput, uv);
+    value10 = max(textureSample.r, max(textureSample.g, textureSample.b));
+  }
+  {
+    float2 uv = (pos + dir * SamplingDistance) * float2(9.0 / 16.0, -1) * 0.5 + 0.5;
+    float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(textureInput, uv);
+    value12 = max(textureSample.r, max(textureSample.g, textureSample.b));
+  }
+  {
+    float2 uv = (pos + normal * -SamplingDistance) * float2(9.0 / 16.0, -1) * 0.5 + 0.5;
+    float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(textureInput, uv);
+    value01 = max(textureSample.r, max(textureSample.g, textureSample.b));
+  }
+  {
+    float2 uv = (pos + normal * SamplingDistance) * float2(9.0 / 16.0, -1) * 0.5 + 0.5;
+    float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(textureInput, uv);
+    value21 = max(textureSample.r, max(textureSample.g, textureSample.b));
+  }
+  float2 grad = float2(value12 - value10, value21 - value01);
+
+  float2 gradDir = dir * grad.x + normal * grad.y;
+  float2 tangentDir = float2(gradDir.y, -gradDir.x);
+  float dotValue = dot(tangentDir, dir);
+  if (dotValue < 0.00001) {
+    tangentDir = -tangentDir;
+  }
+  if (value12 < ValueStopThreshold || grad.x < GradStopThreshold) {
+    didStop = true;
+    break;
+  }
+
+  float2 nextDir = normalize(mix(mix(tangentDir, gradDir, GradientDescentFactor), dir, MomentumFactor));
+  float2 nextPos = pos + nextDir * StepSpeed;
+
+  int writeIndex = atomic_fetch_add_explicit(&(outCounter[0]), 1, memory_order_relaxed) + vertexOffset;
+  WriteBuffer(outVertex, (writeIndex * 2 + 0), pos);
+  WriteBuffer(outVertex, (writeIndex * 2 + 1), nextPos);
+
+  pos = nextPos;
+  dir = nextDir;
+}
+
+time -= TimeDecay;
+if (didStop) {
+  time -= TimeStopDecay;
+  nextNextDir = -nextNextDir;
+}
+nextNextPos = initPos + nextNextDir * StepSpeed * pNextStepDistance;
+if (time <= 0) {
+  uint pGenerator = ((uint)(pGeneratorSeed * 0xFFFFFFFF)) * 22695477 + 1;
+  pGenerator = pGenerator * 22695477 + 1;
+
+  float bestValue = -10000.0f;
+  float2 bestPos = 0.0f;
+  for (int i = 0; i < RejectionSampleTries; ++i) {
+    float pNext0 = ((float)(pGenerator & 0x7FFFFFFF)) / ((float)0x7FFFFFFF);
+    pGenerator = pGenerator * 22695477 + 1;
+    float pNext1 = ((float)(pGenerator & 0x7FFFFFFF)) / ((float)0x7FFFFFFF);
+    pGenerator = pGenerator * 22695477 + 1;
+
+    float2 samplePos = float2(pNext0, pNext1) * 2.0 - 1.0;
+    float2 uv = samplePos * float2(9.0 / 16.0, -1) * 0.5 + 0.5;
+    float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(textureInput, uv);
+    float value = max(textureSample.r, max(textureSample.g, textureSample.b));
+
+    if (value > bestValue) {
+      bestValue = value;
+      bestPos = samplePos;
+    }
+  }
+
+  float pNextDirX = ((float)(pGenerator & 0x7FFFFFFF)) / ((float)0x7FFFFFFF);
+  pGenerator = pGenerator * 22695477 + 1;
+  float pNextDirY = ((float)(pGenerator & 0x7FFFFFFF)) / ((float)0x7FFFFFFF);
+  pGenerator = pGenerator * 22695477 + 1;
+  nextNextPos = bestPos;
+  nextNextDir = normalize(float2(pNextDirX - 0.5, pNextDirY - 0.5));
+  time = 1.0;
+}
+
+
+
+WriteBuffer(outInitPos, gid, nextNextPos);
+WriteBuffer(outInitDir, gid, nextNextDir);
+WriteBuffer(outTime, gid, time);
+
+
+placeholder = float2(time, 0);
+
+
+
+
+

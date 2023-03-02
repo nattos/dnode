@@ -638,7 +638,7 @@ namespace NanoGraph {
       }
     }
 
-    private List<(ICodeGenerator, bool)> GenerateComputePlan(IComputeNode root, List<CodeGeneratorFromComputeNode> dependentComputeNodes, List<DataPlug> dependentComputeInputs) {
+    private List<(ICodeGenerator, bool)> GenerateComputePlan(IComputeNode root, List<CodeGeneratorFromComputeNode> dependentComputeNodes, List<DataEdge> dependentComputeInputs) {
       Dictionary<IDataNode, List<IConditionalNode>> conditionedOnMap = new Dictionary<IDataNode, List<IConditionalNode>>();
       HashSet<IDataNode> conditionedOnRootNode = new HashSet<IDataNode>();
       Dictionary<IConditionalNode, List<IDataNode>> conditionGroups = new Dictionary<IConditionalNode, List<IDataNode>>();
@@ -919,7 +919,7 @@ namespace NanoGraph {
 
       // Get compute input DataPlugs.
       dependentComputeInputs.AddRange(dependentComputeNodes.SelectMany(node => {
-        return GetOutputEdges(node.SourceNode).Where(edge => edge.Destination.Node == root || generators.ContainsKey(edge.Destination.Node)).Select(edge => edge.Source);
+        return GetOutputEdges(node.SourceNode).Where(edge => edge.Destination.Node == root || generators.ContainsKey(edge.Destination.Node));
       }).Distinct());
 
       List<(ICodeGenerator, bool)> plan = rawOrder.Where(entry => entry.node != root && !(entry.node is ICompileTimeOnlyNode)).Select(entry => (generators[entry.node], entry.isPreamble)).ToList();
@@ -930,13 +930,13 @@ namespace NanoGraph {
       public IComputeNode Node;
       public List<(ICodeGenerator generator, bool isPreamble)> Generators;
       public List<CodeGeneratorFromComputeNode> DependentComputeNodes;
-      public List<DataPlug> DependentComputeInputs;
+      public List<DataEdge> DependentComputeInputs;
 
       public ComputePlan(
           IComputeNode node,
           List<(ICodeGenerator, bool)> generators,
           List<CodeGeneratorFromComputeNode> dependentComputeNodes,
-          List<DataPlug> dependentComputeInputs) {
+          List<DataEdge> dependentComputeInputs) {
         Node = node;
         Generators = generators;
         DependentComputeNodes = dependentComputeNodes;
@@ -1084,7 +1084,7 @@ namespace NanoGraph {
       while (queuedCalcNodes.TryDequeue(out IComputeNode node)) {
         using (NewGenerateNodeScope(node)) {
           List<CodeGeneratorFromComputeNode> dependentComputeNodes = new List<CodeGeneratorFromComputeNode>();
-          List<DataPlug> dependentComputeInputs = new List<DataPlug>();
+          List<DataEdge> dependentComputeInputs = new List<DataEdge>();
           List<(ICodeGenerator, bool)> computePlan = GenerateComputePlan(node, dependentComputeNodes, dependentComputeInputs);
           if (node is ISplitComputeNode) {
             // if (dependentComputeNodes.Count > 1) {
@@ -1119,7 +1119,7 @@ namespace NanoGraph {
       }
 
       // Execute each compute plan in order.
-      Dictionary<IComputeNode, CodeCachedResult> bufferRefTokens = new Dictionary<IComputeNode, CodeCachedResult>();
+      Dictionary<DataPlug, CodeCachedResult> bufferRefTokens = new Dictionary<DataPlug, CodeCachedResult>();
       foreach (var plan in computePlans) {
         var computeNode = plan.Node;
         var computePlan = plan.Generators;
