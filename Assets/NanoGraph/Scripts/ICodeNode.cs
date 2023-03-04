@@ -57,10 +57,12 @@ namespace NanoGraph {
 
     public IReadOnlyList<ComputeNodeResultEntry> dependentComputeNodes;
     public IReadOnlyList<DataEdge> dependentComputeInputs;
-    public Dictionary<DataPlug, CodeCachedResult> bufferRefTokens;
+    public Dictionary<(DataPlug, bool dest), CodeCachedResult> bufferRefTokens;
   }
 
   public interface IComputeNodeEmitCodeOperation {
+    INanoCodeContext CodeContext { get; }
+
     void EmitFunctionSignature();
     void EmitFunctionPreamble(out NanoFunction func);
     void EmitLoadFunctionInputs();

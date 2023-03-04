@@ -1119,7 +1119,7 @@ namespace NanoGraph {
       }
 
       // Execute each compute plan in order.
-      Dictionary<DataPlug, CodeCachedResult> bufferRefTokens = new Dictionary<DataPlug, CodeCachedResult>();
+      Dictionary<(DataPlug, bool), CodeCachedResult> bufferRefTokens = new Dictionary<(DataPlug, bool), CodeCachedResult>();
       foreach (var plan in computePlans) {
         var computeNode = plan.Node;
         var computePlan = plan.Generators;

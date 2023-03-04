@@ -72,6 +72,7 @@ namespace NanoGraph {
 
       public List<NanoGpuBufferRef> gpuInputBuffers = new List<NanoGpuBufferRef>();
       public List<NanoGpuExternalBufferRef> gpuExternalInputBuffers = new List<NanoGpuExternalBufferRef>();
+      public CollapsedInputsData CollapsedInputsData;
       // public CodeCachedResult codeCachedResult;
 
       public override void EmitFunctionPreamble(out NanoFunction func) {
@@ -82,7 +83,7 @@ namespace NanoGraph {
         // Load inputs.
         // Note: Only load inputs that we really read.
         int bufferIndex = 0;
-        AddGpuFuncInputs(func, CollectComputeInputs(DependentComputeInputsToLoad), gpuInputBuffers, gpuExternalInputBuffers, ref bufferIndex);
+        AddGpuFuncInputs(func, CollectComputeInputs(DependentComputeInputsToLoad), gpuInputBuffers, gpuExternalInputBuffers, ref bufferIndex, out CollapsedInputsData, prefix: "vertex");
         AddDebugGpuFuncInputs(func, gpuInputBuffers, ref bufferIndex);
 
         func.AddParam(Array.Empty<string>(), program.GetPrimitiveType(PrimitiveType.Uint), $"gid_uint", "[[vertex_id]]");

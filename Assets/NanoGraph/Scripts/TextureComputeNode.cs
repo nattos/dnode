@@ -62,6 +62,8 @@ namespace NanoGraph {
     public override DataSpec ComputeInputSpec => DataSpec.FromFields(InputFields);
     public override DataSpec OutputSpec => DataSpec.FromFields(new[] { new DataField { Name = "Out", Type = TypeSpec.MakePrimitive(PrimitiveType.Texture) } }.Concat(BufferRefOutFields).ToArray());
 
+    protected override FieldPortsMode? ForceBufferRefOutputPortsMode => FieldPortsMode.Combined;
+
     public override IComputeNodeEmitCodeOperation CreateEmitCodeOperation(ComputeNodeEmitCodeOperationContext context) => new EmitterGpu(this, context);
   
     public DataField[] InputFields => new[] { DataField.MakePrimitive("Color", PrimitiveType.Float4) };
@@ -88,6 +90,7 @@ namespace NanoGraph {
       public List<NanoGpuBufferRef> gpuInputBuffers = new List<NanoGpuBufferRef>();
       public List<NanoGpuExternalBufferRef> gpuExternalInputBuffers = new List<NanoGpuExternalBufferRef>();
       public List<NanoGpuBufferRef> gpuOutputBuffers = new List<NanoGpuBufferRef>();
+      private CollapsedInputsData _collapsedInputsData;
       public CodeCachedResult codeCachedResult;
       private ComputeInput? autoSizeModeInput = null;
 
@@ -120,7 +123,7 @@ namespace NanoGraph {
         // Load inputs.
         // Note: Only load inputs that we really read.
         int bufferIndex = 0;
-        AddGpuFuncInputs(func, computeInputs, gpuInputBuffers, gpuExternalInputBuffers, ref bufferIndex);
+        AddGpuFuncInputs(func, computeInputs, gpuInputBuffers, gpuExternalInputBuffers, ref bufferIndex, out _collapsedInputsData);
         AddDebugGpuFuncInputs(func, gpuInputBuffers, ref bufferIndex);
         AddGpuFuncOutputs(func, computeOutputSpec.Fields, gpuOutputBuffers, gpuExternalInputBuffers, ref bufferIndex);
         if (graph.DebugEnabled && Node.DebugEnabled) {
@@ -360,6 +363,9 @@ namespace NanoGraph {
 
         validateCacheFunction.AddStatement($"id<MTLComputeCommandEncoder> encoder = [GetCurrentCommandBuffer() computeCommandEncoder];");
         validateCacheFunction.AddStatement($"[encoder setComputePipelineState:{pipelineStateIdentifier}];");
+
+        // Handle collapsed parameters.
+        EmitLoadCollapsedParameters(validateCacheFunction, _collapsedInputsData);
 
         // Bind buffers.
         EmitBindBuffers(validateCacheFunction, cachedResult, gpuInputBuffers, gpuOutputBuffers);

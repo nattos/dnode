@@ -88,6 +88,7 @@ namespace NanoGraph {
       public NanoProgramType vertexProgramType;
       public List<NanoGpuBufferRef> gpuInputBuffers = new List<NanoGpuBufferRef>();
       public List<NanoGpuExternalBufferRef> gpuExternalInputBuffers = new List<NanoGpuExternalBufferRef>();
+      public CollapsedInputsData CollapsedInputsData;
 
       protected override IReadOnlyList<DataEdge> DependentComputeInputsToLoad => dependentComputeInputs.Where(edge => !(edge.Source.Node == vertexNode && edge.Source.FieldName == "Verts")).ToArray();
 
@@ -124,6 +125,7 @@ namespace NanoGraph {
           }
           AddGpuFuncInput(func, computeInput, $"input{inputIndex}", gpuInputBuffers, gpuExternalInputBuffers, ref inputIndex, ref bufferIndex);
         }
+        MaybeAddGpuFuncCollapsedInputs(func, gpuInputBuffers, ref bufferIndex, out CollapsedInputsData, prefix: "fragment");
         AddDebugGpuFuncInputs(func, gpuInputBuffers, ref bufferIndex);
         func.AddStatement($"#if defined(DEBUG)");
         func.AddStatement($"{func.GetTypeIdentifier(PrimitiveType.Bool)} isDebugThread = primitive_id == 0 && sample_id == 0;");
@@ -242,6 +244,8 @@ namespace NanoGraph {
         NanoFunction fragmentFunc = fragmentOp.func;
         IReadOnlyList<NanoGpuBufferRef> gpuVertexInputBuffers = vertexOp.gpuInputBuffers;
         IReadOnlyList<NanoGpuBufferRef> gpuFragmentInputBuffers = fragmentOp.gpuInputBuffers;
+        CollapsedInputsData vertexCollapsedInputsData = vertexOp.CollapsedInputsData;
+        CollapsedInputsData fragmentCollapsedInputsData = fragmentOp.CollapsedInputsData;
 
         string EmitThreadCountExpr() {
           string VertexInputExpr() {
@@ -342,6 +346,10 @@ namespace NanoGraph {
         validateCacheFunction.AddStatement($"encoder.label = @\"{computeNode.ShortName}\";");
         validateCacheFunction.AddStatement($"[encoder setCullMode:MTLCullModeNone];");
         validateCacheFunction.AddStatement($"[encoder setRenderPipelineState:{pipelineStateIdentifier}];");
+
+        // Handle collapsed parameters.
+        EmitLoadCollapsedParameters(validateCacheFunction, vertexCollapsedInputsData);
+        EmitLoadCollapsedParameters(validateCacheFunction, fragmentCollapsedInputsData);
 
         // Bind all inputs for the vertex shader.
         EmitBindBuffers(validateCacheFunction, gpuVertexInputBuffers, variant: "Vertex");

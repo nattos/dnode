@@ -109,6 +109,7 @@ namespace NanoGraph {
       public List<NanoGpuBufferRef> gpuInputBuffers = new List<NanoGpuBufferRef>();
       public List<NanoGpuExternalBufferRef> gpuExternalInputBuffers = new List<NanoGpuExternalBufferRef>();
       public List<NanoGpuBufferRef> gpuOutputBuffers = new List<NanoGpuBufferRef>();
+      private CollapsedInputsData _collapsedInputsData;
       public CodeCachedResult codeCachedResult;
       public string threadCountLocal;
 
@@ -119,7 +120,7 @@ namespace NanoGraph {
         // Load inputs.
         // Note: Only load inputs that we really read.
         int bufferIndex = 0;
-        AddGpuFuncInputs(func, CollectComputeInputs(DependentComputeInputsToLoad), gpuInputBuffers, gpuExternalInputBuffers, ref bufferIndex);
+        AddGpuFuncInputs(func, CollectComputeInputs(DependentComputeInputsToLoad), gpuInputBuffers, gpuExternalInputBuffers, ref bufferIndex, out _collapsedInputsData);
         AddDebugGpuFuncInputs(func, gpuInputBuffers, ref bufferIndex);
         // Define outputs.
         // AddGpuFuncOutputs(func, computeOutputSpec.Fields, gpuOutputBuffers, ref bufferIndex);
@@ -315,6 +316,10 @@ namespace NanoGraph {
 
         validateCacheFunction.AddStatement($"id<MTLComputeCommandEncoder> encoder = [GetCurrentCommandBuffer() computeCommandEncoder];");
         validateCacheFunction.AddStatement($"[encoder setComputePipelineState:{pipelineStateIdentifier}];");
+
+        // Handle collapsed parameters.
+        EmitLoadCollapsedParameters(validateCacheFunction, _collapsedInputsData);
+
         // Bind buffers.
         EmitBindBuffers(validateCacheFunction, cachedResult, gpuInputBuffers, gpuOutputBuffers);
 

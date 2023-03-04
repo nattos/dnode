@@ -128,7 +128,7 @@ for (int i = 0; i < StepCount; ++i) {
   float2 nextDir = normalize(mix(mix(tangentDir, gradDir, GradientDescentFactor), dir, MomentumFactor));
   float2 nextPos = pos + nextDir * StepSpeed;
 
-  int writeIndex = atomic_fetch_add_explicit(&(outCounter[0]), 1, memory_order_relaxed) + glitchVertexOffset;
+  int writeIndex = max(0, atomic_fetch_add_explicit(&(outCounter[0]), 1, memory_order_relaxed) + glitchVertexOffset);
   WriteBuffer(outVertex, (writeIndex * 2 + 0), pos);
   WriteBuffer(outVertex, (writeIndex * 2 + 1), nextPos);
 
@@ -181,7 +181,7 @@ for (int i = 0; i < StepCount; ++i) {
   float2 nextDir = normalize(mix(mix(tangentDir, gradDir, GradientDescentFactor), dir, MomentumFactor));
   float2 nextPos = pos + nextDir * StepSpeed;
 
-  int writeIndex = atomic_fetch_add_explicit(&(outCounter[0]), 1, memory_order_relaxed) + glitchVertexOffset;
+  int writeIndex = max(0, atomic_fetch_add_explicit(&(outCounter[0]), 1, memory_order_relaxed) + glitchVertexOffset);
   WriteBuffer(outVertex, (writeIndex * 2 + 0), pos);
   WriteBuffer(outVertex, (writeIndex * 2 + 1), nextPos);
 

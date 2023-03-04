@@ -35,6 +35,12 @@ namespace NanoGraph {
     External,
   }
 
+  public class CollapsedInputsData {
+    public string Identifier;
+    public NanoProgramType CollapsedType;
+    public List<NanoGpuBufferRef> CollapsedBuffers;
+  }
+
   public abstract class ComputeNode : DataNode, IComputeNode {
     [EditableAttribute]
     public ExecutionMode ExecutionMode = ExecutionMode.OncePerFrame;
@@ -80,12 +86,13 @@ namespace NanoGraph {
 
     protected DataField[] TypeDeclFields => !RequiresTypeDeclInput ? Array.Empty<DataField>() : new[] { new DataField { Name = "TypeDecl", IsCompileTimeOnly = true, Type = TypeSpec.MakePrimitive(PrimitiveType.TypeDecl) } };
 
-    protected DataField[] BufferRefOutFields {
+    protected virtual FieldPortsMode? ForceBufferRefOutputPortsMode => null;
+    protected virtual DataField[] BufferRefOutFields {
       get {
         if (!HasBufferRefOut) {
           return Array.Empty<DataField>();
         }
-        switch (OutputPortsMode) {
+        switch (ForceBufferRefOutputPortsMode ?? OutputPortsMode) {
           case FieldPortsMode.Combined:
           default:
             return new[] { DataField.MakePrimitive("BufferRef", PrimitiveType.BufferRef).ToCompileTimeOnly() };
@@ -102,7 +109,7 @@ namespace NanoGraph {
         fieldName = null;
         return false;
       }
-      switch (OutputPortsMode) {
+      switch (ForceBufferRefOutputPortsMode ?? OutputPortsMode) {
         case FieldPortsMode.Combined:
         default:
           if (bufferRefFieldName == "BufferRef") {
@@ -124,7 +131,7 @@ namespace NanoGraph {
         bufferRefFieldName = null;
         return false;
       }
-      switch (OutputPortsMode) {
+      switch (ForceBufferRefOutputPortsMode ?? OutputPortsMode) {
         case FieldPortsMode.Combined:
         default:
           if (fieldName == "BufferRef") {
@@ -198,7 +205,7 @@ namespace NanoGraph {
       public TypeSpec resultTypeSpec { get; private set; }
       public NanoProgramType resultType { get; private set; }
       public DataSpec computeOutputSpec { get; private set; }
-      public Dictionary<DataPlug, CodeCachedResult> bufferRefTokens { get; private set; }
+      public Dictionary<(DataPlug, bool dest), CodeCachedResult> bufferRefTokens { get; private set; }
 
       public readonly NanoFunction createPipelinesFunction;
 
@@ -216,11 +223,14 @@ namespace NanoGraph {
 
       public CodeLocal cachedResult { get; private set; }
       protected ComputeInput[] collectedComputeInputs { get; private set; }
+      private List<string> _bufferRefCopyStatements = new List<string>();
 
       private string _lastUpdateFrameNumberIdentifier;
       private string _didInitializeFlagIdentifier;
 
       protected virtual IReadOnlyList<DataEdge> DependentComputeInputsToLoad => dependentComputeInputs;
+
+      public INanoCodeContext CodeContext => computeNode.CodeContext;
 
       public void EmitFunctionSignature() {
         // Define a type to hold the result value.
@@ -236,16 +246,19 @@ namespace NanoGraph {
           string bufferedResultIdentifier = program.AddInstanceField(resultType, $"BufferedResult_{computeNode.ShortName}");
 
           foreach (var bufferedField in resultTypeSpec.Type.Fields) {
+            string bufferedFieldName = resultType.GetField(bufferedField.Name);
             DataPlug bufferRefPlug = new DataPlug { Node = computeNode, FieldName = bufferedField.Name };
-            if (bufferRefTokens.TryGetValue(bufferRefPlug, out CodeCachedResult bufferedResult)) {
+            if (bufferRefTokens.TryGetValue((bufferRefPlug, false), out CodeCachedResult bufferedResult)) {
+              string referencedResultExpr = bufferedResult.Result.Identifier;
+              string fieldName = bufferedResult.ResultType.GetField(bufferedField.Name);
+              _bufferRefCopyStatements.Add($"{referencedResultExpr}.{fieldName} = {bufferedResultIdentifier}.{bufferedFieldName};");
             } else {
-              string bufferedFieldName = resultType.GetField(bufferedField.Name);
               if (bufferedField.Type.IsArray) {
                 this.createPipelinesFunction.AddStatement($"{bufferedResultIdentifier}.{bufferedFieldName}.reset(NanoTypedBuffer<{this.createPipelinesFunction.GetElementTypeIdentifier(bufferedField.Type)}>::Allocate(1));");
               } else {
                 this.createPipelinesFunction.AddStatement($"{bufferedResultIdentifier}.{bufferedFieldName} = 0;");
               }
-              bufferRefTokens[bufferRefPlug] = new CodeCachedResult { ResultType = resultType, Result = new CodeLocal { Identifier = bufferedResultIdentifier, Type = resultTypeSpec } };
+              bufferRefTokens[(bufferRefPlug, false)] = new CodeCachedResult { ResultType = resultType, Result = new CodeLocal { Identifier = bufferedResultIdentifier, Type = resultTypeSpec } };
             }
           }
           cachedResultIdentifier = bufferedResultIdentifier;
@@ -308,6 +321,9 @@ namespace NanoGraph {
             break;
         }
         EmitValidateCacheFunctionInner();
+        foreach (string statement in _bufferRefCopyStatements) {
+          validateCacheFunction.AddStatement(statement);
+        }
       }
 
       public abstract void EmitValidateCacheFunctionInner();
@@ -425,42 +441,46 @@ namespace NanoGraph {
             continue;
           }
 
-          NanoProgramType fieldType;
-          string expression;
+          NanoProgramType fieldType = null;
+          string expression = null;
           string bufferRefForField = null;
           if (isBufferRef) {
             fieldType = this.resultType;
 
-            computeNode.TryGetFieldForBufferRefFieldName(input.Destination.FieldName, out bufferRefForField);
-            DataPlug destBufferRefPlug = new DataPlug { Node = computeNode, FieldName = bufferRefForField };
+            string destFieldName = input.Destination.FieldName;
+            if (computeNode.TryGetFieldForBufferRefFieldName(input.Destination.FieldName, out bufferRefForField)) {
+              DataPlug destBufferRefPlug = new DataPlug { Node = computeNode, FieldName = bufferRefForField };
 
-            (input.Source.Node as ComputeNode).TryGetFieldForBufferRefFieldName(input.Source.FieldName, out string sourceBufferRefForField);
-            DataPlug sourceBufferRefPlug = new DataPlug { Node = input.Source.Node, FieldName = sourceBufferRefForField };
+              (input.Source.Node as ComputeNode).TryGetFieldForBufferRefFieldName(input.Source.FieldName, out string sourceBufferRefForField);
+              DataPlug sourceBufferRefPlug = new DataPlug { Node = input.Source.Node, FieldName = sourceBufferRefForField };
 
-            if (bufferRefTokens.TryGetValue(sourceBufferRefPlug, out var sourceBufferedResult)) {
-              string bufferedResultFieldName = sourceBufferedResult.ResultType.GetField(sourceBufferRefForField);
-              expression = $"{sourceBufferedResult.Result.Identifier}.{bufferedResultFieldName}";
-            } else if (bufferRefTokens.TryGetValue(destBufferRefPlug, out var destBufferedResult)) {
-              string bufferedResultFieldName = destBufferedResult.ResultType.GetField(bufferRefForField);
-              expression = $"{destBufferedResult.Result.Identifier}.{bufferedResultFieldName}";
-            } else {
-              string bufferedResultIdentifier = program.AddInstanceField(resultType, $"BufferedResult_{result.Node.ShortName}");
-              destBufferedResult = new CodeCachedResult { ResultType = resultType, Result = new CodeLocal { Identifier = bufferedResultIdentifier, Type = resultTypeSpec } };
-              bufferRefTokens[destBufferRefPlug] = destBufferedResult;
+              if (bufferRefTokens.TryGetValue((sourceBufferRefPlug, false), out var sourceBufferedResult)) {
+                string bufferedResultFieldName = sourceBufferedResult.ResultType.GetField(sourceBufferRefForField);
+                expression = $"{sourceBufferedResult.Result.Identifier}.{bufferedResultFieldName}";
+              } else if (bufferRefTokens.TryGetValue((destBufferRefPlug, true), out var destBufferedResult)) {
+                string bufferedResultFieldName = destBufferedResult.ResultType.GetField(bufferRefForField);
+                expression = $"{destBufferedResult.Result.Identifier}.{bufferedResultFieldName}";
+              } else {
+                string bufferedResultIdentifier = program.AddInstanceField(resultType, $"BufferedResult_{result.Node.ShortName}");
+                destBufferedResult = new CodeCachedResult { ResultType = resultType, Result = new CodeLocal { Identifier = bufferedResultIdentifier, Type = resultTypeSpec } };
+                bufferRefTokens[(destBufferRefPlug, true)] = destBufferedResult;
+                bufferRefTokens[(sourceBufferRefPlug, false)] = destBufferedResult;
 
-              foreach (var bufferedField in resultTypeSpec.Type.Fields) {
-                string bufferedFieldName = resultType.GetField(bufferedField.Name);
-                if (bufferedField.Type.IsArray) {
-                  this.createPipelinesFunction.AddStatement($"{bufferedResultIdentifier}.{bufferedFieldName}.reset(NanoTypedBuffer<{this.createPipelinesFunction.GetElementTypeIdentifier(bufferedField.Type)}>::Allocate(1));");
-                } else {
-                  this.createPipelinesFunction.AddStatement($"{bufferedResultIdentifier}.{bufferedFieldName} = 0;");
+                foreach (var bufferedField in resultTypeSpec.Type.Fields) {
+                  string bufferedFieldName = resultType.GetField(bufferedField.Name);
+                  if (bufferedField.Type.IsArray) {
+                    this.createPipelinesFunction.AddStatement($"{bufferedResultIdentifier}.{bufferedFieldName}.reset(NanoTypedBuffer<{this.createPipelinesFunction.GetElementTypeIdentifier(bufferedField.Type)}>::Allocate(1));");
+                  } else {
+                    this.createPipelinesFunction.AddStatement($"{bufferedResultIdentifier}.{bufferedFieldName} = 0;");
+                  }
                 }
-              }
 
-              string bufferedResultFieldName = destBufferedResult.ResultType.GetField(bufferRefForField);
-              expression = $"{destBufferedResult.Result.Identifier}.{bufferedResultFieldName}";
+                string bufferedResultFieldName = destBufferedResult.ResultType.GetField(bufferRefForField);
+                expression = $"{destBufferedResult.Result.Identifier}.{bufferedResultFieldName}";
+              }
             }
-          } else {
+          }
+          if (expression == null) {
             fieldType = program.GetProgramType(field.Type, field.Name);
             expression = $"{resultIdentifier}.{result.Result?.ResultType.GetField(field.Name)}";
           }
@@ -478,11 +498,63 @@ namespace NanoGraph {
         }
       }
 
-      protected static void AddGpuFuncInputs(NanoFunction func, IEnumerable<ComputeInput> inputs, List<NanoGpuBufferRef> gpuInputBuffers, List<NanoGpuExternalBufferRef> gpuExternalInputBuffers, ref int bufferIndex) {
+      protected static void AddGpuFuncInputs(NanoFunction func, IEnumerable<ComputeInput> inputs, List<NanoGpuBufferRef> gpuInputBuffers, List<NanoGpuExternalBufferRef> gpuExternalInputBuffers, ref int bufferIndex, out CollapsedInputsData outData, string prefix = null) {
         int inputIndex = 0;
         foreach (var computeInput in inputs) {
           AddGpuFuncInput(func, computeInput, $"input{inputIndex}", gpuInputBuffers, gpuExternalInputBuffers, ref inputIndex, ref bufferIndex);
         }
+        MaybeAddGpuFuncCollapsedInputs(func, gpuInputBuffers, ref bufferIndex, out outData, prefix);
+      }
+
+      protected static void MaybeAddGpuFuncCollapsedInputs(NanoFunction func, List<NanoGpuBufferRef> gpuInputBuffers, ref int bufferIndex, out CollapsedInputsData outData, string prefix = null) {
+        if (!gpuInputBuffers.Any(buffer => buffer.IsCollapsable)) {
+          outData = null;
+          return;
+        }
+        string paramName = !string.IsNullOrEmpty(prefix) ? $"{prefix}CollapsedParams" : "collapsedParams";
+
+        NanoProgramType collapsedType = func.Program.AddCustomType("CollapsedParams");
+        List<NanoGpuBufferRef> collapsedBuffers = new List<NanoGpuBufferRef>();
+        foreach (var buffer in gpuInputBuffers) {
+          if (!buffer.IsCollapsable) {
+            continue;
+          }
+          string fieldName = collapsedType.AddField(buffer.Type, buffer.ParameterName);
+          func.AddStatement($"auto {buffer.ParameterName} = {paramName}.{fieldName};");
+          collapsedBuffers.Add(buffer);
+        }
+
+        gpuInputBuffers.Add(new NanoGpuBufferRef {
+          FieldName = null,
+          Expression = paramName,
+          ParameterName = null,
+          Index = bufferIndex,
+          Type = collapsedType,
+          IsDebugOnly = false,
+          ForceIsRawBuffer = false,
+          IsCollapsable = false,
+        });
+        string[] modifiers = { "constant", "const" };
+        string suffix = $"[[buffer({bufferIndex})]]";
+        func.AddParam(modifiers, collapsedType, paramName, suffix, new NanoParameterOptions { IsConst = true, IsReference = true });
+        bufferIndex++;
+        outData = new CollapsedInputsData {
+          Identifier = paramName,
+          CollapsedType = collapsedType,
+          CollapsedBuffers = collapsedBuffers,
+        };
+      }
+
+      protected void EmitLoadCollapsedParameters(NanoFunction func, CollapsedInputsData data) {
+        if (data == null) {
+          return;
+        }
+        NanoProgramType resultType = data.CollapsedType;
+        func.AddStatement($"{func.GetTypeIdentifier(resultType)} {data.Identifier} = {{");
+        foreach (var buffer in data.CollapsedBuffers) {
+          func.AddStatement($"  .{resultType.GetField(buffer.ParameterName)} = ({buffer.Expression}),");
+        }
+        func.AddStatement($"}};");
       }
 
       protected void AddDebugGpuFuncInputs(NanoFunction func, List<NanoGpuBufferRef> gpuInputBuffers, ref int bufferIndex) {
@@ -495,7 +567,9 @@ namespace NanoGraph {
 
       protected static void AddGpuFuncInput(NanoFunction func, ComputeInput input, string paramName, List<NanoGpuBufferRef> gpuInputBuffers, List<NanoGpuExternalBufferRef> gpuExternalInputBuffers, ref int inputIndex, ref int bufferIndex, bool isDebugOnly = false) {
         if (input.BufferRefForField == null) {
-          AddGpuFuncInput(func, input.Field, input.Expression, paramName, gpuInputBuffers, ref bufferIndex, isReadWrite: input.ReadWrite, isDebugOnly: isDebugOnly);
+          var field = input.Field;
+          bool isCollapsable = input.Operation.CodeContext is NanoCpuContext && !field.Type.IsArray && field.Type.Primitive != null && field.Type.Primitive != PrimitiveType.Texture;
+          AddGpuFuncInput(func, field, input.Expression, paramName, gpuInputBuffers, ref bufferIndex, isReadWrite: input.ReadWrite, isDebugOnly: isDebugOnly, isCollapsable: isCollapsable);
           inputIndex++;
         } else {
           gpuExternalInputBuffers.Add(new NanoGpuExternalBufferRef {
@@ -505,12 +579,12 @@ namespace NanoGraph {
         }
       }
 
-      protected static void AddGpuFuncInput(NanoFunction func, DataField field, string inputExpression, string paramName, List<NanoGpuBufferRef> gpuInputBuffers, ref int bufferIndex, bool isReadWrite = false, bool isDebugOnly = false) {
+      protected static void AddGpuFuncInput(NanoFunction func, DataField field, string inputExpression, string paramName, List<NanoGpuBufferRef> gpuInputBuffers, ref int bufferIndex, bool isReadWrite = false, bool isDebugOnly = false, bool isCollapsable = false) {
         var fieldType = func.Program.GetProgramType(field.Type);
-        AddGpuFuncInput(func, field.Name, fieldType, inputExpression, paramName, gpuInputBuffers, ref bufferIndex, isReadWrite: isReadWrite, isDebugOnly: isDebugOnly);
+        AddGpuFuncInput(func, field.Name, fieldType, inputExpression, paramName, gpuInputBuffers, ref bufferIndex, isReadWrite: isReadWrite, isDebugOnly: isDebugOnly, isCollapsable: isCollapsable);
       }
 
-      protected static void AddGpuFuncInput(NanoFunction func, string fieldName, NanoProgramType fieldType, string inputExpression, string paramName, List<NanoGpuBufferRef> gpuInputBuffers, ref int bufferIndex, bool isReadWrite = false, bool forceIsBuffer = false, bool isDebugOnly = false) {
+      protected static void AddGpuFuncInput(NanoFunction func, string fieldName, NanoProgramType fieldType, string inputExpression, string paramName, List<NanoGpuBufferRef> gpuInputBuffers, ref int bufferIndex, bool isReadWrite = false, bool forceIsBuffer = false, bool isDebugOnly = false, bool isCollapsable = false) {
         if (fieldType == null) {
           return;
         }
@@ -522,7 +596,11 @@ namespace NanoGraph {
           Type = fieldType,
           IsDebugOnly = isDebugOnly,
           ForceIsRawBuffer = forceIsBuffer,
+          IsCollapsable = isCollapsable,
         });
+        if (isCollapsable) {
+          return;
+        }
         string[] modifiers = { "constant", "const" };
         string suffix = $"[[buffer({bufferIndex})]]";
         bool isReference = true;

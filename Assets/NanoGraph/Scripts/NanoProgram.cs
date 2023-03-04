@@ -56,6 +56,7 @@ namespace NanoGraph {
     public bool IsDebugOnly;
     public bool ForceIsRawBuffer;
     public bool IsExternalBufferRef;
+    public bool IsCollapsable;
   }
 
   public struct NanoGpuExternalBufferRef {
