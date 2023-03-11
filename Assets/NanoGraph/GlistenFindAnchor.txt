@@ -1,0 +1,80 @@
+
+
+constexpr float SamplingWidth = 0.005;
+constexpr float Pi = 3.1415926535897932384626433832795;
+
+int fineX = (int)GridSize.x;
+int fineY = (int)GridSize.y;
+int coarseX = fineX / 8;
+int coarseY = fineY / 8;
+float2 coarseTexelSize = 1.0 / float2(coarseX, coarseY);
+float2 fineTexelSize = 1.0 / float2(fineX, fineY);
+
+
+
+int2 bestCoarsePos;
+float bestCoarseSample = 0.0f;
+for (int y = 0; y < coarseY; ++y) {
+  for (int x = 0; x < coarseX; ++x) {
+    float4 sample = SampleTexture<filter::nearest, address::clamp_to_zero>(CoarseTexture, float2(x, y) * coarseTexelSize + coarseTexelSize * 0.5);
+    float value = max(sample.r, max(sample.g, sample.b));
+    if (value > bestCoarseSample) {
+      bestCoarseSample = value;
+      bestCoarsePos = int2(x, y);
+    }
+  }
+}
+
+float2 coarseUV = float2(bestCoarsePos) * coarseTexelSize;
+
+int2 bestFinePos;
+float bestFineSample = 0.0f;
+for (int y = 0; y < coarseY; ++y) {
+  for (int x = 0; x < coarseX; ++x) {
+    float4 sample = SampleTexture<filter::nearest, address::clamp_to_zero>(FineTexture, coarseUV + float2(x, y) * fineTexelSize + fineTexelSize * 0.5);
+    float value = max(sample.r, max(sample.g, sample.b));
+    if (value > bestFineSample) {
+      bestFineSample = value;
+      bestFinePos = int2(x, y);
+    }
+  }
+}
+
+float2 anchorUV = coarseUV + float2(bestFinePos) * fineTexelSize + fineTexelSize * 0.5 + coarseTexelSize * 0.5;
+
+float4 sample01 = SampleTexture<filter::linear, address::clamp_to_zero>(FineTexture, anchorUV + float2(-SamplingWidth, 0));
+float4 sample21 = SampleTexture<filter::linear, address::clamp_to_zero>(FineTexture, anchorUV + float2(SamplingWidth, 0));
+float4 sample10 = SampleTexture<filter::linear, address::clamp_to_zero>(FineTexture, anchorUV + float2(0, -SamplingWidth));
+float4 sample12 = SampleTexture<filter::linear, address::clamp_to_zero>(FineTexture, anchorUV + float2(0, SamplingWidth));
+float value01 = max(sample01.r, max(sample01.g, sample01.b));
+float value21 = max(sample21.r, max(sample21.g, sample21.b));
+float value10 = max(sample10.r, max(sample10.g, sample10.b));
+float value12 = max(sample12.r, max(sample12.g, sample12.b));
+float valueAvg = (value01 + value21 + value10 + value12) * 0.25;
+float2 grad = float2(value21 - value01, value12 - value10);
+float2 gradNorm = grad / max(0.00001, length(grad));
+
+float3 color = (sample01.rgb + sample21.rgb + sample10.rgb + sample12.rgb) * 0.25;
+float3 rawColorGradX = sample21.rgb - sample01.rgb;
+float3 rawColorGradY = sample12.rgb - sample10.rgb;
+float2 colorGradR = float2(rawColorGradX.r, rawColorGradY.r);
+float2 colorGradB = float2(rawColorGradX.b, rawColorGradY.b);
+float2 colorGradG = float2(rawColorGradX.g, rawColorGradY.g);
+
+colorGradR = mix(colorGradR, colorGradR / atan((length(colorGradR) + ColorGradSoft) * ColorGradSquash) / Pi / 2, ColorGradMix);
+colorGradG = mix(colorGradG, colorGradG / atan((length(colorGradG) + ColorGradSoft) * ColorGradSquash) / Pi / 2, ColorGradMix);
+colorGradB = mix(colorGradB, colorGradB / atan((length(colorGradB) + ColorGradSoft) * ColorGradSquash) / Pi / 2, ColorGradMix);
+
+float3 colorGradX = float3(colorGradR.x, colorGradB.x, colorGradG.x);
+float3 colorGradY = float3(colorGradR.y, colorGradB.y, colorGradG.y);
+colorGradX *= valueAvg;
+colorGradY *= valueAvg;
+
+color -= (gradNorm.x * colorGradX + gradNorm.y * colorGradY) * mix(1.0, ColorGradAdjust, valueAvg);
+
+Position = anchorUV + grad * 1.0;
+Direction = gradNorm;
+Grad = grad;
+Color = color;
+ColorGradX = colorGradX;
+ColorGradY = colorGradY;

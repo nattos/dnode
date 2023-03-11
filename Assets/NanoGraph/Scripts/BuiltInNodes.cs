@@ -255,6 +255,7 @@ namespace NanoGraph {
       { ValueProviderType.Step, new StepValueProvider() },
       { ValueProviderType.FrameNumber, new FrameNumberValueProvider() },
       { ValueProviderType.Time, new TimeValueProvider() },
+      { ValueProviderType.DeltaTime, new DeltaTimeValueProvider() },
       { ValueProviderType.Length, new LengthValueProvider() },
       { ValueProviderType.TextureSize, new TextureSizeValueProvider() },
       { ValueProviderType.OutputTextureSize, new OutputTextureSizeValueProvider() },
@@ -274,6 +275,7 @@ namespace NanoGraph {
     Step,
     FrameNumber,
     Time,
+    DeltaTime,
     Length,
     TextureSize,
     OutputTextureSize,
@@ -357,6 +359,19 @@ namespace NanoGraph {
         NanoGraph.CurrentGenerateState.AddError($"Time source only works in CPU contexts (for node {node}).");
       }
       return context.Function.EmitConvert(TypeSpec.MakePrimitive(PrimitiveType.Double), elementType, "GetFrameTime()");
+    }
+  }
+
+  public class DeltaTimeValueProvider : IValueProvider {
+    public DataField[] GetExtraInputFields(TypeSpec elementType) => Array.Empty<DataField>();
+    public IEnumerable<DataEdge> FilteredAutoTypeEdges(IReadOnlyList<DataEdge> inputEdges) => Array.Empty<DataEdge>();
+    public PrimitiveType? PreferredType => PrimitiveType.Double;
+    public string EmitCode(ICodeNode node, CodeContext context, int inputsIndexOffset, string indexExpr, string lengthExpr, TypeSpec elementType) {
+      // Note: Only works in CPU context.
+      if (!(context.Function.Context is NanoCpuContext)) {
+        NanoGraph.CurrentGenerateState.AddError($"Time source only works in CPU contexts (for node {node}).");
+      }
+      return context.Function.EmitConvert(TypeSpec.MakePrimitive(PrimitiveType.Double), elementType, "GetFrameDeltaTime()");
     }
   }
 

@@ -65,6 +65,7 @@ public:
 
   int GetFrameNumber() const { return _frameNumber; }
   double GetFrameTime() const { return _frameTime; }
+  double GetFrameDeltaTime() const { return _frameDeltaTime; }
 
   static void SetCurrentInstance(NanoProgram* ptr);
   static NanoProgram* GetCurrentInstance();
@@ -90,6 +91,7 @@ private:
   int _frameNumber = 0;
   double _startTime = 0;
   double _frameTime = 0;
+  double _frameDeltaTime = 0;
 
   static NSLock* _threadMapLock;
   static std::unique_ptr<std::map<NSThread*, NanoProgram*>> _threadMap;

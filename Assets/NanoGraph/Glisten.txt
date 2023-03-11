@@ -1,0 +1,44 @@
+
+
+float2 squashFactor = float2(SquashX, SquashY);
+float stretchGradPower = atan(length(Grad) * StretchGradSquash);
+
+
+auto outPosition = output0;
+auto outColor = output1;
+
+Shape = max(0.01, Shape);
+float scale = (LevelCount * Shape) / (gid + (LevelCount * Shape)) * Size;
+float colorAlpha = (1.0 + gid) / (LevelCount * (LevelCount + 1));
+// float colorAlpha = 1.0 / LevelCount;
+
+float3 colorGradX = ColorGradX * ColorGradPower;
+float3 colorGradY = ColorGradY * ColorGradPower;
+
+float2 dir = Direction;
+float2 fanAnchorPos = dir;
+dir = float2(dir.x * AngleStep.x - dir.y * AngleStep.y, dir.x * AngleStep.y + dir.y * AngleStep.x);
+for (int i = 0; i < StepCount; ++i) {
+  float2 nextDir = float2(dir.x * AngleStep.x - dir.y * AngleStep.y, dir.x * AngleStep.y + dir.y * AngleStep.x);
+  float2 v1 = fanAnchorPos;
+  float2 v2 = dir;
+  float2 v3 = nextDir;
+  v1 += dot(v1, Direction) * (StretchGrad - 1.0) * stretchGradPower;
+  v2 += dot(v2, Direction) * (StretchGrad - 1.0) * stretchGradPower;
+  v3 += dot(v3, Direction) * (StretchGrad - 1.0) * stretchGradPower;
+  v1 *= squashFactor;
+  v2 *= squashFactor;
+  v3 *= squashFactor;
+  WriteBuffer(outPosition, (gid * 3 * StepCount) + (i * 3) + 0, Position + v1 * scale);
+  WriteBuffer(outPosition, (gid * 3 * StepCount) + (i * 3) + 1, Position + v2 * scale);
+  WriteBuffer(outPosition, (gid * 3 * StepCount) + (i * 3) + 2, Position + v3 * scale);
+  WriteBuffer(outColor, (gid * 3 * StepCount) + (i * 3) + 0, float4(Color + v1.x * colorGradX + v1.y * colorGradY, colorAlpha));
+  WriteBuffer(outColor, (gid * 3 * StepCount) + (i * 3) + 1, float4(Color + v2.x * colorGradX + v2.y * colorGradY, colorAlpha));
+  WriteBuffer(outColor, (gid * 3 * StepCount) + (i * 3) + 2, float4(Color + v3.x * colorGradX + v3.y * colorGradY, colorAlpha));
+  dir = nextDir;
+}
+
+
+placeholder = Direction;
+
+

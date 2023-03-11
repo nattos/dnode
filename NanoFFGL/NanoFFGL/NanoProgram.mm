@@ -195,7 +195,9 @@ vector_int2 OutputTextureSize = vector_int2 { 1920, 1080 };
 
 void NanoProgram::Run() {
   EnsureResources();
-  _frameTime = [NSDate now].timeIntervalSince1970 - _startTime;
+  double nextFrameTime = [NSDate now].timeIntervalSince1970 - _startTime;
+  _frameDeltaTime = nextFrameTime - _frameTime;
+  _frameTime = nextFrameTime;
 
   SetCurrentInstance(this);
   _currentCommandBuffer = [_commandQueue commandBuffer];

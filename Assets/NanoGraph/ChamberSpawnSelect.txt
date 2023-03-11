@@ -1,0 +1,45 @@
+
+
+constexpr float MaxVertexSpawnDistance = 8.0;
+constexpr float MaxVertexSpawnDistanceSqr = MaxVertexSpawnDistance * MaxVertexSpawnDistance;
+constexpr float MinVertexSpawnDistance = 0.0001;
+constexpr float MinVertexSpawnDistanceSqr = MinVertexSpawnDistance * MinVertexSpawnDistance;
+
+
+if (cond) {
+  result = b;
+
+  float pGeneratorSeed = prandom.x;
+  uint pGenerator = ((uint)(pGeneratorSeed * 0xFFFFFFFF)) * 22695477 + 1;
+  pGenerator = pGenerator * 22695477 + 1;
+
+  float pIsLine = ((float)(pGenerator & 0x7FFFFFFF)) / ((float)0x7FFFFFFF);
+  pGenerator = pGenerator * 22695477 + 1;
+
+  if (pIsLine < IsLineRate && vertexCount > 0) {
+    for (int i = 0; i < 10; ++i) {
+      float pLineIndex = ((float)(pGenerator & 0x7FFFFFFF)) / ((float)0x7FFFFFFF);
+      pGenerator = pGenerator * 22695477 + 1;
+
+      float pLineIndex2 = 1 - pLineIndex;
+      pLineIndex2 *= pLineIndex2;
+      pLineIndex2 = 1 - pLineIndex2;
+      float indexRaw = vertexCount * pLineIndex2;
+      int indexCoarse = floor(indexRaw);
+      float indexFine = indexRaw - indexCoarse;
+      int vertexIndex = max(0, min(vertexCount - 1, indexCoarse));
+      float2 v0 = SampleBuffer(vertices, vertexIndex * 2 + 0) * 0.5 + 0.5;
+      float2 v1 = SampleBuffer(vertices, vertexIndex * 2 + 1) * 0.5 + 0.5;
+      float2 v = mix(v0, v1, indexFine);
+      float distSqr = dot(v - 0.5, v - 0.5);
+      if (isfinite(distSqr) && distSqr < MaxVertexSpawnDistanceSqr && distSqr > MinVertexSpawnDistanceSqr) {
+        result.x = v.x;
+        result.y = v.y;
+        break;
+      }
+    }
+  }
+} else {
+  result = a;
+}
+
