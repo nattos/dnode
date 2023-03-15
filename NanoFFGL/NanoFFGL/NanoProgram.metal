@@ -109,10 +109,8 @@ static inline vector_float2 atan2_op(vector_float2 a, vector_float2 b) { return 
 static inline vector_float3 atan2_op(vector_float3 a, vector_float3 b) { return vector_float3 { atan2_op(a.x, b.x), atan2_op(a.y, b.y), atan2_op(a.z, b.z) }; }
 static inline vector_float4 atan2_op(vector_float4 a, vector_float4 b) { return vector_float4 { atan2_op(a.x, b.x), atan2_op(a.y, b.y), atan2_op(a.z, b.z), atan2_op(a.w, b.w) }; }
 
-static inline float abs_op(float a) { return abs(a); }
-static inline vector_float2 abs_op(vector_float2 a) { return vector_float2 { abs(a.x), abs(a.y) }; }
-static inline vector_float3 abs_op(vector_float3 a) { return vector_float3 { abs(a.x), abs(a.y), abs(a.z) }; }
-static inline vector_float4 abs_op(vector_float4 a) { return vector_float4 { abs(a.x), abs(a.y), abs(a.z), abs(a.w) }; }
+template<typename T> static inline T abs_op(T a) { return abs(a); }
+template<typename T> static inline T sign_op(T a) { return sign(a); }
 
 static inline float modulo_op(int a, int b) { return (a % b); }
 static inline float modulo_op(float a, float b) { return modf(a, b); }
@@ -207,6 +205,7 @@ template<bool useAlpha, typename T> static inline T lerp_mix(T rhs, T lhs, float
 
 template<bool useAlpha, typename T> static inline T blend_mix(T rhs, float t) { return rhs * t; }
 template<bool useAlpha, typename T> static inline T blend_mix(T rhs, T lhs, float t) { return mix(rhs, lhs, t); }
+template<> inline vector_float4  blend_mix<true, vector_float4>(vector_float4 rhs, float t) { rhs.a *= t; return rhs; }
 template<> inline vector_float4 blend_mix<true, vector_float4>(vector_float4 rhs, vector_float4 lhs, float t) {
   if (t < 0.5f) {
     float a = lhs.a * t * 2.0f;

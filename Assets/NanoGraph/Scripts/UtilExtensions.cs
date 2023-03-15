@@ -6,6 +6,20 @@ using UnityEngine;
 
 namespace NanoGraph {
   internal static class UtilExtensions {
+    public static T? ElementAtOrNull<T>(this IReadOnlyList<T> self, int index) where T : struct {
+      if (index < 0 || index >= self.Count) {
+        return null;
+      }
+      return self[index];
+    }
+
+    public static T? FirstOrNull<T>(this IEnumerable<T> self) where T : struct {
+      foreach (T value in self) {
+        return value;
+      }
+      return null;
+    }
+
     public static T? FirstOrNull<T>(this IEnumerable<T> self, Predicate<T> predicate) where T : struct {
       foreach (T value in self) {
         if (predicate.Invoke(value)) {

@@ -679,6 +679,7 @@ namespace NanoGraph {
 
   public enum PackableType {
     Custom,
+    Float,
     Float2,
     Float3,
     Float4,
@@ -690,6 +691,14 @@ namespace NanoGraph {
     public IReadOnlyList<TypeField> Fields { get; private set; }
 
     private static readonly IReadOnlyDictionary<PackableType, PackableTypeInfo> _types = new Dictionary<PackableType, PackableTypeInfo> {
+      {
+        PackableType.Float,
+        new PackableTypeInfo {
+          Type = PackableType.Float,
+          Primitive = PrimitiveType.Float,
+          Fields = null,
+        }
+      },
       {
         PackableType.Float2,
         new PackableTypeInfo {
@@ -751,9 +760,6 @@ namespace NanoGraph {
     public TypeDeclMode TypeDeclMode = TypeDeclMode.External;
     public TypeDecl InternalType;
 
-    public IReadOnlyList<DataEdge> Inputs;
-    public IReadOnlyList<DataEdge> Outputs;
-
     void IAutoTypeNode.UpdateTypesFromInputs() {
       IsArray = false;
       foreach (var edge in Graph.GetInputEdges(this)) {
@@ -792,9 +798,21 @@ namespace NanoGraph {
       get {
         PackableTypeInfo packableTypeInfo = PackableTypeInfo.GetTypeInfo(Type);
         if (packableTypeInfo != null) {
-          return packableTypeInfo.Fields;
+          return packableTypeInfo.Fields ?? new[] { TypeField.MakePrimitive("In", packableTypeInfo.Primitive) };
         }
         return CustomPackToTypeElement.Fields;
+      }
+    }
+
+    public PrimitiveType? PackToScalarValueType {
+      get {
+        PackableTypeInfo packableTypeInfo = PackableTypeInfo.GetTypeInfo(Type);
+        if (packableTypeInfo != null) {
+          if (packableTypeInfo.Fields == null) {
+            return packableTypeInfo.Primitive;
+          }
+        }
+        return null;
       }
     }
 
@@ -816,6 +834,8 @@ namespace NanoGraph {
       List<string> initializerParts = new List<string>();
       var resultType = context.Function.Program.GetProgramType(PackToType, this.ToString());
       var fields = PackFromFields;
+      PrimitiveType? packToScalarValueType = PackToScalarValueType;
+      bool isPackToScalarValue = packToScalarValueType != null;
       if (IsArray) {
         string outputLocalIdentifier = context.OutputLocals[0].Identifier;
         var elementType = context.Function.Program.GetProgramType(PackToTypeElement, this.ToString());
@@ -825,26 +845,43 @@ namespace NanoGraph {
 
         context.Function.AddStatement($"{context.Function.GetTypeIdentifier(resultType)} {outputLocalIdentifier}(NanoTypedBuffer<{context.Function.GetTypeIdentifier(elementType)}>::Allocate({inputLengthLocal}));");
         string indexLocal = context.Function.AllocLocal("Index");
+
         context.Function.AddStatement($"for ({NanoProgram.IntIdentifier} {indexLocal} = 0; {indexLocal} < {inputLengthLocal}; ++{indexLocal}) {{");
-        for (int i = 0; i < fields.Count; ++i) {
-          var field = fields[i];
-          string fieldAssignment = elementType.IsBuiltIn ? "" : $".{elementType.GetField(field.Name)} = ";
-          string inputExpr = context.Function.Context.EmitSampleBuffer(context.InputLocals[i].Identifier, indexLocal);
-          initializerParts.Add($"{fieldAssignment}({context.Function.EmitConvert(context.InputLocals[i].Type, field.Type, inputExpr)}),");
+        if (isPackToScalarValue) {
+        } else {
+          string constructElementExpr;
+          if (isPackToScalarValue) {
+            string inputExpr = context.Function.Context.EmitSampleBuffer(context.InputLocals[0].Identifier, indexLocal);
+            constructElementExpr = context.Function.EmitConvert(context.InputLocals[0].Type, TypeSpec.MakePrimitive(packToScalarValueType.Value), inputExpr);
+          } else {
+            for (int i = 0; i < fields.Count; ++i) {
+              var field = fields[i];
+              string fieldAssignment = elementType.IsBuiltIn ? "" : $".{elementType.GetField(field.Name)} = ";
+              string inputExpr = context.Function.Context.EmitSampleBuffer(context.InputLocals[i].Identifier, indexLocal);
+              initializerParts.Add($"{fieldAssignment}({context.Function.EmitConvert(context.InputLocals[i].Type, field.Type, inputExpr)}),");
+            }
+            string initializerStr = string.Join("\n", initializerParts);
+            constructElementExpr = $"{context.Function.GetTypeIdentifier(elementType)} {{ {initializerStr} }}";
+          }
+          context.Function.AddStatement($"  {context.Function.Context.EmitWriteBuffer(outputLocalIdentifier, indexLocal, constructElementExpr)};");;
         }
-        string initializerStr = string.Join("\n", initializerParts);
-        string constructElementExpr = $"{context.Function.GetTypeIdentifier(elementType)} {{ {initializerStr} }}";
-        context.Function.AddStatement($"  {context.Function.Context.EmitWriteBuffer(outputLocalIdentifier, indexLocal, constructElementExpr)};");;
         context.Function.AddStatement($"}}");
       } else {
-        for (int i = 0; i < fields.Count; ++i) {
-          var field = fields[i];
-          string fieldAssignment = resultType.IsBuiltIn ? "" : $".{resultType.GetField(field.Name)} = ";
-          string inputIdentifier = context.InputLocals[i].Identifier;
-          initializerParts.Add($"{fieldAssignment}({context.Function.EmitConvert(context.InputLocals[i].Type, field.Type, inputIdentifier)}),");
+        string constructElementExpr;
+        if (isPackToScalarValue) {
+          string inputExpr = context.InputLocals[0].Identifier;
+          constructElementExpr = context.Function.EmitConvert(context.InputLocals[0].Type, TypeSpec.MakePrimitive(packToScalarValueType.Value), inputExpr);
+        } else {
+          for (int i = 0; i < fields.Count; ++i) {
+            var field = fields[i];
+            string fieldAssignment = resultType.IsBuiltIn ? "" : $".{resultType.GetField(field.Name)} = ";
+            string inputIdentifier = context.InputLocals[i].Identifier;
+            initializerParts.Add($"{fieldAssignment}({context.Function.EmitConvert(context.InputLocals[i].Type, field.Type, inputIdentifier)}),");
+          }
+          string initializerStr = string.Join("\n", initializerParts);
+          constructElementExpr = $"{{ {initializerStr} }}";
         }
-        string initializerStr = string.Join("\n", initializerParts);
-        context.Function.AddStatement($"{context.Function.GetTypeIdentifier(resultType)} {context.OutputLocals[0].Identifier} = {{ {initializerStr} }};");
+        context.Function.AddStatement($"{context.Function.GetTypeIdentifier(resultType)} {context.OutputLocals[0].Identifier} = {constructElementExpr};");
       }
     }
   }
@@ -852,9 +889,6 @@ namespace NanoGraph {
   public class UnpackNode : DataNode, ICodeNode, IAutoTypeNode {
     public TypeDeclMode TypeDeclMode = TypeDeclMode.External;
     public TypeSpec InternalType;
-
-    public IReadOnlyList<DataEdge> Inputs;
-    public IReadOnlyList<DataEdge> Outputs;
 
     public override DataSpec InputSpec => DataSpec.FromFields(DataField.MakeType("In", PackToType));
     public override DataSpec OutputSpec => DataSpec.FromTypeFields(PackToTypeFields.ToArray());
@@ -908,7 +942,7 @@ namespace NanoGraph {
               PrimitiveType primitiveType = field.Value.Primitive.Value;
               PackableTypeInfo packableTypeInfo = PackableTypeInfo.GetTypeInfo(primitiveType);
               if (packableTypeInfo != null) {
-                return packableTypeInfo.Fields;
+                return packableTypeInfo.Fields ?? new[] { TypeField.MakePrimitive("Out", packableTypeInfo.Primitive) };
               }
             }
             if (field == null || field.Value.Type == null) {
@@ -920,12 +954,36 @@ namespace NanoGraph {
       }
     }
 
+    public PrimitiveType? PackToScalarValueType {
+      get {
+        switch (TypeDeclMode) {
+          case TypeDeclMode.Internal:
+          default:
+            return null;
+          case TypeDeclMode.External: {
+            TypeSpec? field = Graph.GetEdgeToDestinationOrNull(new DataPlug { Node = this, FieldName = "In" })?.SourceFieldOrNull?.Type;
+            if (field?.Primitive != null) {
+              PrimitiveType primitiveType = field.Value.Primitive.Value;
+              PackableTypeInfo packableTypeInfo = PackableTypeInfo.GetTypeInfo(primitiveType);
+              if (packableTypeInfo != null) {
+                if (packableTypeInfo.Fields == null) {
+                  return packableTypeInfo.Primitive;
+                }
+              }
+            }
+            return null;
+          }
+        }
+      }
+    }
+
     public void EmitCode(CodeContext context) {
       CodeLocal inputLocal = context.InputLocals[0];
       NanoProgramType inputType = context.Function.Program.GetProgramType(inputLocal.Type);
       TypeSpec type = PackToType;
       IReadOnlyList<TypeField> typeFields = PackToTypeFieldsElementTypes;
       bool isArray = type.IsArray;
+      bool isPackToScalarValue = PackToScalarValueType != null;
       if (isArray) {
         string inputLengthLocal = context.Function.AllocLocal("Length");
         context.Function.AddStatement($"{NanoProgram.IntIdentifier} {inputLengthLocal} = GetLength({inputLocal.Identifier});");
@@ -940,20 +998,150 @@ namespace NanoGraph {
         string indexLocal = context.Function.AllocLocal("Index");
         context.Function.AddStatement($"for ({NanoProgram.IntIdentifier} {indexLocal} = 0; {indexLocal} < {inputLengthLocal}; ++{indexLocal}) {{");
         foreach (var field in typeFields) {
+          string inputElementExpr = context.Function.Context.EmitSampleBuffer(inputLocal.Identifier, indexLocal);
+          string fieldInputExpr;
+          if (isPackToScalarValue) {
+            fieldInputExpr = inputElementExpr;
+          } else {
+            string inputField = inputType.ElementType.IsBuiltIn ? field.Name : inputType.GetField(field.Name);
+            fieldInputExpr = $"{inputElementExpr}.{inputField}";
+          }
           CodeLocal outputLocal = context.OutputLocals[index++];
-          string inputField = inputType.ElementType.IsBuiltIn ? field.Name : inputType.GetField(field.Name);
-          string inputExpr = $"{context.Function.Context.EmitSampleBuffer(inputLocal.Identifier, indexLocal)}.{inputField}";
-          context.Function.AddStatement($"  {context.Function.Context.EmitWriteBuffer(outputLocal.Identifier, indexLocal, inputExpr)};");
+          context.Function.AddStatement($"  {context.Function.Context.EmitWriteBuffer(outputLocal.Identifier, indexLocal, fieldInputExpr)};");
         }
         context.Function.AddStatement($"}}");
       } else {
         int index = 0;
         foreach (var field in typeFields) {
+          string fieldInputExpr;
+          if (isPackToScalarValue) {
+            fieldInputExpr = inputLocal.Identifier;
+          } else {
+            string inputField = inputType.IsBuiltIn ? field.Name : inputType.GetField(field.Name);
+            fieldInputExpr = $"{inputLocal.Identifier}.{inputField}";
+          }
           CodeLocal outputLocal = context.OutputLocals[index++];
           string outputTypeIdentifier = context.Function.GetTypeIdentifier(field.Type);
-          string inputField = inputType.IsBuiltIn ? field.Name : inputType.GetField(field.Name);
-          context.Function.AddStatement($"{outputTypeIdentifier} {outputLocal.Identifier} = {inputLocal.Identifier}.{inputField};");
+          context.Function.AddStatement($"{outputTypeIdentifier} {outputLocal.Identifier} = {fieldInputExpr};");
         }
+      }
+    }
+  }
+
+  public class RepackNode : DataNode, ICodeNode {
+    [EditableAttribute]
+    public TypeDeclBuilder Fields = new TypeDeclBuilder { Fields = { TypeDeclBuilderField.Make("0", PrimitiveType.Float3), TypeDeclBuilderField.Make("1", PrimitiveType.Float) } };
+
+    [EditableAttribute]
+    public bool AutoOutType = true;
+
+    [EditableAttribute]
+    public TypeDeclBuilder OutFields = new TypeDeclBuilder { Fields = { TypeDeclBuilderField.Make("Out", PrimitiveType.Float4) } };
+
+    public override DataSpec InputSpec => DataSpec.FromTypeFields(Fields.AsTypeFields());
+    public override DataSpec OutputSpec => AutoOutType ? DataSpec.FromFields(DataField.MakePrimitive("Out", AutoPackOutType.Primitive)) : DataSpec.FromTypeFields(OutFields.AsTypeFields());
+
+    public PackableTypeInfo[] PackableTypes {
+      get {
+        List<PackableTypeInfo> result = new List<PackableTypeInfo>();
+        foreach (var field in Fields.Fields) {
+          switch (field.Primitive) {
+            case PrimitiveType.Float:
+              result.Add(PackableTypeInfo.GetTypeInfo(PackableType.Float));
+              break;
+            case PrimitiveType.Float2:
+              result.Add(PackableTypeInfo.GetTypeInfo(PackableType.Float2));
+              break;
+            case PrimitiveType.Float3:
+              result.Add(PackableTypeInfo.GetTypeInfo(PackableType.Float3));
+              break;
+            case PrimitiveType.Float4:
+              result.Add(PackableTypeInfo.GetTypeInfo(PackableType.Float4));
+              break;
+          }
+        }
+        return result.ToArray();
+      }
+    }
+
+    public PackableTypeInfo[] OutPackableTypes {
+      get {
+        if (AutoOutType) {
+          return new[] { AutoPackOutType };
+        }
+        List<PackableTypeInfo> result = new List<PackableTypeInfo>();
+        foreach (var field in OutFields.Fields) {
+          switch (field.Primitive) {
+            case PrimitiveType.Float:
+              result.Add(PackableTypeInfo.GetTypeInfo(PackableType.Float));
+              break;
+            case PrimitiveType.Float2:
+              result.Add(PackableTypeInfo.GetTypeInfo(PackableType.Float2));
+              break;
+            case PrimitiveType.Float3:
+              result.Add(PackableTypeInfo.GetTypeInfo(PackableType.Float3));
+              break;
+            case PrimitiveType.Float4:
+              result.Add(PackableTypeInfo.GetTypeInfo(PackableType.Float4));
+              break;
+          }
+        }
+        return result.ToArray();
+      }
+    }
+
+    private PackableTypeInfo AutoPackOutType {
+      get {
+        int elementLength = PackableTypes.Sum(info => info.Fields?.Count ?? 1);
+        switch (elementLength) {
+          case 0:
+          case 1:
+            return PackableTypeInfo.GetTypeInfo(PackableType.Float);
+          case 2:
+            return PackableTypeInfo.GetTypeInfo(PackableType.Float2);
+          case 3:
+            return PackableTypeInfo.GetTypeInfo(PackableType.Float3);
+          default:
+          case 4:
+            return PackableTypeInfo.GetTypeInfo(PackableType.Float4);
+        }
+      }
+    }
+
+    public void EmitCode(CodeContext context) {
+      int inputFieldIndex = 0;
+      var inputExprs = new List<(string expr, TypeSpec fromType)>();
+      foreach (var inputInfo in PackableTypes) {
+        var inputLocal = context.InputLocals[inputFieldIndex];
+        if (inputInfo.Fields == null) {
+          inputExprs.Add((inputLocal.Identifier, inputLocal.Type));
+        } else {
+          foreach (var field in inputInfo.Fields) {
+            inputExprs.Add(($"{inputLocal.Identifier}.{field.Name}", field.Type));
+          }
+        }
+        inputFieldIndex++;
+      }
+
+      int nextInputFieldIndex = 0;
+      var outPackableTypes = OutPackableTypes;
+      for (int outputFieldIndex = 0; outputFieldIndex < outPackableTypes.Length; ++outputFieldIndex) {
+        PackableTypeInfo outputTypeInfo = outPackableTypes[outputFieldIndex];
+        string constructElementExpr;
+        if (outputTypeInfo.Fields == null) {
+          var input = inputExprs.ElementAtOrNull(nextInputFieldIndex++) ?? ("0", TypeSpec.MakePrimitive(PrimitiveType.Int));
+          constructElementExpr = context.Function.EmitConvert(input.fromType, TypeSpec.MakePrimitive(outputTypeInfo.Primitive), input.expr);
+        } else {
+          List<string> initializerParts = new List<string>();
+          foreach (var outputField in outputTypeInfo.Fields) {
+            var input = inputExprs.ElementAtOrNull(nextInputFieldIndex++) ?? ("0", TypeSpec.MakePrimitive(PrimitiveType.Int));
+            var elementExpr = context.Function.EmitConvert(input.fromType, outputField.Type, input.expr);
+            initializerParts.Add($"{elementExpr},");
+          }
+          string initializerStr = string.Join("\n", initializerParts);
+          constructElementExpr = $"{{ {initializerStr} }}";
+        }
+        context.Function.AddStatement($"{context.Function.GetTypeIdentifier(outputTypeInfo.Primitive)} {context.OutputLocals[outputFieldIndex].Identifier} = {constructElementExpr};");
       }
     }
   }

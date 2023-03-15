@@ -722,6 +722,8 @@ namespace NanoGraph.VisualScripting {
   [Alias(typeof(PackAliasProvider))]
   public class Pack : NodeOfType<PackNode>{}
   public class Unpack : NodeOfType<UnpackNode>{}
+  [Alias(typeof(RepackAliasProvider))]
+  public class Repack : NodeOfType<RepackNode>{}
   public class Switch : NodeOfType<SwitchNode>{}
   [Alias(typeof(LiteralAliasProvider))]
   public class Literal : NodeOfType<LiteralNode>{}
@@ -846,6 +848,48 @@ namespace NanoGraph.VisualScripting {
         }
         yield return (name, null, unit => ((unit as NodeBasedNode).Node as PackNode).Type = value);
       }
+    }
+  }
+
+  public class RepackAliasProvider : IAliasProvider {
+    public IEnumerable<string> GetAliases() => null;
+    public IEnumerable<(string label, string[] aliases, Action<IUnit> configurer)> GetAlternatives() {
+      void SetBinaryType(IUnit unit, PrimitiveType a, PrimitiveType b) {
+        RepackNode node = ((unit as NodeBasedNode).Node as RepackNode);
+        node.Fields = new TypeDeclBuilder { Fields = { TypeDeclBuilderField.Make("0", a), TypeDeclBuilderField.Make("1", b) } };
+      }
+      void SetTrinaryType(IUnit unit, PrimitiveType a, PrimitiveType b, PrimitiveType c) {
+        RepackNode node = ((unit as NodeBasedNode).Node as RepackNode);
+        node.Fields = new TypeDeclBuilder { Fields = { TypeDeclBuilderField.Make("0", a), TypeDeclBuilderField.Make("1", b), TypeDeclBuilderField.Make("2", c) } };
+      }
+      void SetOutputBinaryType(IUnit unit, PrimitiveType input, PrimitiveType a, PrimitiveType b) {
+        RepackNode node = ((unit as NodeBasedNode).Node as RepackNode);
+        node.AutoOutType = false;
+        node.Fields = new TypeDeclBuilder { Fields = { TypeDeclBuilderField.Make("0", input) } };
+        node.OutFields = new TypeDeclBuilder { Fields = { TypeDeclBuilderField.Make("0", a), TypeDeclBuilderField.Make("1", b) } };
+      }
+      void SetOutputTrinaryType(IUnit unit, PrimitiveType input, PrimitiveType a, PrimitiveType b, PrimitiveType c) {
+        RepackNode node = ((unit as NodeBasedNode).Node as RepackNode);
+        node.AutoOutType = false;
+        node.Fields = new TypeDeclBuilder { Fields = { TypeDeclBuilderField.Make("0", input) } };
+        node.OutFields = new TypeDeclBuilder { Fields = { TypeDeclBuilderField.Make("0", a), TypeDeclBuilderField.Make("1", b), TypeDeclBuilderField.Make("2", c) } };
+      }
+      yield return ("Repack 2-1", null, unit => SetBinaryType(unit, PrimitiveType.Float2, PrimitiveType.Float));
+      yield return ("Repack 1-2", null, unit => SetBinaryType(unit, PrimitiveType.Float, PrimitiveType.Float2));
+      yield return ("Repack 3-1", null, unit => SetBinaryType(unit, PrimitiveType.Float3, PrimitiveType.Float));
+      yield return ("Repack 2-2", null, unit => SetBinaryType(unit, PrimitiveType.Float2, PrimitiveType.Float2));
+      yield return ("Repack 1-3", null, unit => SetBinaryType(unit, PrimitiveType.Float, PrimitiveType.Float3));
+      yield return ("Repack 2-1-1", null, unit => SetTrinaryType(unit, PrimitiveType.Float2, PrimitiveType.Float, PrimitiveType.Float));
+      yield return ("Repack 1-2-1", null, unit => SetTrinaryType(unit, PrimitiveType.Float, PrimitiveType.Float2, PrimitiveType.Float));
+      yield return ("Repack 1-1-2", null, unit => SetTrinaryType(unit, PrimitiveType.Float, PrimitiveType.Float, PrimitiveType.Float2));
+      yield return ("Repack 3=>2-1", null, unit => SetOutputBinaryType(unit, PrimitiveType.Float3, PrimitiveType.Float2, PrimitiveType.Float));
+      yield return ("Repack 3=>1-2", null, unit => SetOutputBinaryType(unit, PrimitiveType.Float3, PrimitiveType.Float, PrimitiveType.Float2));
+      yield return ("Repack 3=>3-1", null, unit => SetOutputBinaryType(unit, PrimitiveType.Float3, PrimitiveType.Float3, PrimitiveType.Float));
+      yield return ("Repack 4=>2-2", null, unit => SetOutputBinaryType(unit, PrimitiveType.Float4, PrimitiveType.Float2, PrimitiveType.Float2));
+      yield return ("Repack 4=>1-3", null, unit => SetOutputBinaryType(unit, PrimitiveType.Float4, PrimitiveType.Float, PrimitiveType.Float3));
+      yield return ("Repack 4=>2-1-1", null, unit => SetOutputTrinaryType(unit, PrimitiveType.Float4, PrimitiveType.Float2, PrimitiveType.Float, PrimitiveType.Float));
+      yield return ("Repack 4=>1-2-1", null, unit => SetOutputTrinaryType(unit, PrimitiveType.Float4, PrimitiveType.Float, PrimitiveType.Float2, PrimitiveType.Float));
+      yield return ("Repack 4=>1-1-2", null, unit => SetOutputTrinaryType(unit, PrimitiveType.Float4, PrimitiveType.Float, PrimitiveType.Float, PrimitiveType.Float2));
     }
   }
 

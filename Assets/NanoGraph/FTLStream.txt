@@ -1,0 +1,114 @@
+
+
+// constexpr float MotionSpeed = 0.01;
+// constexpr float BoundarySize = 0.7;
+// constexpr float BoundaryShape = 50.0;
+// constexpr float BoundaryStiffness = 100.0;
+// constexpr float BoundarySpeed = 0.1;
+// constexpr float BoundaryMaxInfluence = 0.99;
+// constexpr float Momentum = 0.5;
+// constexpr float IntegrationSpeed = 0.015;
+// constexpr float SpawnRadius = 0.75;
+// constexpr float SpawnDistance = 2.0;
+// constexpr float SpawnYaw = 0.2;
+// constexpr float SpawnPitch = 0.05;
+
+constexpr float Pi = 3.1415926535897932384626433832795;
+
+auto outPosition = output0;
+auto outTime = output1;
+auto outIndex = output2;
+auto outInitPos = output3;
+auto outInitDir = output4;
+
+float speedScale = MotionSpeed * 3.0;
+
+float time = SampleBuffer(outTime, gid);
+time -= MotionSpeed * IntegrationSpeed / 0.02;
+
+
+float3 flowDir = float3(1, 0, 0);
+
+float3 sampleBasisX = float3(ViewX.x, ViewY.x, ViewZ.x);
+float3 sampleBasisY = float3(ViewX.y, ViewY.y, ViewZ.y);
+float3 sampleBasisZ = float3(ViewX.z, ViewY.z, ViewZ.z);
+
+int index = SampleBuffer(outIndex, gid);
+float3 pos;
+float3 dir;
+if (time <= 0.0) {
+  float4 pInitValue = prandom[gid];
+  float4 pRandomValue = prandom[(index + gid) & 0xFFFFF];
+  time = index == 0 ? pInitValue.x : saturate(time - floor(time));
+  index = (index + gid) * 22695477 + 1;
+  WriteBuffer(outIndex, gid, index);
+
+  float spawnAngle = pRandomValue.x;
+  float spawnDistance = pRandomValue.y;
+  float spawnForward = (-pRandomValue.z) * 0.8 * speedScale;
+  float spawnAngleRad = spawnAngle * Pi * 2.0;
+  float spawnAngleCos = cos(spawnAngleRad);
+  float spawnAngleSin = sin(spawnAngleRad);
+  float3 spawnNormal = float3(0, 1, 0) * spawnAngleCos + float3(0, 0, 1) * spawnAngleSin;
+  float3 spawnOffset = spawnNormal * sqrt(spawnDistance) * SpawnRadius + flowDir * spawnForward;
+
+  dir = flowDir;
+  pos = (dir * -SpawnDistance) + spawnOffset;
+} else {
+  pos = SampleBuffer(outInitPos, gid);
+  dir = SampleBuffer(outInitDir, gid);
+}
+WriteBuffer(outTime, gid, saturate(time));
+
+
+
+float4 pvalue = prandom[(index + gid) & 0xFFFFF];
+
+
+float3 writePos = pos;
+float3 writeDir = dir;
+
+
+constexpr int SegmentCount = 128;
+float rawStepIndex = SegmentCount * speedScale;
+int coarseStepIndex = max(0, min((int)floor(rawStepIndex), SegmentCount - 1));
+float fineStepIndex = saturate(rawStepIndex - coarseStepIndex);
+for (int i = 0; i < SegmentCount; ++i) {
+  float3 samplePos = pos.x * ViewX + pos.y * ViewY + pos.z * ViewZ;
+  float2 uv = samplePos.xy * 0.5 + 0.5;
+  uv -= 0.5;
+  uv.x *= AspectRatio;
+  uv.y = -uv.y;
+  uv += 0.5;
+  float4 sampleColor = SampleTexture<filter::linear, address::clamp_to_zero>(InputTexture, uv);
+  float sampleValue = max(sampleColor.r, max(sampleColor.g, sampleColor.b));
+  float sampleIntensity = atan(sampleValue * 200) / Pi * 2.0;
+
+  float sphericalSignedDist = BoundarySize - length(pos);
+  sphericalSignedDist *= mix(1.0, sampleIntensity, ImageInfluence);
+
+  float3 sphericalNormal = normalize(pos);
+  float influence = 1.0 - (abs(atan(sphericalSignedDist * BoundaryShape)) / Pi * 2.0);
+  influence = max(0.0, influence - (1.0 - BoundaryMaxInfluence));
+  float3 grad = -abs(atan(sphericalSignedDist * BoundaryStiffness)) * -(BoundarySpeed * BoundaryShape) * sphericalNormal * -dot(dir, sphericalNormal) * mix(1.0, sampleIntensity, ImageInfluence);
+  dir = mix(mix(flowDir, grad, influence), dir, Momentum);
+  dir = normalize(dir);
+
+  float3 nextPos = pos + dir * IntegrationSpeed;
+  float3 v1 = pos;
+  float3 v2 = nextPos;
+  WriteBuffer(outPosition, (gid * SegmentCount + i) * 2 + 0, float4(v1.xyz, 1));
+  WriteBuffer(outPosition, (gid * SegmentCount + i) * 2 + 1, float4(v2.xyz, 1));
+
+  if (i == coarseStepIndex) {
+    writePos = mix(pos, nextPos, fineStepIndex);
+    writeDir = dir;
+  }
+  pos = nextPos;
+}
+
+
+WriteBuffer(outInitPos, gid, writePos);
+WriteBuffer(outInitDir, gid, writeDir);
+
+

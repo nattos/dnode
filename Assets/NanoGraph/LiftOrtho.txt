@@ -1,0 +1,79 @@
+
+
+// constexpr float StepSpeed = 0.01;
+// constexpr float AnimSquash = 2.0;
+// constexpr float AlphaSquash = 100.0;
+// constexpr float ZAnimContrib = 0.5;
+// constexpr float ZShapeContrib = 0.5;
+// constexpr float SizeAnimContrib = 0.5;
+// constexpr float SizeZContrib = 0.5;
+// constexpr float AspectRatio = 9.0 / 16.0;
+
+constexpr float Pi = 3.1415926535897932384626433832795;
+
+float2 squashFactor = float2(1.0 * AspectRatio, 1.0);
+
+auto outPosition = output0;
+auto outTime = output1;
+auto outIndex = output2;
+
+float time = SampleBuffer(outTime, gid);
+time -= StepSpeed;
+
+
+int index = SampleBuffer(outIndex, gid);
+if (time <= 0.0) {
+  time = index == 0 ? prandom[gid].x : saturate(time - floor(time));
+  index = (index + gid) * 22695477 + 1;
+  WriteBuffer(outIndex, gid, index);
+}
+WriteBuffer(outTime, gid, saturate(time));
+
+
+
+float4 pvalue = prandom[(index + gid) & 0xFFFFF];
+Position = pvalue.xy;
+float angle = (Angle + (pvalue.z - 0.5) * AngleRandContrib) * Pi * 2;
+Direction = float2(cos(angle), sin(angle));
+
+float2 centeredPos = Position - 0.5;
+centeredPos.y *= AspectRatio;
+centeredPos.x *= 1.0 + SphericalAspect * 4;
+centeredPos.y *= 1.0 - SphericalAspect * 4;
+float shapePos = magnitude_op(centeredPos * SphericalScale) + SphericalPhase;
+float shapeCos = cos(shapePos * Pi);
+float zRangeMin = mix(0.0, 0.5 - shapeCos * 0.5, ZShapeContrib);
+float zRangeMax = mix(0.5, 0.5 + shapeCos * 0.5, ZShapeContrib);
+
+float animT = time * 2.0 - 1.0;
+animT = 1.0 - pow(animT * animT, AnimSquash);
+float zT = mix(1.0, animT, ZAnimContrib);
+float posZ = mix(zRangeMin, zRangeMax, pvalue.z) * zT;
+
+float scale = Size * 0.1 * mix(1.0, animT, SizeAnimContrib) * mix(1.0, zT, SizeZContrib);
+float alpha = atan(animT * AlphaSquash) / Pi * 2;
+
+float2 dir = Direction;
+float2 fanAnchorPos = dir;
+dir = float2(dir.x * AngleStep.x - dir.y * AngleStep.y, dir.x * AngleStep.y + dir.y * AngleStep.x);
+for (int i = 0; i < StepCount; ++i) {
+  float2 nextDir = float2(dir.x * AngleStep.x - dir.y * AngleStep.y, dir.x * AngleStep.y + dir.y * AngleStep.x);
+  float2 v1 = fanAnchorPos;
+  float2 v2 = dir;
+  float2 v3 = nextDir;
+  v1 *= squashFactor;
+  v2 *= squashFactor;
+  v3 *= squashFactor;
+  float2 pos1 = (Position + v1 * scale) * 2.0 - 1.0;
+  float2 pos2 = (Position + v2 * scale) * 2.0 - 1.0;
+  float2 pos3 = (Position + v3 * scale) * 2.0 - 1.0;
+  WriteBuffer(outPosition, (gid * 3 * StepCount) + (i * 3) + 0, float4(pos1, posZ, alpha));
+  WriteBuffer(outPosition, (gid * 3 * StepCount) + (i * 3) + 1, float4(pos2, posZ, alpha));
+  WriteBuffer(outPosition, (gid * 3 * StepCount) + (i * 3) + 2, float4(pos3, posZ, alpha));
+  dir = nextDir;
+}
+
+
+placeholder = float2(time, index);
+
+

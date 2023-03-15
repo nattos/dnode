@@ -61,9 +61,9 @@ float2 colorGradR = float2(rawColorGradX.r, rawColorGradY.r);
 float2 colorGradB = float2(rawColorGradX.b, rawColorGradY.b);
 float2 colorGradG = float2(rawColorGradX.g, rawColorGradY.g);
 
-colorGradR = mix(colorGradR, colorGradR / atan((length(colorGradR) + ColorGradSoft) * ColorGradSquash) / Pi / 2, ColorGradMix);
-colorGradG = mix(colorGradG, colorGradG / atan((length(colorGradG) + ColorGradSoft) * ColorGradSquash) / Pi / 2, ColorGradMix);
-colorGradB = mix(colorGradB, colorGradB / atan((length(colorGradB) + ColorGradSoft) * ColorGradSquash) / Pi / 2, ColorGradMix);
+colorGradR = colorGradR / atan((length(colorGradR) + ColorGradSoft) * ColorGradSquash) / Pi / 2;
+colorGradG = colorGradG / atan((length(colorGradG) + ColorGradSoft) * ColorGradSquash) / Pi / 2;
+colorGradB = colorGradB / atan((length(colorGradB) + ColorGradSoft) * ColorGradSquash) / Pi / 2;
 
 float3 colorGradX = float3(colorGradR.x, colorGradB.x, colorGradG.x);
 float3 colorGradY = float3(colorGradR.y, colorGradB.y, colorGradG.y);
