@@ -15,6 +15,78 @@
 
 #include "NanoProgram.h"
 
+
+
+
+static NSString* kGetAllBroadcastedTexturesKey = @"NanoFFGL::GetAllBroadcastedTextures";
+static NSString* kGetAllBroadcastedTexturesUserInfoInfosKey = @"Infos";
+
+static int gTextureBroadcastNextId = 0;
+
+struct TextureBroadcastInfo {
+  int Id;
+  const char* Name;
+  int Width;
+  int Height;
+  id<MTLTexture> MetalTexture;
+  GLuint GlTexture;
+};
+
+
+std::vector<TextureBroadcastInfo> GetAllBroadcastedTextures() {
+  std::vector<TextureBroadcastInfo> infos;
+  NSDictionary* userDict = @{
+    kGetAllBroadcastedTexturesUserInfoInfosKey: [NSValue valueWithPointer:&infos],
+  };
+  [[NSNotificationCenter defaultCenter] postNotificationName:kGetAllBroadcastedTexturesKey object:userDict];
+  return infos;
+}
+
+
+#include <functional>
+#include <tuple>
+
+id<NSObject> RegisterBroadcastedTexture(const char* name, std::function<std::tuple<id<MTLTexture>, GLuint>()> textureProvider) {
+  int thisId = gTextureBroadcastNextId++;
+  return [[NSNotificationCenter defaultCenter] addObserverForName:kGetAllBroadcastedTexturesKey object:nil queue:nil usingBlock:^(NSNotification * _Nonnull notification) {
+    auto entry = textureProvider();
+    id<MTLTexture> metalTexture = std::get<0>(entry);
+    int width = (int)metalTexture.width;
+    int height = (int)metalTexture.height;
+    GLuint glTexture = std::get<1>(entry);
+    TextureBroadcastInfo info = {
+      .Id = thisId,
+      .Name = name,
+      .Width = width,
+      .Height = height,
+      .MetalTexture = metalTexture,
+      .GlTexture = glTexture,
+    };
+
+    std::vector<TextureBroadcastInfo>* infos = (std::vector<TextureBroadcastInfo>*)[(NSValue*)notification.userInfo[kGetAllBroadcastedTexturesUserInfoInfosKey] pointerValue];
+    infos->push_back(info);
+  }];
+}
+
+void UnregisterBroadcastedTexture(id<NSObject> key) {
+  [[NSNotificationCenter defaultCenter] removeObserver:key];
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 namespace {
   NanoProgram* g_program = nullptr;
   

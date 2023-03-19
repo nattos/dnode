@@ -652,6 +652,7 @@ template<> void BlitOutputTextureImpl<id<MTLTexture>>(id<MTLTexture> textureOutp
 
 
 
+
 NSLock* NanoProgram::_threadMapLock = [[NSLock alloc] init];
 std::unique_ptr<std::map<NSThread*, NanoProgram*>> NanoProgram::_threadMap;
 

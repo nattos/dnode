@@ -11,6 +11,18 @@
 		0C34D381296F783E00D3C19F /* IOSurface.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0C34D380296F783E00D3C19F /* IOSurface.framework */; };
 		0C34D38F296F78E100D3C19F /* NanoProgram.mm in Sources */ = {isa = PBXBuildFile; fileRef = 0C518A36294BCB7B00E31962 /* NanoProgram.mm */; };
 		0C34D391296F790B00D3C19F /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = 0C518A2E294BCB0D00E31962 /* main.mm */; };
+		0C4E42A529C75D1F00834EE4 /* SyphonMessageQueue.m in Sources */ = {isa = PBXBuildFile; fileRef = 0C4E428729C75CCD00834EE4 /* SyphonMessageQueue.m */; };
+		0C4E42A629C75D1F00834EE4 /* SyphonServerDirectory.m in Sources */ = {isa = PBXBuildFile; fileRef = 0C4E427529C75CCD00834EE4 /* SyphonServerDirectory.m */; };
+		0C4E42A729C75D1F00834EE4 /* SyphonMessageSender.m in Sources */ = {isa = PBXBuildFile; fileRef = 0C4E427629C75CCD00834EE4 /* SyphonMessageSender.m */; };
+		0C4E42A829C75D1F00834EE4 /* SyphonClientConnectionManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 0C4E427B29C75CCD00834EE4 /* SyphonClientConnectionManager.m */; };
+		0C4E42A929C75D1F00834EE4 /* SyphonCFMessageReceiver.m in Sources */ = {isa = PBXBuildFile; fileRef = 0C4E427C29C75CCD00834EE4 /* SyphonCFMessageReceiver.m */; };
+		0C4E42AA29C75D1F00834EE4 /* SyphonMessaging.m in Sources */ = {isa = PBXBuildFile; fileRef = 0C4E427D29C75CCD00834EE4 /* SyphonMessaging.m */; };
+		0C4E42AB29C75D1F00834EE4 /* SyphonDispatch.c in Sources */ = {isa = PBXBuildFile; fileRef = 0C4E427E29C75CCD00834EE4 /* SyphonDispatch.c */; };
+		0C4E42AC29C75D1F00834EE4 /* SyphonPrivate.m in Sources */ = {isa = PBXBuildFile; fileRef = 0C4E428029C75CCD00834EE4 /* SyphonPrivate.m */; };
+		0C4E42AD29C75D1F00834EE4 /* SyphonMessageReceiver.m in Sources */ = {isa = PBXBuildFile; fileRef = 0C4E428529C75CCD00834EE4 /* SyphonMessageReceiver.m */; };
+		0C4E42AE29C75D1F00834EE4 /* SyphonCFMessageSender.m in Sources */ = {isa = PBXBuildFile; fileRef = 0C4E428C29C75CCD00834EE4 /* SyphonCFMessageSender.m */; };
+		0C4E42AF29C75D1F00834EE4 /* SyphonServerConnectionManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 0C4E427829C75CCD00834EE4 /* SyphonServerConnectionManager.m */; };
+		0C4E42B029C75D2E00834EE4 /* libSyphon.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 0C4E429C29C75CFE00834EE4 /* libSyphon.a */; };
 		0C518A2A294BCB0D00E31962 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0C518A29294BCB0D00E31962 /* Assets.xcassets */; };
 		0C5E92842972D78700DD1FEC /* libNanoFFGLLib.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 0C34D386296F78CF00D3C19F /* libNanoFFGLLib.a */; };
 		0C5E92852972D79400DD1FEC /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0CF2DE73296F9B3100E7E950 /* MetalKit.framework */; };
@@ -20,12 +32,38 @@
 		0C5E928E2972D86B00DD1FEC /* AAPLOpenGLMetalInteropTexture.m in Sources */ = {isa = PBXBuildFile; fileRef = 0C5E928D2972D86B00DD1FEC /* AAPLOpenGLMetalInteropTexture.m */; };
 		0C5E92902972D88E00DD1FEC /* CoreVideo.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0C5E928F2972D88E00DD1FEC /* CoreVideo.framework */; };
 		0C5E92922972DBE000DD1FEC /* FFGLSDK.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 0C5E92912972DBE000DD1FEC /* FFGLSDK.cpp */; };
+		0C6096E129C72A2B00EFF780 /* AAPLOpenGLMetalInteropTexture.m in Sources */ = {isa = PBXBuildFile; fileRef = 0C5E928D2972D86B00DD1FEC /* AAPLOpenGLMetalInteropTexture.m */; };
+		0C6096E229C72A2B00EFF780 /* FFGLSDK.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 0C5E92912972DBE000DD1FEC /* FFGLSDK.cpp */; };
+		0C6096E329C72A2B00EFF780 /* IOPushPlugin.mm in Sources */ = {isa = PBXBuildFile; fileRef = 0CEE60DC29C725EB00FB4D22 /* IOPushPlugin.mm */; };
+		0C6096E529C72A2B00EFF780 /* CoreVideo.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0C5E928F2972D88E00DD1FEC /* CoreVideo.framework */; };
+		0C6096E629C72A2B00EFF780 /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0C34D37E296F783100D3C19F /* Metal.framework */; };
+		0C6096E729C72A2B00EFF780 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0CF2DE73296F9B3100E7E950 /* MetalKit.framework */; };
+		0CBB555E29C73F23002C42DC /* NioStackData.mm in Sources */ = {isa = PBXBuildFile; fileRef = 0CBB555029C73E7B002C42DC /* NioStackData.mm */; };
+		0CBB556129C75C0C002C42DC /* AAPLOpenGLMetalInteropTexture.m in Sources */ = {isa = PBXBuildFile; fileRef = 0C5E928D2972D86B00DD1FEC /* AAPLOpenGLMetalInteropTexture.m */; };
+		0CBB556229C75C0C002C42DC /* FFGLSDK.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 0C5E92912972DBE000DD1FEC /* FFGLSDK.cpp */; };
+		0CBB556329C75C0C002C42DC /* IOPushPlugin.mm in Sources */ = {isa = PBXBuildFile; fileRef = 0CEE60DC29C725EB00FB4D22 /* IOPushPlugin.mm */; };
+		0CBB556529C75C0C002C42DC /* CoreVideo.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0C5E928F2972D88E00DD1FEC /* CoreVideo.framework */; };
+		0CBB556629C75C0C002C42DC /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0C34D37E296F783100D3C19F /* Metal.framework */; };
+		0CBB556729C75C0C002C42DC /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0CF2DE73296F9B3100E7E950 /* MetalKit.framework */; };
+		0CEE60CE29C725A900FB4D22 /* AAPLOpenGLMetalInteropTexture.m in Sources */ = {isa = PBXBuildFile; fileRef = 0C5E928D2972D86B00DD1FEC /* AAPLOpenGLMetalInteropTexture.m */; };
+		0CEE60CF29C725A900FB4D22 /* FFGLSDK.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 0C5E92912972DBE000DD1FEC /* FFGLSDK.cpp */; };
+		0CEE60D329C725A900FB4D22 /* CoreVideo.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0C5E928F2972D88E00DD1FEC /* CoreVideo.framework */; };
+		0CEE60D429C725A900FB4D22 /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0C34D37E296F783100D3C19F /* Metal.framework */; };
+		0CEE60D529C725A900FB4D22 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0CF2DE73296F9B3100E7E950 /* MetalKit.framework */; };
+		0CEE60DD29C725EB00FB4D22 /* IOPushPlugin.mm in Sources */ = {isa = PBXBuildFile; fileRef = 0CEE60DC29C725EB00FB4D22 /* IOPushPlugin.mm */; };
 		0CF2DE74296F9B3100E7E950 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0CF2DE73296F9B3100E7E950 /* MetalKit.framework */; };
 		0CF2DE75296F9B4E00E7E950 /* libNanoFFGLLib.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 0C34D386296F78CF00D3C19F /* libNanoFFGLLib.a */; };
 		0CF2DE7C296F9C6800E7E950 /* NanoProgram.metal in Sources */ = {isa = PBXBuildFile; fileRef = 0C518A37294BCB7B00E31962 /* NanoProgram.metal */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		0C4E42B129C75D2E00834EE4 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0C518A18294BCB0C00E31962 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 0C4E429B29C75CFE00834EE4;
+			remoteInfo = Syphon;
+		};
 		0C5E92822972D78000DD1FEC /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 0C518A18294BCB0C00E31962 /* Project object */;
@@ -48,6 +86,31 @@
 		0C34D380296F783E00D3C19F /* IOSurface.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOSurface.framework; path = System/Library/Frameworks/IOSurface.framework; sourceTree = SDKROOT; };
 		0C34D386296F78CF00D3C19F /* libNanoFFGLLib.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libNanoFFGLLib.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		0C34D392296F798D00D3C19F /* NanoProgram.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NanoProgram.h; sourceTree = "<group>"; };
+		0C4E427529C75CCD00834EE4 /* SyphonServerDirectory.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SyphonServerDirectory.m; sourceTree = "<group>"; };
+		0C4E427629C75CCD00834EE4 /* SyphonMessageSender.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SyphonMessageSender.m; sourceTree = "<group>"; };
+		0C4E427729C75CCD00834EE4 /* SyphonMessageQueue.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SyphonMessageQueue.h; sourceTree = "<group>"; };
+		0C4E427829C75CCD00834EE4 /* SyphonServerConnectionManager.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SyphonServerConnectionManager.m; sourceTree = "<group>"; };
+		0C4E427929C75CCD00834EE4 /* Syphon_Prefix.pch */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Syphon_Prefix.pch; sourceTree = "<group>"; };
+		0C4E427A29C75CCD00834EE4 /* SyphonMessageReceiver.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SyphonMessageReceiver.h; sourceTree = "<group>"; };
+		0C4E427B29C75CCD00834EE4 /* SyphonClientConnectionManager.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SyphonClientConnectionManager.m; sourceTree = "<group>"; };
+		0C4E427C29C75CCD00834EE4 /* SyphonCFMessageReceiver.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SyphonCFMessageReceiver.m; sourceTree = "<group>"; };
+		0C4E427D29C75CCD00834EE4 /* SyphonMessaging.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SyphonMessaging.m; sourceTree = "<group>"; };
+		0C4E427E29C75CCD00834EE4 /* SyphonDispatch.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = SyphonDispatch.c; sourceTree = "<group>"; };
+		0C4E427F29C75CCD00834EE4 /* SyphonCFMessageSender.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SyphonCFMessageSender.h; sourceTree = "<group>"; };
+		0C4E428029C75CCD00834EE4 /* SyphonPrivate.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SyphonPrivate.m; sourceTree = "<group>"; };
+		0C4E428129C75CCD00834EE4 /* SyphonServerDirectory.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SyphonServerDirectory.h; sourceTree = "<group>"; };
+		0C4E428229C75CCD00834EE4 /* SyphonBuildMacros.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SyphonBuildMacros.h; sourceTree = "<group>"; };
+		0C4E428329C75CCD00834EE4 /* SyphonCFMessageReceiver.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SyphonCFMessageReceiver.h; sourceTree = "<group>"; };
+		0C4E428429C75CCD00834EE4 /* SyphonClientConnectionManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SyphonClientConnectionManager.h; sourceTree = "<group>"; };
+		0C4E428529C75CCD00834EE4 /* SyphonMessageReceiver.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SyphonMessageReceiver.m; sourceTree = "<group>"; };
+		0C4E428629C75CCD00834EE4 /* SyphonServerConnectionManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SyphonServerConnectionManager.h; sourceTree = "<group>"; };
+		0C4E428729C75CCD00834EE4 /* SyphonMessageQueue.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SyphonMessageQueue.m; sourceTree = "<group>"; };
+		0C4E428829C75CCD00834EE4 /* SyphonMessageSender.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SyphonMessageSender.h; sourceTree = "<group>"; };
+		0C4E428929C75CCD00834EE4 /* SyphonMessaging.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SyphonMessaging.h; sourceTree = "<group>"; };
+		0C4E428A29C75CCD00834EE4 /* SyphonDispatch.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SyphonDispatch.h; sourceTree = "<group>"; };
+		0C4E428B29C75CCD00834EE4 /* SyphonPrivate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SyphonPrivate.h; sourceTree = "<group>"; };
+		0C4E428C29C75CCD00834EE4 /* SyphonCFMessageSender.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SyphonCFMessageSender.m; sourceTree = "<group>"; };
+		0C4E429C29C75CFE00834EE4 /* libSyphon.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libSyphon.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		0C518A20294BCB0C00E31962 /* NanoFFGL.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = NanoFFGL.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		0C518A29294BCB0D00E31962 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		0C518A2E294BCB0D00E31962 /* main.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
@@ -63,13 +126,27 @@
 		0C5E928D2972D86B00DD1FEC /* AAPLOpenGLMetalInteropTexture.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AAPLOpenGLMetalInteropTexture.m; sourceTree = "<group>"; };
 		0C5E928F2972D88E00DD1FEC /* CoreVideo.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreVideo.framework; path = System/Library/Frameworks/CoreVideo.framework; sourceTree = SDKROOT; };
 		0C5E92912972DBE000DD1FEC /* FFGLSDK.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = FFGLSDK.cpp; path = lib/FFGLSDK.cpp; sourceTree = "<group>"; };
+		0C6096EC29C72A2B00EFF780 /* IO Pop.bundle */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "IO Pop.bundle"; sourceTree = BUILT_PRODUCTS_DIR; };
 		0CA86911294DF9B60040333B /* Generated */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Generated; sourceTree = "<group>"; };
 		0CBAE510299AF500009510A5 /* Prefix.pch */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Prefix.pch; sourceTree = "<group>"; };
+		0CBB554F29C73E7B002C42DC /* NioStackData.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NioStackData.h; sourceTree = "<group>"; };
+		0CBB555029C73E7B002C42DC /* NioStackData.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = NioStackData.mm; sourceTree = "<group>"; };
+		0CBB555529C73F17002C42DC /* libNioStack.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = libNioStack.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
+		0CBB556C29C75C0C002C42DC /* IO Export.bundle */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "IO Export.bundle"; sourceTree = BUILT_PRODUCTS_DIR; };
+		0CEE60DB29C725A900FB4D22 /* IO Push.bundle */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "IO Push.bundle"; sourceTree = BUILT_PRODUCTS_DIR; };
+		0CEE60DC29C725EB00FB4D22 /* IOPushPlugin.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = IOPushPlugin.mm; sourceTree = "<group>"; };
 		0CF2DE73296F9B3100E7E950 /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		0C34D384296F78CF00D3C19F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0C4E429A29C75CFE00834EE4 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -98,6 +175,44 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		0C6096E429C72A2B00EFF780 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0C6096E529C72A2B00EFF780 /* CoreVideo.framework in Frameworks */,
+				0C6096E629C72A2B00EFF780 /* Metal.framework in Frameworks */,
+				0C6096E729C72A2B00EFF780 /* MetalKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0CBB555329C73F16002C42DC /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0CBB556429C75C0C002C42DC /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0CBB556529C75C0C002C42DC /* CoreVideo.framework in Frameworks */,
+				0CBB556629C75C0C002C42DC /* Metal.framework in Frameworks */,
+				0C4E42B029C75D2E00834EE4 /* libSyphon.a in Frameworks */,
+				0CBB556729C75C0C002C42DC /* MetalKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0CEE60D229C725A900FB4D22 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0CEE60D329C725A900FB4D22 /* CoreVideo.framework in Frameworks */,
+				0CEE60D429C725A900FB4D22 /* Metal.framework in Frameworks */,
+				0CEE60D529C725A900FB4D22 /* MetalKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -111,6 +226,38 @@
 				0C34D37C296F782100D3C19F /* Cocoa.framework */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		0C4E427429C75CCD00834EE4 /* Syphon */ = {
+			isa = PBXGroup;
+			children = (
+				0C4E427529C75CCD00834EE4 /* SyphonServerDirectory.m */,
+				0C4E427629C75CCD00834EE4 /* SyphonMessageSender.m */,
+				0C4E427729C75CCD00834EE4 /* SyphonMessageQueue.h */,
+				0C4E427829C75CCD00834EE4 /* SyphonServerConnectionManager.m */,
+				0C4E427929C75CCD00834EE4 /* Syphon_Prefix.pch */,
+				0C4E427A29C75CCD00834EE4 /* SyphonMessageReceiver.h */,
+				0C4E427B29C75CCD00834EE4 /* SyphonClientConnectionManager.m */,
+				0C4E427C29C75CCD00834EE4 /* SyphonCFMessageReceiver.m */,
+				0C4E427D29C75CCD00834EE4 /* SyphonMessaging.m */,
+				0C4E427E29C75CCD00834EE4 /* SyphonDispatch.c */,
+				0C4E427F29C75CCD00834EE4 /* SyphonCFMessageSender.h */,
+				0C4E428029C75CCD00834EE4 /* SyphonPrivate.m */,
+				0C4E428129C75CCD00834EE4 /* SyphonServerDirectory.h */,
+				0C4E428229C75CCD00834EE4 /* SyphonBuildMacros.h */,
+				0C4E428329C75CCD00834EE4 /* SyphonCFMessageReceiver.h */,
+				0C4E428429C75CCD00834EE4 /* SyphonClientConnectionManager.h */,
+				0C4E428529C75CCD00834EE4 /* SyphonMessageReceiver.m */,
+				0C4E428629C75CCD00834EE4 /* SyphonServerConnectionManager.h */,
+				0C4E428729C75CCD00834EE4 /* SyphonMessageQueue.m */,
+				0C4E428829C75CCD00834EE4 /* SyphonMessageSender.h */,
+				0C4E428929C75CCD00834EE4 /* SyphonMessaging.h */,
+				0C4E428A29C75CCD00834EE4 /* SyphonDispatch.h */,
+				0C4E428B29C75CCD00834EE4 /* SyphonPrivate.h */,
+				0C4E428C29C75CCD00834EE4 /* SyphonCFMessageSender.m */,
+			);
+			name = Syphon;
+			path = lib/Syphon;
 			sourceTree = "<group>";
 		};
 		0C518A17294BCB0C00E31962 = {
@@ -128,6 +275,11 @@
 				0C518A20294BCB0C00E31962 /* NanoFFGL.app */,
 				0C34D386296F78CF00D3C19F /* libNanoFFGLLib.a */,
 				0C5E927E2972D74900DD1FEC /* Plugin.bundle */,
+				0CEE60DB29C725A900FB4D22 /* IO Push.bundle */,
+				0C6096EC29C72A2B00EFF780 /* IO Pop.bundle */,
+				0CBB555529C73F17002C42DC /* libNioStack.dylib */,
+				0CBB556C29C75C0C002C42DC /* IO Export.bundle */,
+				0C4E429C29C75CFE00834EE4 /* libSyphon.a */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -136,6 +288,7 @@
 			isa = PBXGroup;
 			children = (
 				0CA86911294DF9B60040333B /* Generated */,
+				0C4E427429C75CCD00834EE4 /* Syphon */,
 				0C5E928C2972D86B00DD1FEC /* AAPLGLHeaders.h */,
 				0C5E928B2972D86B00DD1FEC /* AAPLOpenGLMetalInteropTexture.h */,
 				0C5E928D2972D86B00DD1FEC /* AAPLOpenGLMetalInteropTexture.m */,
@@ -146,7 +299,10 @@
 				0C518A2E294BCB0D00E31962 /* main.mm */,
 				0C518A30294BCB0D00E31962 /* NanoFFGL.entitlements */,
 				0C518A3C294BD18F00E31962 /* Base64.h */,
+				0CEE60DC29C725EB00FB4D22 /* IOPushPlugin.mm */,
 				0C518A3D294BD2CF00E31962 /* json.hpp */,
+				0CBB554F29C73E7B002C42DC /* NioStackData.h */,
+				0CBB555029C73E7B002C42DC /* NioStackData.mm */,
 				0C5E92882972D7E900DD1FEC /* Plugin.mm */,
 				0CBAE510299AF500009510A5 /* Prefix.pch */,
 				0C5E92912972DBE000DD1FEC /* FFGLSDK.cpp */,
@@ -158,6 +314,20 @@
 
 /* Begin PBXHeadersBuildPhase section */
 		0C34D382296F78CF00D3C19F /* Headers */ = {
+			isa = PBXHeadersBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0C4E429829C75CFE00834EE4 /* Headers */ = {
+			isa = PBXHeadersBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0CBB555129C73F16002C42DC /* Headers */ = {
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -182,6 +352,23 @@
 			name = NanoFFGLLib;
 			productName = NanoFFGLLib;
 			productReference = 0C34D386296F78CF00D3C19F /* libNanoFFGLLib.a */;
+			productType = "com.apple.product-type.library.static";
+		};
+		0C4E429B29C75CFE00834EE4 /* Syphon */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0C4E42A229C75CFE00834EE4 /* Build configuration list for PBXNativeTarget "Syphon" */;
+			buildPhases = (
+				0C4E429829C75CFE00834EE4 /* Headers */,
+				0C4E429929C75CFE00834EE4 /* Sources */,
+				0C4E429A29C75CFE00834EE4 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Syphon;
+			productName = Syphon;
+			productReference = 0C4E429C29C75CFE00834EE4 /* libSyphon.a */;
 			productType = "com.apple.product-type.library.static";
 		};
 		0C518A1F294BCB0C00E31962 /* NanoFFGL */ = {
@@ -220,6 +407,75 @@
 			productReference = 0C5E927E2972D74900DD1FEC /* Plugin.bundle */;
 			productType = "com.apple.product-type.bundle";
 		};
+		0C6096DF29C72A2B00EFF780 /* IO Pop */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0C6096E929C72A2B00EFF780 /* Build configuration list for PBXNativeTarget "IO Pop" */;
+			buildPhases = (
+				0C6096E029C72A2B00EFF780 /* Sources */,
+				0C6096E429C72A2B00EFF780 /* Frameworks */,
+				0C6096E829C72A2B00EFF780 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "IO Pop";
+			productName = Test;
+			productReference = 0C6096EC29C72A2B00EFF780 /* IO Pop.bundle */;
+			productType = "com.apple.product-type.bundle";
+		};
+		0CBB555429C73F16002C42DC /* NioStack */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0CBB555B29C73F17002C42DC /* Build configuration list for PBXNativeTarget "NioStack" */;
+			buildPhases = (
+				0CBB555129C73F16002C42DC /* Headers */,
+				0CBB555229C73F16002C42DC /* Sources */,
+				0CBB555329C73F16002C42DC /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = NioStack;
+			productName = NioStack;
+			productReference = 0CBB555529C73F17002C42DC /* libNioStack.dylib */;
+			productType = "com.apple.product-type.library.dynamic";
+		};
+		0CBB555F29C75C0C002C42DC /* IO Export */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0CBB556929C75C0C002C42DC /* Build configuration list for PBXNativeTarget "IO Export" */;
+			buildPhases = (
+				0CBB556029C75C0C002C42DC /* Sources */,
+				0CBB556429C75C0C002C42DC /* Frameworks */,
+				0CBB556829C75C0C002C42DC /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				0C4E42B229C75D2E00834EE4 /* PBXTargetDependency */,
+			);
+			name = "IO Export";
+			productName = Test;
+			productReference = 0CBB556C29C75C0C002C42DC /* IO Export.bundle */;
+			productType = "com.apple.product-type.bundle";
+		};
+		0CEE60CA29C725A900FB4D22 /* IO Push */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0CEE60D829C725A900FB4D22 /* Build configuration list for PBXNativeTarget "IO Push" */;
+			buildPhases = (
+				0CEE60CD29C725A900FB4D22 /* Sources */,
+				0CEE60D229C725A900FB4D22 /* Frameworks */,
+				0CEE60D729C725A900FB4D22 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "IO Push";
+			productName = Test;
+			productReference = 0CEE60DB29C725A900FB4D22 /* IO Push.bundle */;
+			productType = "com.apple.product-type.bundle";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -232,10 +488,16 @@
 					0C34D385296F78CF00D3C19F = {
 						CreatedOnToolsVersion = 13.1;
 					};
+					0C4E429B29C75CFE00834EE4 = {
+						CreatedOnToolsVersion = 14.2;
+					};
 					0C518A1F294BCB0C00E31962 = {
 						CreatedOnToolsVersion = 13.1;
 					};
 					0C5E927D2972D74900DD1FEC = {
+						CreatedOnToolsVersion = 14.2;
+					};
+					0CBB555429C73F16002C42DC = {
 						CreatedOnToolsVersion = 14.2;
 					};
 				};
@@ -256,6 +518,11 @@
 				0C518A1F294BCB0C00E31962 /* NanoFFGL */,
 				0C34D385296F78CF00D3C19F /* NanoFFGLLib */,
 				0C5E927D2972D74900DD1FEC /* Plugin */,
+				0CEE60CA29C725A900FB4D22 /* IO Push */,
+				0C6096DF29C72A2B00EFF780 /* IO Pop */,
+				0CBB555F29C75C0C002C42DC /* IO Export */,
+				0CBB555429C73F16002C42DC /* NioStack */,
+				0C4E429B29C75CFE00834EE4 /* Syphon */,
 			);
 		};
 /* End PBXProject section */
@@ -276,6 +543,27 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		0C6096E829C72A2B00EFF780 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0CBB556829C75C0C002C42DC /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0CEE60D729C725A900FB4D22 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -284,6 +572,24 @@
 			buildActionMask = 2147483647;
 			files = (
 				0C34D38F296F78E100D3C19F /* NanoProgram.mm in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0C4E429929C75CFE00834EE4 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0C4E42AD29C75D1F00834EE4 /* SyphonMessageReceiver.m in Sources */,
+				0C4E42A529C75D1F00834EE4 /* SyphonMessageQueue.m in Sources */,
+				0C4E42AE29C75D1F00834EE4 /* SyphonCFMessageSender.m in Sources */,
+				0C4E42A929C75D1F00834EE4 /* SyphonCFMessageReceiver.m in Sources */,
+				0C4E42A829C75D1F00834EE4 /* SyphonClientConnectionManager.m in Sources */,
+				0C4E42A629C75D1F00834EE4 /* SyphonServerDirectory.m in Sources */,
+				0C4E42AB29C75D1F00834EE4 /* SyphonDispatch.c in Sources */,
+				0C4E42A729C75D1F00834EE4 /* SyphonMessageSender.m in Sources */,
+				0C4E42AC29C75D1F00834EE4 /* SyphonPrivate.m in Sources */,
+				0C4E42AA29C75D1F00834EE4 /* SyphonMessaging.m in Sources */,
+				0C4E42AF29C75D1F00834EE4 /* SyphonServerConnectionManager.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -307,9 +613,52 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		0C6096E029C72A2B00EFF780 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0C6096E129C72A2B00EFF780 /* AAPLOpenGLMetalInteropTexture.m in Sources */,
+				0C6096E229C72A2B00EFF780 /* FFGLSDK.cpp in Sources */,
+				0C6096E329C72A2B00EFF780 /* IOPushPlugin.mm in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0CBB555229C73F16002C42DC /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0CBB555E29C73F23002C42DC /* NioStackData.mm in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0CBB556029C75C0C002C42DC /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0CBB556129C75C0C002C42DC /* AAPLOpenGLMetalInteropTexture.m in Sources */,
+				0CBB556229C75C0C002C42DC /* FFGLSDK.cpp in Sources */,
+				0CBB556329C75C0C002C42DC /* IOPushPlugin.mm in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0CEE60CD29C725A900FB4D22 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0CEE60CE29C725A900FB4D22 /* AAPLOpenGLMetalInteropTexture.m in Sources */,
+				0CEE60CF29C725A900FB4D22 /* FFGLSDK.cpp in Sources */,
+				0CEE60DD29C725EB00FB4D22 /* IOPushPlugin.mm in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		0C4E42B229C75D2E00834EE4 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 0C4E429B29C75CFE00834EE4 /* Syphon */;
+			targetProxy = 0C4E42B129C75D2E00834EE4 /* PBXContainerItemProxy */;
+		};
 		0C5E92832972D78000DD1FEC /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 0C34D385296F78CF00D3C19F /* NanoFFGLLib */;
@@ -344,6 +693,34 @@
 				GCC_INCREASE_PRECOMPILED_HEADER_SHARING = YES;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = NanoFFGL/Prefix.pch;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+			};
+			name = Release;
+		};
+		0C4E42A329C75CFE00834EE4 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_OBJC_ARC = NO;
+				CODE_SIGN_STYLE = Automatic;
+				EXECUTABLE_PREFIX = lib;
+				GCC_PREFIX_HEADER = NanoFFGL/lib/Syphon/Syphon_Prefix.pch;
+				MACOSX_DEPLOYMENT_TARGET = 13.1;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+			};
+			name = Debug;
+		};
+		0C4E42A429C75CFE00834EE4 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_OBJC_ARC = NO;
+				CODE_SIGN_STYLE = Automatic;
+				EXECUTABLE_PREFIX = lib;
+				GCC_PREFIX_HEADER = NanoFFGL/lib/Syphon/Syphon_Prefix.pch;
+				MACOSX_DEPLOYMENT_TARGET = 13.1;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 			};
@@ -561,6 +938,202 @@
 			};
 			name = Release;
 		};
+		0C6096EA29C72A2B00EFF780 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+					"$(PREPROCESSOR_BASE)",
+					"NIO_POP=1",
+				);
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = "\"NanoFFGL/lib/\"";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSPrincipalClass = "";
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Bundles";
+				MACOSX_DEPLOYMENT_TARGET = 13.1;
+				MARKETING_VERSION = 1.0;
+				PREPROCESSOR_BASE = "TARGET_OS_MAC=1 TARGET_MACOS=1";
+				PRODUCT_BUNDLE_IDENTIFIER = "";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				WRAPPER_EXTENSION = bundle;
+			};
+			name = Debug;
+		};
+		0C6096EB29C72A2B00EFF780 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(PREPROCESSOR_BASE)",
+					"NIO_POP=1",
+				);
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = "\"NanoFFGL/lib/\"";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSPrincipalClass = "";
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Bundles";
+				MACOSX_DEPLOYMENT_TARGET = 13.1;
+				MARKETING_VERSION = 1.0;
+				PREPROCESSOR_BASE = "TARGET_OS_MAC=1 TARGET_MACOS=1";
+				PRODUCT_BUNDLE_IDENTIFIER = "";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				WRAPPER_EXTENSION = bundle;
+			};
+			name = Release;
+		};
+		0CBB555C29C73F17002C42DC /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CODE_SIGN_STYLE = Automatic;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				EXECUTABLE_PREFIX = lib;
+				MACOSX_DEPLOYMENT_TARGET = 13.1;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+			};
+			name = Debug;
+		};
+		0CBB555D29C73F17002C42DC /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CODE_SIGN_STYLE = Automatic;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				EXECUTABLE_PREFIX = lib;
+				MACOSX_DEPLOYMENT_TARGET = 13.1;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+			};
+			name = Release;
+		};
+		0CBB556A29C75C0C002C42DC /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+					"$(PREPROCESSOR_BASE)",
+					"NIO_EXPORT=1",
+				);
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = "\"NanoFFGL/lib/\"";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSPrincipalClass = "";
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Bundles";
+				MACOSX_DEPLOYMENT_TARGET = 13.1;
+				MARKETING_VERSION = 1.0;
+				PREPROCESSOR_BASE = "TARGET_OS_MAC=1 TARGET_MACOS=1";
+				PRODUCT_BUNDLE_IDENTIFIER = "";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				WRAPPER_EXTENSION = bundle;
+			};
+			name = Debug;
+		};
+		0CBB556B29C75C0C002C42DC /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(PREPROCESSOR_BASE)",
+					"NIO_EXPORT=1",
+				);
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = "\"NanoFFGL/lib/\"";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSPrincipalClass = "";
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Bundles";
+				MACOSX_DEPLOYMENT_TARGET = 13.1;
+				MARKETING_VERSION = 1.0;
+				PREPROCESSOR_BASE = "TARGET_OS_MAC=1 TARGET_MACOS=1";
+				PRODUCT_BUNDLE_IDENTIFIER = "";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				WRAPPER_EXTENSION = bundle;
+			};
+			name = Release;
+		};
+		0CEE60D929C725A900FB4D22 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+					"$(PREPROCESSOR_BASE)",
+					"NIO_PUSH=1",
+				);
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = "\"NanoFFGL/lib/\"";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSPrincipalClass = "";
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Bundles";
+				MACOSX_DEPLOYMENT_TARGET = 13.1;
+				MARKETING_VERSION = 1.0;
+				PREPROCESSOR_BASE = "TARGET_OS_MAC=1 TARGET_MACOS=1";
+				PRODUCT_BUNDLE_IDENTIFIER = "";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				WRAPPER_EXTENSION = bundle;
+			};
+			name = Debug;
+		};
+		0CEE60DA29C725A900FB4D22 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(PREPROCESSOR_BASE)",
+					"NIO_PUSH=1",
+				);
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = "\"NanoFFGL/lib/\"";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSPrincipalClass = "";
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Bundles";
+				MACOSX_DEPLOYMENT_TARGET = 13.1;
+				MARKETING_VERSION = 1.0;
+				PREPROCESSOR_BASE = "TARGET_OS_MAC=1 TARGET_MACOS=1";
+				PRODUCT_BUNDLE_IDENTIFIER = "";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				WRAPPER_EXTENSION = bundle;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -569,6 +1142,15 @@
 			buildConfigurations = (
 				0C34D38D296F78CF00D3C19F /* Debug */,
 				0C34D38E296F78CF00D3C19F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		0C4E42A229C75CFE00834EE4 /* Build configuration list for PBXNativeTarget "Syphon" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0C4E42A329C75CFE00834EE4 /* Debug */,
+				0C4E42A429C75CFE00834EE4 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -596,6 +1178,42 @@
 			buildConfigurations = (
 				0C5E92802972D74900DD1FEC /* Debug */,
 				0C5E92812972D74900DD1FEC /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		0C6096E929C72A2B00EFF780 /* Build configuration list for PBXNativeTarget "IO Pop" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0C6096EA29C72A2B00EFF780 /* Debug */,
+				0C6096EB29C72A2B00EFF780 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		0CBB555B29C73F17002C42DC /* Build configuration list for PBXNativeTarget "NioStack" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0CBB555C29C73F17002C42DC /* Debug */,
+				0CBB555D29C73F17002C42DC /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		0CBB556929C75C0C002C42DC /* Build configuration list for PBXNativeTarget "IO Export" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0CBB556A29C75C0C002C42DC /* Debug */,
+				0CBB556B29C75C0C002C42DC /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		0CEE60D829C725A900FB4D22 /* Build configuration list for PBXNativeTarget "IO Push" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0CEE60D929C725A900FB4D22 /* Debug */,
+				0CEE60DA29C725A900FB4D22 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
