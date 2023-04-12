@@ -14,6 +14,7 @@ namespace NanoGraph {
     public string EffectName = "Program";
     public bool DebugEnabled = true;
     public GlobalTextureBitDepth GlobalBitDepth;
+    public Vector2Int TargetOutputSize = new Vector2Int(1920, 1080);
 
     public IReadOnlyList<string> Messages { get; private set; }
 
@@ -1020,6 +1021,8 @@ namespace NanoGraph {
         generateState.DeepestNode = generateState.CurrentNode;
       }
 
+      bool hasPonkOutput = false;
+
       var program = new NanoProgram(EffectName);
       var executeFunction = program.AddOverrideFunction("Execute", NanoProgram.CpuContext, program.VoidType);
       var createPipelinesFunction = program.AddOverrideFunction("CreatePipelines", NanoProgram.CpuContext, program.VoidType);
@@ -1125,6 +1128,10 @@ namespace NanoGraph {
         var computePlan = plan.Generators;
         var dependentComputeNodes = plan.DependentComputeNodes;
         var dependentComputeInputs = plan.DependentComputeInputs;
+
+        // Much hack.
+        hasPonkOutput |= computePlan.Any(node => node.generator.SourceNode is PonkOutputNode);
+
         using (NewGenerateNodeScope(computeNode)) {
           // Read inputs.
           var dependentComputeNodeResults = new List<ComputeNodeResultEntry>();
@@ -1390,6 +1397,11 @@ namespace NanoGraph {
       executeFunction.AddStatement($"[encoder endEncoding];");
       executeFunction.AddStatement($"#endif // defined(DEBUG)");
 
+      // Much hack.
+      if (hasPonkOutput) {
+        executeFunction.AddStatement($"DoPonkOutput(GetOutputBuffer(0), GetOutputBuffer(1), GetOutputBuffer(2));");
+      }
+
       // Store final outputs.
       int finalOutputIndex = 0;
       foreach (var outputNode in outputNodes) {
@@ -1431,6 +1443,18 @@ namespace NanoGraph {
       }
       getDebugValuesFunction.AddStatement($"return debugValues;");
       getDebugSettableValuesFunction.AddStatement($"return debugValues;");
+
+      var getOutputBufferFunction = program.AddOverrideFunction("GetOutputBuffer", NanoProgram.CpuContext, program.MTLBuffer);
+      getOutputBufferFunction.AddParam(Array.Empty<string>(), program.IntType, "index", null);
+      getOutputBufferFunction.AddStatement($"switch (index) {{");
+      int bufferOutputIndex = 0;
+      foreach (string bufferInstanceFieldIdentifier in program.BufferOutputs) {
+        getOutputBufferFunction.AddStatement($"  case {bufferOutputIndex}:");
+        getOutputBufferFunction.AddStatement($"    return {bufferInstanceFieldIdentifier};");
+        ++bufferOutputIndex;
+      }
+      getOutputBufferFunction.AddStatement($"}}");
+      getOutputBufferFunction.AddStatement($"return nullptr;");
 
       string outerCpuCode = program.OuterCpuCode;
       if (DebugVerbose) {

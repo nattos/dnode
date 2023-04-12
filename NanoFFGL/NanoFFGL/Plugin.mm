@@ -160,6 +160,7 @@ public:
       g_pipeline.reset(new Pipeline());
     }
     _program->EnsureResources();
+    _program->OutputTextureSize = vector_int2 { (int)vp->width, (int)vp->height };
     return CFFGLPlugin::InitGL(vp);
   }
 
@@ -185,6 +186,7 @@ public:
     const auto* pInputTexture = pGL->inputTextures[0];
     _inputTexture = ResizeTexture(_inputTexture, pInputTexture->HardwareWidth, pInputTexture->HardwareHeight, /* createGLFBO */ true);
     _outputTexture = ResizeTexture(_outputTexture, pInputTexture->HardwareWidth, pInputTexture->HardwareHeight);
+    _program->OutputTextureSize = vector_int2 { (int)pInputTexture->HardwareWidth, (int)pInputTexture->HardwareHeight };
 
     {
       auto& shader = g_pipeline->GetBlitFromTex2DShader();

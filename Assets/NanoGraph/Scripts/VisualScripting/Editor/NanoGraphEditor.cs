@@ -40,10 +40,12 @@ namespace NanoGraph.VisualScripting {
       float textureInputsHeight = inputCount * EditorGUIUtility.singleLineHeight;
 
       int parameterCount = PluginService.Instance.GetParameters().Length;
-      float parameterHeight = parameterCount * EditorGUIUtility.singleLineHeight;
+      float parameterHeight = (parameterCount + 1) * EditorGUIUtility.singleLineHeight;
+
+      float targetOutputSizeHeight = 3 * EditorGUIUtility.singleLineHeight;
 
       float spacing = EditorGUIUtility.singleLineHeight * 2;
-      return textureInputsHeight + parameterHeight + spacing;
+      return textureInputsHeight + parameterHeight + targetOutputSizeHeight + spacing;
     }
 
     private void DrawControls(Rect rect, out float height) {
@@ -82,6 +84,21 @@ namespace NanoGraph.VisualScripting {
           }
         }
       }
+      Rect buttonRect = rect;
+      buttonRect.x = buttonRect.xMax - 175;
+      buttonRect.width = 175;
+      if (GUI.Button(buttonRect, "Reset all to default")) {
+        foreach (var parameter in PluginService.Instance.GetParameters()) {
+          PluginService.Instance.SetParameter(parameter.Name, parameter.DefaultValue);
+        }
+      }
+      rect.y += rect.height;
+      rect.y += EditorGUIUtility.singleLineHeight;
+
+      rect.height = EditorGUIUtility.singleLineHeight * 2;
+      NanoGraph.DebugInstance.TargetOutputSize = EditorGUI.Vector2IntField(rect, "Target Output Size", NanoGraph.DebugInstance.TargetOutputSize);
+      rect.y += rect.height;
+
       rect.y += EditorGUIUtility.singleLineHeight;
       height = rect.y;
     }

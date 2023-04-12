@@ -1,0 +1,94 @@
+
+auto outCellIndex = output0;
+auto outCellCount = output1;
+auto outEnterDir = output2;
+auto outExitDir = output3;
+
+constexpr int GridSize = 32;
+constexpr int CenterX = GridSize / 2;
+constexpr int CenterY = GridSize / 2;
+constexpr float TexelSize = 1.0 / GridSize;
+constexpr int MaxLength = 192;
+
+bool hadStartCell = false;
+int2 startCell;
+for (int searchY = 0; searchY < GridSize; ++searchY) {
+  float2 uv = float2(CenterX, searchY) * TexelSize;
+  bool searchValue = SampleTexture<filter::nearest, address::clamp_to_zero>(texture, uv).r > 0.5;
+  if (searchValue) {
+    bool value0 = SampleTexture<filter::nearest, address::clamp_to_zero>(texture, float2(CenterX - 1, searchY) * TexelSize).r > 0.5;
+    bool value2 = SampleTexture<filter::nearest, address::clamp_to_zero>(texture, float2(CenterX + 1, searchY) * TexelSize).r > 0.5;
+    if (value0 || value2) {
+      startCell = int2(CenterX, searchY);
+      hadStartCell = true;
+      break;
+    }
+  }
+}
+if (!hadStartCell) {
+  WriteBuffer(outCellCount, 0, 0);
+  return;
+}
+
+
+int writeIndex = 0;
+int2 startDir = int2(1, 0);
+
+int2 prevCell = startCell - startDir;
+int2 searchCell = startCell;
+for (int i = 0; i < MaxLength; ++i) {
+
+  int2 dir = searchCell - prevCell;
+  int2 normalDir = int2(dir.y, -dir.x);
+  int2 originCell = prevCell - normalDir * 2;
+  bool value00 = SampleTexture<filter::nearest, address::clamp_to_zero>(texture, float2(originCell + dir * 0 + normalDir * 0) * TexelSize).a > 0.5;
+  bool value10 = SampleTexture<filter::nearest, address::clamp_to_zero>(texture, float2(originCell + dir * 1 + normalDir * 0) * TexelSize).a > 0.5;
+  bool value20 = SampleTexture<filter::nearest, address::clamp_to_zero>(texture, float2(originCell + dir * 2 + normalDir * 0) * TexelSize).a > 0.5;
+  bool value30 = SampleTexture<filter::nearest, address::clamp_to_zero>(texture, float2(originCell + dir * 3 + normalDir * 0) * TexelSize).a > 0.5;
+  bool value01 = SampleTexture<filter::nearest, address::clamp_to_zero>(texture, float2(originCell + dir * 0 + normalDir * 1) * TexelSize).a > 0.5;
+  bool value11 = SampleTexture<filter::nearest, address::clamp_to_zero>(texture, float2(originCell + dir * 1 + normalDir * 1) * TexelSize).a > 0.5;
+  bool value21 = SampleTexture<filter::nearest, address::clamp_to_zero>(texture, float2(originCell + dir * 2 + normalDir * 1) * TexelSize).a > 0.5;
+  bool value31 = SampleTexture<filter::nearest, address::clamp_to_zero>(texture, float2(originCell + dir * 3 + normalDir * 1) * TexelSize).a > 0.5;
+  bool value02 = SampleTexture<filter::nearest, address::clamp_to_zero>(texture, float2(originCell + dir * 0 + normalDir * 2) * TexelSize).a > 0.5;
+  bool value12 = SampleTexture<filter::nearest, address::clamp_to_zero>(texture, float2(originCell + dir * 1 + normalDir * 2) * TexelSize).a > 0.5;
+  bool value22 = SampleTexture<filter::nearest, address::clamp_to_zero>(texture, float2(originCell + dir * 2 + normalDir * 2) * TexelSize).a > 0.5;
+  bool value32 = SampleTexture<filter::nearest, address::clamp_to_zero>(texture, float2(originCell + dir * 3 + normalDir * 2) * TexelSize).a > 0.5;
+  bool value03 = SampleTexture<filter::nearest, address::clamp_to_zero>(texture, float2(originCell + dir * 0 + normalDir * 3) * TexelSize).a > 0.5;
+  bool value13 = SampleTexture<filter::nearest, address::clamp_to_zero>(texture, float2(originCell + dir * 1 + normalDir * 3) * TexelSize).a > 0.5;
+  bool value23 = SampleTexture<filter::nearest, address::clamp_to_zero>(texture, float2(originCell + dir * 2 + normalDir * 3) * TexelSize).a > 0.5;
+  bool value33 = SampleTexture<filter::nearest, address::clamp_to_zero>(texture, float2(originCell + dir * 3 + normalDir * 3) * TexelSize).a > 0.5;
+  bool value04 = SampleTexture<filter::nearest, address::clamp_to_zero>(texture, float2(originCell + dir * 0 + normalDir * 4) * TexelSize).a > 0.5;
+  bool value14 = SampleTexture<filter::nearest, address::clamp_to_zero>(texture, float2(originCell + dir * 1 + normalDir * 4) * TexelSize).a > 0.5;
+  bool value24 = SampleTexture<filter::nearest, address::clamp_to_zero>(texture, float2(originCell + dir * 2 + normalDir * 4) * TexelSize).a > 0.5;
+  bool value34 = SampleTexture<filter::nearest, address::clamp_to_zero>(texture, float2(originCell + dir * 3 + normalDir * 4) * TexelSize).a > 0.5;
+
+  int2 nextDir;
+  if (value13 && !(value02 && value22 && value03 && value23 && value04 && value14 && value24) && !(!value03 && !value23)) {
+    nextDir = normalDir;
+  } else if (value22 && !(value11 && value21 && value31 && value32 && value13 && value23 && value33) && !(!value21 && !value23)) {
+    nextDir = dir;
+  } else if (value11 && !(value00 && value10 && value20 && value01 && value21 && value02 && value22) && !(!value01 && !value21)) {
+    nextDir = -normalDir;
+  } else {
+    nextDir = -dir;
+  }
+
+  int thisWriteIndex = writeIndex++;
+  WriteBuffer(outCellIndex, thisWriteIndex, uint2(searchCell));
+  WriteBuffer(outEnterDir, thisWriteIndex, uint2(dir));
+  WriteBuffer(outExitDir, thisWriteIndex, uint2(nextDir));
+
+  int2 nextCell = searchCell + nextDir;
+  if (nextCell.x == startCell.x && nextCell.y == startCell.y) {
+    break;
+  }
+
+  prevCell = searchCell;
+  searchCell = nextCell;
+}
+
+WriteBuffer(outCellCount, 0, writeIndex);
+
+
+placeholder = uint2(startCell);
+

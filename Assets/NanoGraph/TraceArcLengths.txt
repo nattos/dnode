@@ -1,0 +1,114 @@
+
+constexpr float Pi = 3.1415926535897932384626433832795;
+constexpr int MaxSegments = 5;
+// constexpr float Segments = 3;
+// constexpr float PartLength = 0.1;
+
+
+auto outPositions = output0;
+auto outCounter = output1;
+auto outPathIndex = output2;
+auto outPathPoint = output3;
+
+
+int inputCount = Counter[0];
+
+
+
+float arcLength = 0;
+{
+  float2 prevVertex = Vertices[inputCount - 1];
+  for (int i = 0; i < inputCount; ++i) {
+    float2 thisVertex = Vertices[i];
+    float length = magnitude_op(thisVertex - prevVertex);
+    arcLength += length;
+    prevVertex = thisVertex;
+  }
+}
+
+if (arcLength < 0.0001) {
+  return;
+}
+float invArcLength = 1.0 / arcLength;
+
+
+int coarseSegments = min(MaxSegments, (int)ceil(Segments));
+float fineSegments = (Segments - coarseSegments + 1);
+float squashedSegments = coarseSegments - 1 + atan(fineSegments * SegmentsSquash) / Pi * 2;
+float targetLength = PartLength / squashedSegments;
+float finalSegmentTargetLength = targetLength * fineSegments;
+
+float startLengths[MaxSegments];
+for (int i = 0; i < coarseSegments; ++i) {
+  startLengths[i] = i / squashedSegments + Phase;
+}
+
+float startPoses[MaxSegments];
+for (int i = 0; i < coarseSegments; ++i) {
+  float thisTargetLength = i == (coarseSegments - 1) ? finalSegmentTargetLength : targetLength;
+  float startLength = fract(startLengths[i] - thisTargetLength * 0.5);
+  float startPos = 0;
+  float thisLength = 0;
+  float2 prevVertex = Vertices[inputCount - 1];
+  for (int i = 0; i < inputCount; ++i) {
+    float2 thisVertex = Vertices[i];
+    float length = magnitude_op(thisVertex - prevVertex) * invArcLength;
+    float nextLength = thisLength + length;
+
+    if (nextLength >= startLength) {
+      startPos = i + (nextLength - startLength) / length;
+      break;
+    }
+
+    thisLength = nextLength;
+    prevVertex = thisVertex;
+  }
+  startPoses[i] = startPos;
+}
+
+for (int segmentIndex = 0; segmentIndex < coarseSegments; ++segmentIndex) {
+  float thisTargetLength = segmentIndex == (coarseSegments - 1) ? finalSegmentTargetLength : targetLength;
+  float startPos = startPoses[segmentIndex];
+  float coarseIndex = floor(startPos);
+  int index = ((int)coarseIndex + inputCount) % inputCount;
+  float thisLength = 0;
+  float2 prevVertex;
+  {
+    float2 v0 = Vertices[(index - 1 + inputCount) % inputCount];
+    float2 v1 = Vertices[index % inputCount];
+    prevVertex = mix(v0, v1, 1 - (startPos - coarseIndex));
+  }
+  for (int i = 0; i < inputCount + 2; ++i) {
+    float2 thisVertex = Vertices[(index + i) % inputCount];
+
+    float length = magnitude_op(thisVertex - prevVertex) * invArcLength;
+    float nextLength = thisLength + length;
+    bool terminate = false;
+    if (nextLength > thisTargetLength) {
+      thisVertex = mix(prevVertex, thisVertex, 1 - (nextLength - thisTargetLength) / length);
+      terminate = true;
+    }
+
+    {
+      int writeIndex = atomic_fetch_add_explicit(&(outCounter[1]), 1, memory_order_relaxed);
+      WriteBuffer(outPositions, writeIndex * 2 + 0, prevVertex);
+      WriteBuffer(outPositions, writeIndex * 2 + 1, thisVertex);
+    }
+
+    {
+      int writeIndex = atomic_fetch_add_explicit(&(outCounter[0]), 1, memory_order_relaxed);
+      WriteBuffer(outPathIndex, writeIndex, segmentIndex);
+      WriteBuffer(outPathPoint, writeIndex, thisVertex);
+    }
+
+    if (terminate) {
+      break;
+    }
+
+    thisLength = nextLength;
+    prevVertex = thisVertex;
+  }
+}
+
+placeholder = float2(squashedSegments, fineSegments);
+

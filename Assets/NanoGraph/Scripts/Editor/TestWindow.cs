@@ -35,6 +35,9 @@ namespace NanoGraph {
 
     private readonly Lazy<Styles> _styles = new Lazy<Styles>(() => new Styles());
 
+    [SerializeField]
+    public Vector2Int SerializedTargetOutputSize = new Vector2Int(1920, 1080);
+
     public void OnEnable() {
       Instance = this;
       SelectedInputs = SelectedInputs ?? new List<SelectedInput>();
@@ -42,6 +45,8 @@ namespace NanoGraph {
       _compileStartTime = Time.realtimeSinceStartupAsDouble;
       PluginService.Instance.TextureInputsNeedUpdating += OnTextureInputsNeedUpdating;
       PluginService.Instance.TextureOutputsUpdated += OnTextureOutputsUpdated;
+
+      NanoGraph.DebugInstance.TargetOutputSize = SerializedTargetOutputSize;
     }
 
     public void OnDisable() {
@@ -50,6 +55,8 @@ namespace NanoGraph {
       }
       PluginService.Instance.TextureInputsNeedUpdating -= OnTextureInputsNeedUpdating;
       PluginService.Instance.TextureOutputsUpdated -= OnTextureOutputsUpdated;
+
+      SerializedTargetOutputSize = NanoGraph.DebugInstance.TargetOutputSize;
     }
 
     private void OnTextureInputsNeedUpdating() {
@@ -66,7 +73,17 @@ namespace NanoGraph {
         }
 
         if (sourceTexture != null) {
-          Graphics.CopyTexture(sourceTexture, inputTexture);
+          if (sourceTexture.width == inputTexture.width && sourceTexture.height == inputTexture.height) {
+            Graphics.CopyTexture(sourceTexture, inputTexture);
+          } else {
+            int copyWidth = Mathf.Min(sourceTexture.width, inputTexture.width);
+            int copyHeight = Mathf.Min(sourceTexture.height, inputTexture.height);
+            int srcX = Mathf.Max(0, (sourceTexture.width - copyWidth) / 2);
+            int srcY = Mathf.Max(0, (sourceTexture.height - copyHeight) / 2);
+            int dstX = Mathf.Max(0, (inputTexture.width - copyWidth) / 2);
+            int dstY = Mathf.Max(0, (inputTexture.height - copyHeight) / 2);
+            Graphics.CopyTexture(sourceTexture, 0, 0, srcX, srcY, copyWidth, copyHeight, inputTexture, 0, 0, dstX, dstY);
+          }
         } else {
           var temp = RenderTexture.GetTemporary(
               inputTexture.width, inputTexture.height, 0,
@@ -108,7 +125,10 @@ namespace NanoGraph {
         monitorTexture = Texture2D.blackTexture;
       }
       // float aspectRatio = monitorTexture.height / (float) monitorTexture.width;
-      float aspectRatio = 9.0f / 16.0f;
+      // float aspectRatio = 9.0f / 16.0f;
+      Vector2Int targetOutputSize = NanoGraph.DebugInstance.TargetOutputSize;
+      PluginService.Instance.RenderSize = targetOutputSize;
+      float aspectRatio = targetOutputSize.y / (float)targetOutputSize.x;
       float desiredHeight = this.position.width * aspectRatio;
       Rect textureRect = EditorGUILayout.GetControlRect(GUILayout.Height(desiredHeight));
       EditorGUI.DrawPreviewTexture(textureRect, monitorTexture, null, ScaleMode.ScaleToFit);

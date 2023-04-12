@@ -201,7 +201,7 @@ int main(int argc, const char* argv[]) {
         } else if (json.contains(kProcessTexturesRequestKey)) {
           double processTextureStartTime = [NSDate now].timeIntervalSince1970;
           nlohmann::json request = json[kProcessTexturesRequestKey].get<nlohmann::json>();
-          
+
           std::vector<id<MTLTexture>> inputTextures;
           std::vector<id<MTLTexture>> outputTextures;
           std::vector<IOSurfaceRef> acquiredSurfaces;
@@ -231,6 +231,10 @@ int main(int argc, const char* argv[]) {
           }
           std::string debugOutputTextureKey = request.value<std::string>("DebugOutputTextureKey", "");
           g_program->DebugSetOutputTextureKey(debugOutputTextureKey);
+          if (outputTextures.size() > 0) {
+            id<MTLTexture> outputTexture = outputTextures[0];
+            g_program->OutputTextureSize = vector_int2 { (int)outputTexture.width, (int)outputTexture.height };
+          }
 
           g_program->Run();
 

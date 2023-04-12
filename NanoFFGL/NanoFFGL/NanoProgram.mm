@@ -1,5 +1,7 @@
 #include "Prefix.pch"
 
+#include "PonkSender.h"
+
 namespace {
   id<MTLDevice> NanoProgramGetCurrentMTLDevice();
   id<MTLCommandQueue> NanoProgramGetCurrentMTLCommandQueue();
@@ -191,8 +193,6 @@ class NanoSharedTexture {
 NanoProgram::NanoProgram() {}
 NanoProgram::~NanoProgram() {}
 
-vector_int2 OutputTextureSize = vector_int2 { 1920, 1080 };
-
 void NanoProgram::Run() {
   EnsureResources();
   double nextFrameTime = [NSDate now].timeIntervalSince1970 - _startTime;
@@ -271,6 +271,65 @@ NanoProgram* NanoProgram::GetCurrentInstance() {
   return result;
 }
 
+void NanoProgram::DoPonkOutput(id<MTLBuffer> counterBuffer, id<MTLBuffer> pathPointsBuffer, id<MTLBuffer> pathIndexBuffer) {
+  if (!_ponkSender) {
+    _ponkSender.reset(new PONKSender());
+  }
+
+  std::vector<std::vector<PonkSenderPoint>> lines;
+  if (_ponkSyncToCpuCommandBuffer && _ponkCounterBuffer && _ponkPathPointBuffer && _ponkPathIndexBuffer) {
+    [_ponkSyncToCpuCommandBuffer waitUntilCompleted];
+    _ponkSyncToCpuCommandBuffer = nullptr;
+    int count = ((const int *)_ponkCounterBuffer.contents)[0];
+    const vector_float2* points = (const vector_float2*)_ponkPathPointBuffer.contents;
+    const int* indices = (const int*)_ponkPathIndexBuffer.contents;
+    for (int i = 0; i < count; ++i) {
+      const vector_float2 point = points[i];
+      const int index = indices[i];
+      if (index < 0 || index >= PonkMaxPaths) {
+        continue;
+      }
+      while (lines.size() <= index) {
+        lines.emplace_back();
+      }
+      vector_float2 clientPoint = point;
+      std::vector<PonkSenderPoint>& polyline = lines[index];
+      PonkSenderPoint ponkSenderPoint = {
+        .Point = vector_float2 { clientPoint.x, clientPoint.y },
+        .Color = vector_float4(1.0f),
+      };
+      polyline.push_back(ponkSenderPoint);
+    }
+  }
+  for (int i = lines.size() - 1; i >= 0; --i) {
+    if (lines[i].size() == 0) {
+      lines.erase(lines.begin() + i);
+    }
+  }
+  _ponkSender->draw(lines);
+
+  if (!counterBuffer || !pathPointsBuffer || !pathIndexBuffer) {
+    return;
+  }
+  _ponkCounterBuffer = [_device newBufferWithLength:counterBuffer.length options:MTLResourceStorageModeManaged];
+  _ponkPathPointBuffer = [_device newBufferWithLength:pathPointsBuffer.length options:MTLResourceStorageModeManaged];
+  _ponkPathIndexBuffer = [_device newBufferWithLength:pathIndexBuffer.length options:MTLResourceStorageModeManaged];
+  {
+    id<MTLCommandQueue> commandQueue = GetCommandQueue();
+    id<MTLCommandBuffer> buffer = [commandQueue commandBuffer];
+    id<MTLBlitCommandEncoder> encoder = [buffer blitCommandEncoder];
+    [encoder copyFromBuffer:counterBuffer sourceOffset:0 toBuffer:_ponkCounterBuffer destinationOffset:0 size:counterBuffer.length];
+    [encoder copyFromBuffer:pathPointsBuffer sourceOffset:0 toBuffer:_ponkPathPointBuffer destinationOffset:0 size:pathPointsBuffer.length];
+    [encoder copyFromBuffer:pathIndexBuffer sourceOffset:0 toBuffer:_ponkPathIndexBuffer destinationOffset:0 size:pathIndexBuffer.length];
+    [encoder synchronizeResource:_ponkCounterBuffer];
+    [encoder synchronizeResource:_ponkPathPointBuffer];
+    [encoder synchronizeResource:_ponkPathIndexBuffer];
+    [encoder endEncoding];
+    // TODO: Use [buffer addCompletedHandler:] to reduce latency.
+    [buffer commit];
+    _ponkSyncToCpuCommandBuffer = buffer;
+  }
+}
 
 
 
@@ -293,6 +352,8 @@ NanoProgram* NanoProgram::GetCurrentInstance() {
       return originalTexture;
     }
     MTLTextureDescriptor* desc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:format width:width height:height mipmapped:NO];
+    desc.usage = MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite | MTLTextureUsageRenderTarget;
+    
     return [_device newTextureWithDescriptor:desc];
   }
   

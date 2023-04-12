@@ -1,0 +1,14 @@
+
+constexpr int Count = 8;
+
+float2 uvCorner = gid_xy_norm - texelSize * (Count / 2);
+float2 uv;
+float4 maxValue = 0;
+for (int y = 0; y < Count; ++y) {
+  uv.y = y * texelSize + uvCorner.y;
+  for (int x = 0; x < Count; ++x) {
+    uv.x = x * texelSize + uvCorner.x;
+    maxValue = max(maxValue, SampleTexture<filter::nearest, address::clamp_to_zero>(texture, uv));
+  }
+}
+color = maxValue;

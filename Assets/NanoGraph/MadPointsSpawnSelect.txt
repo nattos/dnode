@@ -1,0 +1,149 @@
+
+
+auto outPos = output0;
+auto outTime = output1;
+auto outDir = output2;
+auto outPowerPosition = output3;
+auto outPowerIntensity = output4;
+auto outPowerCounter = output5;
+auto outCounter = output6;
+auto outLightPosition = output7;
+auto outType = output8;
+auto outEnvelope = output9;
+auto outLightTime = output10;
+auto outAccel = output11;
+
+
+
+
+// constexpr float DeltaTime = 1.0 / 60;
+// constexpr float EnvelopeDecayRate = 10.0;
+// constexpr float EnvelopeTriggerRate = 0.1;
+// constexpr float RetypeRate = 0.01;
+// constexpr float RespawnRate = 0.001;
+// constexpr float PowerSpawnRate = 0.01;
+// constexpr float Speed = 0.01;
+// constexpr float TimeToLive = 0.3;
+// constexpr float SamplingShape = 3.0f;
+// constexpr int SamplingRetries = 10;
+// constexpr int Momentum = 0.2;
+// constexpr float UpVelocity = 1.2;
+
+
+float4 prandom = random[abs(gid * 163495671 + poffset) & (1048576 - 1)];
+float pRespawn = prandom.z;
+float pEnvelope = prandom.w;
+
+float pGeneratorSeed = prandom.x;
+uint pGenerator = ((uint)(pGeneratorSeed * 0xFFFFFFFF)) * 22695477 + 1;
+pGenerator = pGenerator * 22695477 + 1;
+
+
+
+
+
+
+
+float2 pos = SampleBuffer(outPos, gid);
+float time = SampleBuffer(outTime, gid);
+float2 dir = SampleBuffer(outDir, gid);
+int type = SampleBuffer(outType, gid);
+float envelope = SampleBuffer(outEnvelope, gid);
+float2 accel = SampleBuffer(outAccel, gid);
+
+
+bool doRespawn = pRespawn < RespawnRate;
+bool doExport = false;
+time -= 0.01 / max(0.00001, TimeToLive);
+
+if (doRespawn) {
+  float2 bestInitPos = 0;
+  float bestInitPosValue = 1.0;
+  for (int i = 0; i < SamplingRetries; ++i) {
+    float pX = ((float)(pGenerator & 0x7FFFFFFF)) / ((float)0x7FFFFFFF);
+    pGenerator = pGenerator * 22695477 + 1;
+    float pY = ((float)(pGenerator & 0x7FFFFFFF)) / ((float)0x7FFFFFFF);
+    pGenerator = pGenerator * 22695477 + 1;
+    float pSamplingJitter = ((float)(pGenerator & 0x7FFFFFFF)) / ((float)0x7FFFFFFF);
+    pGenerator = pGenerator * 22695477 + 1;
+
+    float2 tryPos = float2(pX, pY);
+    tryPos.y = 1 - tryPos.y;
+    tryPos.y = pow(tryPos.y * tryPos.y, SamplingShape);
+    tryPos.y = 1 - tryPos.y;
+
+    float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(textureInput, tryPos);
+    float value = max(textureSample.r, max(textureSample.g, textureSample.b)) - pSamplingJitter * InputSmoothing;
+    if (value < bestInitPosValue) {
+      bestInitPosValue = value;
+      bestInitPos = tryPos;
+    }
+  }
+
+  float pType = ((float)(pGenerator & 0x7FFFFFFF)) / ((float)0x7FFFFFFF);
+  pGenerator = pGenerator * 22695477 + 1;
+
+  pos = bestInitPos * 2 - 1;
+  dir = 0;
+  accel = 0;
+  time = 1.0;
+  type = pType < PowerSpawnRate;
+  envelope = 1.0;
+  doExport = true;
+} else if (time > 0) {
+  pos = pos * 2 - 1;
+  float2 nextAccel = 0;
+  nextAccel.y -= UpVelocity;
+  accel = mix(nextAccel, accel, Momentum);
+  float2 nextDir = accel + normalize(pos) * Sink;
+  dir = mix(nextDir, dir, Momentum);
+  pos += dir * Speed * 2.0;
+  doExport = true;
+
+  float pRetype = ((float)(pGenerator & 0x7FFFFFFF)) / ((float)0x7FFFFFFF);
+  pGenerator = pGenerator * 22695477 + 1;
+  if (pRetype < RetypeRate) {
+    envelope = 1.0;
+    type = 1;
+  }
+
+  if (type == 1) {
+    envelope = max(0.0, envelope - EnvelopeDecayRate * DeltaTime);
+    if (pEnvelope < EnvelopeTriggerRate) {
+      envelope = 1.0;
+    }
+  }
+}
+
+
+bool doExportPower = doExport && type == 1;
+pos = pos * 0.5 + 0.5;
+
+if (doExport) {
+  int writeIndex = atomic_fetch_add_explicit(&(outCounter[0]), 1, memory_order_relaxed);
+  WriteBuffer(outLightPosition, writeIndex, pos);
+  WriteBuffer(outLightTime, writeIndex, time);
+}
+if (doExportPower) {
+  int writeIndex = atomic_fetch_add_explicit(&(outPowerCounter[0]), 1, memory_order_relaxed);
+  if (writeIndex < MaxPowerCount) {
+    WriteBuffer(outPowerPosition, writeIndex, pos);
+    WriteBuffer(outPowerIntensity, writeIndex, time * pow(envelope, EnvelopeCurve));
+  } else {
+    type = 0;
+  }
+}
+
+WriteBuffer(outPos, gid, pos);
+WriteBuffer(outTime, gid, time);
+WriteBuffer(outDir, gid, dir);
+WriteBuffer(outType, gid, type);
+WriteBuffer(outEnvelope, gid, envelope);
+WriteBuffer(outAccel, gid, accel);
+
+
+placeholder = float2(time, pRespawn);
+
+
+
+

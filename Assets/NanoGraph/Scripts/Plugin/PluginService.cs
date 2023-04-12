@@ -31,6 +31,7 @@ namespace NanoGraph.Plugin {
     private bool _isRendering = false;
     private CancelationFlag _renderLoopCancelationFlag;
 
+    [NonSerialized]
     public Vector2Int RenderSize = new Vector2Int(1920, 1080);
     public string DebugOutputTextureKey = "";
 

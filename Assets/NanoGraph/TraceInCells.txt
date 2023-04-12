@@ -1,0 +1,131 @@
+
+
+
+constexpr int GridSize = 32;
+constexpr int SubgridSize = 16;
+// constexpr float Threshold = 0.1;
+
+auto outCounter = output0;
+auto outVertices = output1;
+
+int2 cellIndex = int2(cellIndexU);
+int2 enterDir = int2(enterDirU);
+int2 exitDir = int2(exitDirU);
+
+float2 cellScale = float2(2.0 / GridSize) * float2(1, -1);
+float2 cellOffset = (float2(1.0 / GridSize) - 1) * float2(1, -1);
+
+if (gid >= cellCount) {
+  return;
+}
+
+// WriteBuffer(outVertices, gid * 2 + 0, cellCenter + float2(1.0 / 16.0, fract(gid / 16.0) / 16.0));
+// WriteBuffer(outVertices, gid * 2 + 1, cellCenter + float2((fract(gid / 16.0) - 1.0) / 16.0, fract(gid / 16.0) / 16.0));
+// {
+//   int writeIndex = atomic_fetch_add_explicit(&(outCounter[0]), 1, memory_order_relaxed);
+//   WriteBuffer(outVertices, writeIndex * 2 + 0, float2(cellIndex) * cellScale + cellOffset);
+//   WriteBuffer(outVertices, writeIndex * 2 + 1, float2(cellIndex - enterDir) * cellScale + cellOffset);
+// }
+// {
+//   int writeIndex = atomic_fetch_add_explicit(&(outCounter[0]), 1, memory_order_relaxed);
+//   WriteBuffer(outVertices, writeIndex * 2 + 0, float2(cellIndex) * cellScale + cellOffset);
+//   WriteBuffer(outVertices, writeIndex * 2 + 1, float2(cellIndex + exitDir) * cellScale + cellOffset);
+// }
+
+
+bool subgrid[SubgridSize * SubgridSize];
+
+for (int y = 0; y < SubgridSize; ++y) {
+  for (int x = 0; x < SubgridSize; ++x) {
+    float2 uv = (float2(cellIndex) + float2(x, y) / (SubgridSize - 1)) / GridSize;
+    float4 sample = SampleTexture<filter::nearest, address::clamp_to_zero>(fineTexture, uv);
+    float value = max(sample.r, max(sample.g, sample.b));
+    bool filled = value > Threshold;
+    subgrid[y * SubgridSize + x] = filled;
+  }
+}
+
+int2 v0int = int2(SubgridSize / 2) - enterDir * SubgridSize / 2;
+v0int = max(0, min(SubgridSize - 1, v0int));
+{
+  int2 dir = enterDir;
+  int2 normal = int2(dir.y, -dir.x);
+  int2 v = v0int + normal * SubgridSize / 2;
+  int2 result = v - normal * SubgridSize;
+  for (int i = 0; i < SubgridSize; ++i) {
+    int2 uv = max(0, min(SubgridSize - 1, v - normal * i));
+    bool value = subgrid[uv.y * SubgridSize + uv.x];
+    if (value) {
+      result = uv;
+      break;
+    }
+  }
+  v0int = result;
+}
+float2 v0 = (float2(cellIndex) + float2(v0int) / (SubgridSize - 1)) / GridSize;
+
+
+int2 v1int = int2(SubgridSize / 2) + exitDir * SubgridSize / 2;
+v1int = max(0, min(SubgridSize - 1, v1int));
+{
+  int2 dir = exitDir;
+  int2 normal = int2(dir.y, -dir.x);
+  int2 v = v1int + normal * SubgridSize / 2;
+  int2 result = v - normal * SubgridSize;
+  for (int i = 0; i < SubgridSize; ++i) {
+    int2 uv = max(0, min(SubgridSize - 1, v - normal * i));
+    bool value = subgrid[uv.y * SubgridSize + uv.x];
+    if (value) {
+      result = uv;
+      break;
+    }
+  }
+  v1int = result;
+}
+float2 v1 = (float2(cellIndex) + float2(v1int) / (SubgridSize - 1)) / GridSize;
+
+
+int2 v_5int = (v0int + v1int) / 2;
+v_5int = max(0, min(SubgridSize - 1, v_5int));
+{
+  int2 dir = exitDir + enterDir;
+  int2 normal = int2(dir.y, -dir.x);
+  int2 vin = v_5int;
+  int2 v = vin + normal * SubgridSize / 2;
+  int2 result = v - normal * SubgridSize;
+
+  bool vinXOut = vin.x == 0 || vin.x == (SubgridSize - 1);
+  bool vinYOut = vin.y == 0 || vin.y == (SubgridSize - 1);
+  if (vinXOut || vinYOut) {
+    result = vin;
+  } else {
+    for (int i = 0; i < SubgridSize; ++i) {
+      int2 uv = max(0, min(SubgridSize - 1, v - normal * i));
+      bool value = subgrid[uv.y * SubgridSize + uv.x];
+      if (value) {
+        result = uv;
+        break;
+      }
+    }
+  }
+  v_5int = result;
+}
+float2 v_5 = (float2(cellIndex) + float2(v_5int) / (SubgridSize - 1)) / GridSize;
+
+// {
+//   int writeIndex = atomic_fetch_add_explicit(&(outCounter[0]), 1, memory_order_relaxed);
+//   WriteBuffer(outVertices, writeIndex * 2 + 0, (v0 * 2 - 1) * float2(1, -1));
+//   WriteBuffer(outVertices, writeIndex * 2 + 1, (v_5 * 2 - 1) * float2(1, -1));
+// }
+{
+  atomic_fetch_add_explicit(&(outCounter[0]), 1, memory_order_relaxed);
+  atomic_fetch_add_explicit(&(outCounter[0]), 1, memory_order_relaxed);
+  WriteBuffer(outVertices, gid * 2 + 0, (v_5 * 2 - 1) * float2(1, -1));
+  WriteBuffer(outVertices, gid * 2 + 1, (v1 * 2 - 1) * float2(1, -1));
+}
+
+
+
+
+placeholder = float2(cellIndex);
+

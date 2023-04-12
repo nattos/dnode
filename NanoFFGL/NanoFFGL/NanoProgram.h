@@ -1,6 +1,9 @@
 #pragma once
 
+#import "MetalKit/MetalKit.h"
+
 class NanoSharedTexture;
+class PONKSender;
 
 struct BlitOutputTextureResources {
   id<MTLComputePipelineState> CopyTextureSampleNearestPipeline;
@@ -9,6 +12,8 @@ struct BlitOutputTextureResources {
 };
 
 class NanoProgram {
+private:
+  static constexpr int PonkMaxPaths = 16;
 public:
   struct ParameterDecl {
     std::string Name;
@@ -52,6 +57,8 @@ public:
   id<MTLTexture> GetTextureInput(int index) const;
   void SetTextureInput(int index, id<MTLTexture> value);
   void BlitOutputTexture(int index, id<MTLTexture> outputTexture);
+
+  virtual id<MTLBuffer> GetOutputBuffer(int index) { return nullptr; }
   
   int32_t DebugGetOutputTextureSurfaceId() const;
   const std::string& DebugGetOutputTextureKey() const { return _debugOutputTextureKey; }
@@ -66,6 +73,8 @@ public:
   int GetFrameNumber() const { return _frameNumber; }
   double GetFrameTime() const { return _frameTime; }
   double GetFrameDeltaTime() const { return _frameDeltaTime; }
+  
+  void DoPonkOutput(id<MTLBuffer> counterBuffer, id<MTLBuffer> pathPointsBuffer, id<MTLBuffer> pathIndexBuffer);
 
   static void SetCurrentInstance(NanoProgram* ptr);
   static NanoProgram* GetCurrentInstance();
@@ -92,6 +101,12 @@ private:
   double _startTime = 0;
   double _frameTime = 0;
   double _frameDeltaTime = 0;
+
+  id<MTLCommandBuffer> _ponkSyncToCpuCommandBuffer = nullptr;
+  id<MTLBuffer> _ponkCounterBuffer = nullptr;
+  id<MTLBuffer> _ponkPathPointBuffer = nullptr;
+  id<MTLBuffer> _ponkPathIndexBuffer = nullptr;
+  std::unique_ptr<PONKSender> _ponkSender;
 
   static NSLock* _threadMapLock;
   static std::unique_ptr<std::map<NSThread*, NanoProgram*>> _threadMap;

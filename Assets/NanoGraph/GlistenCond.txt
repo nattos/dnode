@@ -1,4 +1,8 @@
 
+if (Intensity <= 0) {
+  return;
+}
+
 
 float2 squashFactor = float2(SquashX, SquashY);
 float stretchGradPower = atan(length(Grad) * StretchGradSquash);
@@ -6,11 +10,12 @@ float stretchGradPower = atan(length(Grad) * StretchGradSquash);
 
 auto outPosition = output0;
 auto outColor = output1;
+auto outCounter = output2;
 
 Shape = max(0.01, Shape);
 int levelIndex = gid % (StepCount * LevelCount);
 float scale = (LevelCount * Shape) / (levelIndex + (LevelCount * Shape)) * Size;
-float colorAlpha = (1.0 + levelIndex) / (LevelCount * (LevelCount + 1));
+float colorAlpha = (1.0 + levelIndex) / (LevelCount * (LevelCount + 1)) * Intensity;
 // float colorAlpha = 1.0 / LevelCount;
 
 float3 colorGradX = ColorGradX * ColorGradPower;
@@ -30,16 +35,18 @@ for (int i = 0; i < StepCount; ++i) {
   v1 *= squashFactor;
   v2 *= squashFactor;
   v3 *= squashFactor;
-  WriteBuffer(outPosition, (gid * 3 * StepCount) + (i * 3) + 0, Position + v1 * scale);
-  WriteBuffer(outPosition, (gid * 3 * StepCount) + (i * 3) + 1, Position + v2 * scale);
-  WriteBuffer(outPosition, (gid * 3 * StepCount) + (i * 3) + 2, Position + v3 * scale);
-  WriteBuffer(outColor, (gid * 3 * StepCount) + (i * 3) + 0, float4(Color + v1.x * colorGradX + v1.y * colorGradY, colorAlpha));
-  WriteBuffer(outColor, (gid * 3 * StepCount) + (i * 3) + 1, float4(Color + v2.x * colorGradX + v2.y * colorGradY, colorAlpha));
-  WriteBuffer(outColor, (gid * 3 * StepCount) + (i * 3) + 2, float4(Color + v3.x * colorGradX + v3.y * colorGradY, colorAlpha));
+  int writeIndex = atomic_fetch_add_explicit(&(outCounter[0]), 1, memory_order_relaxed);
+  WriteBuffer(outPosition, (writeIndex * 3) + 0, Position + v1 * scale);
+  WriteBuffer(outPosition, (writeIndex * 3) + 1, Position + v2 * scale);
+  WriteBuffer(outPosition, (writeIndex * 3) + 2, Position + v3 * scale);
+  WriteBuffer(outColor, (writeIndex * 3) + 0, float4(Color + v1.x * colorGradX + v1.y * colorGradY, colorAlpha));
+  WriteBuffer(outColor, (writeIndex * 3) + 1, float4(Color + v2.x * colorGradX + v2.y * colorGradY, colorAlpha));
+  WriteBuffer(outColor, (writeIndex * 3) + 2, float4(Color + v3.x * colorGradX + v3.y * colorGradY, colorAlpha));
   dir = nextDir;
+  placeholder = float2(writeIndex, 0);
 }
 
 
-placeholder = Direction;
+// placeholder = Direction;
 
 

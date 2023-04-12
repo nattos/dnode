@@ -490,6 +490,9 @@ namespace NanoGraph {
     public IReadOnlyList<NanoValueInputDecl> ValueInputs => _valueInputs;
     private readonly List<NanoValueInputDecl> _valueInputs = new List<NanoValueInputDecl>();
 
+    public IReadOnlyList<string> BufferOutputs => _bufferOutputs;
+    private readonly List<string> _bufferOutputs = new List<string>();
+
     public static readonly string IntIdentifier = "int32_t";
     public static readonly string UintIdentifier = "uint32_t";
     public readonly NanoProgramType VoidType;
@@ -551,6 +554,12 @@ namespace NanoGraph {
         Key = index,
       });
       return index;
+    }
+
+    public string AllocateBufferOutput(string nameHint) {
+      string instanceFieldIdentifier = AddInstanceField(MTLBuffer, nameHint);
+      _bufferOutputs.Add(instanceFieldIdentifier);
+      return instanceFieldIdentifier;
     }
 
     public void AddPreambleStatement(string line) {
