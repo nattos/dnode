@@ -15,12 +15,19 @@ class NanoProgram {
 private:
   static constexpr int PonkMaxPaths = 16;
 public:
+  enum class ParameterType {
+    Float,
+    String,
+  };
+
   struct ParameterDecl {
     std::string Name;
     double DefaultValue;
+    std::string DefaultStringValue;
     double MinValue;
     double MaxValue;
     int Key;
+    ParameterType Type;
   };
 
   struct DebugValue {
@@ -51,6 +58,8 @@ public:
   int GetValueInputCount() const;
   double GetValueInput(int index) const;
   void SetValueInput(int index, double value);
+  std::string GetStringValueInput(int index) const;
+  void SetStringValueInput(int index, const std::string& value);
 
   // TODO: Should be const, but generator code doesn't yet support tagging functions with const.
   virtual int GetTextureInputCount() = 0;
@@ -74,6 +83,7 @@ public:
   double GetFrameTime() const { return _frameTime; }
   double GetFrameDeltaTime() const { return _frameDeltaTime; }
   
+  void SetPonkOutput(bool ponkEnabled, const std::string& ponkDestination);
   void DoPonkOutput(id<MTLBuffer> counterBuffer, id<MTLBuffer> pathPointsBuffer, id<MTLBuffer> pathIndexBuffer);
 
   static void SetCurrentInstance(NanoProgram* ptr);
@@ -92,6 +102,7 @@ private:
   id<MTLCommandBuffer> _currentCommandBuffer;
   bool _createdPipelines = false;
   std::vector<double> _valueInputs;
+  std::vector<std::string> _stringValueInputs;
   std::vector<id<MTLTexture>> _inputTextures;
   std::string _debugOutputTextureKey;
 
@@ -102,10 +113,13 @@ private:
   double _frameTime = 0;
   double _frameDeltaTime = 0;
 
+  bool _ponkEnabled = false;
+  std::string _ponkDestination;
   id<MTLCommandBuffer> _ponkSyncToCpuCommandBuffer = nullptr;
   id<MTLBuffer> _ponkCounterBuffer = nullptr;
   id<MTLBuffer> _ponkPathPointBuffer = nullptr;
   id<MTLBuffer> _ponkPathIndexBuffer = nullptr;
+  std::string _ponkSenderDestination;
   std::unique_ptr<PONKSender> _ponkSender;
 
   static NSLock* _threadMapLock;

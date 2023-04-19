@@ -77,11 +77,23 @@ namespace NanoGraph.VisualScripting {
 
       foreach (var parameter in PluginService.Instance.GetParameters()) {
         using (var check = new EditorGUI.ChangeCheckScope()) {
-          float newValue = EditorGUI.Slider(rect, parameter.Name, (float)parameter.Value, (float)parameter.MinValue, (float)parameter.MaxValue);
-          rect.y += rect.height;
-          if (check.changed) {
-            PluginService.Instance.SetParameter(parameter.Name, newValue);
+          switch (parameter.Type) {
+            case NanoValueInputType.Float: {
+              float newValue = EditorGUI.Slider(rect, parameter.Name, (float)parameter.Value, (float)parameter.MinValue, (float)parameter.MaxValue);
+              if (check.changed) {
+                PluginService.Instance.SetParameter(parameter.Name, newValue);
+              }
+              break;
+            }
+            case NanoValueInputType.String: {
+              string newValue = EditorGUI.TextField(rect, parameter.Name, parameter.StringValue);
+              if (check.changed) {
+                PluginService.Instance.SetParameterString(parameter.Name, newValue);
+              }
+              break;
+            }
           }
+          rect.y += rect.height;
         }
       }
       Rect buttonRect = rect;
@@ -90,6 +102,7 @@ namespace NanoGraph.VisualScripting {
       if (GUI.Button(buttonRect, "Reset all to default")) {
         foreach (var parameter in PluginService.Instance.GetParameters()) {
           PluginService.Instance.SetParameter(parameter.Name, parameter.DefaultValue);
+          PluginService.Instance.SetParameterString(parameter.Name, parameter.DefaultStringValue);
         }
       }
       rect.y += rect.height;

@@ -1431,9 +1431,11 @@ namespace NanoGraph {
             getParamsFunc.AddStatement($"  ParameterDecl {{");
             getParamsFunc.AddStatement($"    .Name = {getParamsFunc.EmitLiteral(valueInput.Name)},");
             getParamsFunc.AddStatement($"    .DefaultValue = {getParamsFunc.EmitLiteral(valueInput.DefaultValue)},");
+            getParamsFunc.AddStatement($"    .DefaultStringValue = {getParamsFunc.EmitLiteral(valueInput.DefaultStringValue)},");
             getParamsFunc.AddStatement($"    .MinValue = {getParamsFunc.EmitLiteral(valueInput.MinValue)},");
             getParamsFunc.AddStatement($"    .MaxValue = {getParamsFunc.EmitLiteral(valueInput.MaxValue)},");
             getParamsFunc.AddStatement($"    .Key = {getParamsFunc.EmitLiteral(valueInput.Key)},");
+            getParamsFunc.AddStatement($"    .Type = ParameterType::{valueInput.Type},");
             getParamsFunc.AddStatement($"  }},");
           }
           getParamsFunc.AddStatement("};");

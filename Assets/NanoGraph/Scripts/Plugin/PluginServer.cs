@@ -28,14 +28,17 @@ namespace NanoGraph.Plugin {
       public string Name;
       public double Value;
       public double DefaultValue;
+      public string DefaultStringValue;
       public double MaxValue;
       public double MinValue;
+      public string Type;
     }
     public Parameter[] Parameters;
   }
 
   public class SetParametersRequest {
     public Dictionary<string, double> Values;
+    public Dictionary<string, string> StringValues;
   }
   public class SetParametersResponse {}
 
@@ -118,10 +121,11 @@ namespace NanoGraph.Plugin {
       });
     }
 
-    public async Task<SetParametersResponse> SetParametersRequest(IEnumerable<KeyValuePair<string, double>> values) {
+    public async Task<SetParametersResponse> SetParametersRequest(IEnumerable<KeyValuePair<string, double>> values = null, IEnumerable<KeyValuePair<string, string>> stringValues = null) {
       return await SendRequestAsync<SetParametersResponse>(new Request {
         SetParameters = new SetParametersRequest {
-          Values = values.ToDictionary(entry => entry.Key, entry => entry.Value),
+          Values = values?.ToDictionary(entry => entry.Key, entry => entry.Value) ?? new Dictionary<string, double>(),
+          StringValues = stringValues?.ToDictionary(entry => entry.Key, entry => entry.Value) ?? new Dictionary<string, string>(),
         }
       });
     }

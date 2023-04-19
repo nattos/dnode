@@ -1,0 +1,322 @@
+
+constexpr float Pi = 3.1415926535897932384626433832795;
+// constexpr float Scale = 1.0;
+// constexpr float SizeSquash = 4.0;
+// constexpr float MaxSize = 0.5;
+// constexpr float LaserFlickerRate = 0.5;
+// constexpr float LaserFlickerEnv = 1.0;
+// constexpr float LaserFlickerThreshold = 0.35;
+// constexpr float LaserHoldTime = 1.0;
+// constexpr float Momentum = 0.1;
+
+constexpr int MaxPointCount = 32;
+
+auto outPosition = output0;
+auto outPathIndex = output1;
+auto outCounter = output2;
+auto outTriggerCenter = output3;
+auto outTriggerDirection = output4;
+auto outTriggerNormal = output5;
+auto outTriggerSize = output6;
+auto outPonkCounter = output7;
+auto outPonkPathPoints = output8;
+auto outPonkPathIndex = output9;
+auto outTriggerTime = output10;
+
+
+float pMode2TriggerRay = prandom.x;
+
+
+float2 transformScale = float2(2.0, -2.0);
+float2 transformOrigin = float2(-1.0, 1.0);
+
+int PointCount = max(3, (int)round(PointCountFloat));
+Size = atan(Size * SizeSquash / MaxSize) / Pi * 2 * MaxSize * Scale;
+
+
+// {
+//   int writeIndex = atomic_fetch_add_explicit(&(outCounter[0]), 1, memory_order_relaxed);
+//   WriteBuffer(outPosition, writeIndex, float2(0, 0));
+// }
+// {
+//   int writeIndex = atomic_fetch_add_explicit(&(outCounter[0]), 1, memory_order_relaxed);
+//   WriteBuffer(outPosition, writeIndex, (Center * transformScale) + transformOrigin);
+// }
+// {
+//   int writeIndex = atomic_fetch_add_explicit(&(outCounter[0]), 1, memory_order_relaxed);
+//   WriteBuffer(outPosition, writeIndex, ((Center + Direction * Size.x * 0.5) * transformScale) + transformOrigin);
+// }
+// {
+//   int writeIndex = atomic_fetch_add_explicit(&(outCounter[0]), 1, memory_order_relaxed);
+//   WriteBuffer(outPosition, writeIndex, (Center * transformScale) + transformOrigin);
+// }
+// {
+//   int writeIndex = atomic_fetch_add_explicit(&(outCounter[0]), 1, memory_order_relaxed);
+//   WriteBuffer(outPosition, writeIndex, ((Center + Normal * Size.y * 0.5) * transformScale) + transformOrigin);
+// }
+
+
+
+float2 triggerCenter = SampleBuffer(outTriggerCenter, gid);
+float2 triggerDirection = SampleBuffer(outTriggerDirection, gid);
+float2 triggerNormal = SampleBuffer(outTriggerNormal, gid);
+float2 triggerSize = SampleBuffer(outTriggerSize, gid);
+float triggerTime = SampleBuffer(outTriggerTime, gid);
+if (EnvTriggered) {
+  triggerCenter = Center;
+  triggerDirection = magnitude_op(triggerDirection) > 0.1 ? normalize(mix(Direction, triggerDirection, Momentum)) : Direction;
+  triggerNormal = magnitude_op(triggerNormal) > 0.1 ? normalize(mix(Normal, triggerNormal, Momentum)) : Normal;
+  // triggerDirection = Direction;
+  // triggerNormal = Normal;
+  triggerSize = Size;
+  triggerTime = LaserHoldTime * 2;
+  WriteBuffer(outTriggerCenter, gid, triggerCenter);
+  WriteBuffer(outTriggerDirection, gid, triggerDirection);
+  WriteBuffer(outTriggerNormal, gid, triggerNormal);
+  WriteBuffer(outTriggerSize, gid, triggerSize);
+}
+
+
+if (!EnvTriggered && EnvValue <= 0.0 && Mode != 2) {
+  return;
+}
+if (!all(isfinite(triggerCenter)) || !all(isfinite(triggerDirection)) || !all(isfinite(triggerNormal)) || !all(isfinite(triggerSize))) {
+  return;
+}
+
+
+float laserFlickerEnvContrib = mix(1.0, 1 - sin(saturate(EnvValue) * Pi), LaserFlickerEnv);
+float flickerDutyFraction = 1.0 - laserFlickerEnvContrib * 0.5;
+triggerTime -= LaserFlickerRate * laserFlickerEnvContrib;
+if (triggerTime < 0) {
+  triggerTime -= floor(triggerTime);
+}
+WriteBuffer(outTriggerTime, gid, triggerTime);
+bool envFlickerOn = triggerTime > flickerDutyFraction && (laserFlickerEnvContrib > LaserFlickerThreshold || triggerTime > 1.0);
+
+bool isLaser = EnvTriggered || envFlickerOn;
+float lineAlpha = EnvValue;
+
+
+if (Mode == 0) {
+  float2 startPoint;
+  float phaseOffset = 0.5 / PointCount;
+  float radiusScale = 0.5 * pow(2.0, 1.0 / (PointCount - 2));
+  for (int i = 0; i < PointCount; ++i) {
+    float t = i / (float)PointCount;
+    float angle = (t + phaseOffset) * Pi * 2;
+    float2 arcDir = float2(cos(angle), sin(angle));
+
+    float2 nextPoint = triggerCenter + (triggerDirection * triggerSize.x * arcDir.x + triggerNormal * triggerSize.y * arcDir.y) * radiusScale;
+    {
+      int writeIndex = atomic_fetch_add_explicit(&(outCounter[0]), 1, memory_order_relaxed);
+      WriteBuffer(outPosition, writeIndex, float3((nextPoint * transformScale) + transformOrigin, lineAlpha));
+      WriteBuffer(outPathIndex, writeIndex, 0);
+    }
+    if (isLaser) {
+      int writeIndex = atomic_fetch_add_explicit(&(outPonkCounter[0]), 1, memory_order_relaxed);
+      WriteBuffer(outPonkPathPoints, writeIndex, (nextPoint * transformScale) + transformOrigin);
+      WriteBuffer(outPonkPathIndex, writeIndex, 0);
+    }
+
+    if (i == 0) {
+      startPoint = nextPoint;
+    }
+  }
+  {
+    int writeIndex = atomic_fetch_add_explicit(&(outCounter[0]), 1, memory_order_relaxed);
+    WriteBuffer(outPosition, writeIndex, float3((startPoint * transformScale) + transformOrigin, lineAlpha));
+    WriteBuffer(outPathIndex, writeIndex, 0);
+  }
+  if (isLaser) {
+    int writeIndex = atomic_fetch_add_explicit(&(outPonkCounter[0]), 1, memory_order_relaxed);
+    WriteBuffer(outPonkPathPoints, writeIndex, (startPoint * transformScale) + transformOrigin);
+    WriteBuffer(outPonkPathIndex, writeIndex, 0);
+  }
+} else if (Mode == 1) {
+  int RayCount = PointCount;
+  constexpr int RayStepCount = 32;
+  constexpr float RayStep = 0.3 / RayStepCount;
+  float2 triggerSizeNorm = triggerSize / max(0.0001, max(triggerSize.x, triggerSize.y));
+
+  float2 startPoint;
+  float phaseOffset = 0.5 / PointCount;
+  float radiusScale = 0.5 * pow(2.0, 1.0 / (RayCount - 2));
+  for (int i = 0; i < RayCount; ++i) {
+    float t = i / (float)RayCount;
+    float angle = (t + phaseOffset) * Pi * 2;
+    float2 arcDir = float2(cos(angle), sin(angle));
+
+    float rayDistance = RayStep;
+    float2 rayDir = triggerDirection * triggerSizeNorm.x * arcDir.x + triggerNormal * triggerSizeNorm.y * arcDir.y;
+    for (int j = 0; j < RayStepCount; ++j) {
+      float2 uv = triggerCenter + rayDir * rayDistance;
+      float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(fineTexture, uv);
+      float value = max(textureSample.r, max(textureSample.g, textureSample.b));
+      if (value < 0.1) {
+        break;
+      }
+      rayDistance += RayStep;
+    }
+
+    float2 nextPoint = triggerCenter + rayDir * rayDistance * Scale;
+    {
+      int writeIndex = atomic_fetch_add_explicit(&(outCounter[0]), 1, memory_order_relaxed);
+      WriteBuffer(outPosition, writeIndex, float3((nextPoint * transformScale) + transformOrigin, lineAlpha));
+      WriteBuffer(outPathIndex, writeIndex, 0);
+    }
+    if (isLaser) {
+      int writeIndex = atomic_fetch_add_explicit(&(outPonkCounter[0]), 1, memory_order_relaxed);
+      WriteBuffer(outPonkPathPoints, writeIndex, (nextPoint * transformScale) + transformOrigin);
+      WriteBuffer(outPonkPathIndex, writeIndex, 0);
+    }
+
+    if (i == 0) {
+      startPoint = nextPoint;
+    }
+  }
+  {
+    int writeIndex = atomic_fetch_add_explicit(&(outCounter[0]), 1, memory_order_relaxed);
+    WriteBuffer(outPosition, writeIndex, float3((startPoint * transformScale) + transformOrigin, lineAlpha));
+    WriteBuffer(outPathIndex, writeIndex, 0);
+  }
+  if (isLaser) {
+    int writeIndex = atomic_fetch_add_explicit(&(outPonkCounter[0]), 1, memory_order_relaxed);
+    WriteBuffer(outPonkPathPoints, writeIndex, (startPoint * transformScale) + transformOrigin);
+    WriteBuffer(outPonkPathIndex, writeIndex, 0);
+  }
+} else if (Mode == 2) {
+  constexpr float RayCountSquash = 8;
+  constexpr float RayMinAlpha = 0.2;
+  constexpr int RayStepCount = 32;
+  constexpr float RayStep = 0.5 / RayStepCount;
+  float rayCountT = saturate(atan(PointCountFloat / MaxPointCount * RayCountSquash) / Pi * 2 * 1.18);
+  int RayCount = (int)ceil(rayCountT * MaxPointCount);
+  float2 triggerSizeNorm = triggerSize / max(0.0001, max(triggerSize.x, triggerSize.y));
+
+  constexpr float Threshold = 0.3;
+  constexpr float RollingDistanceStopThreshold = 0.1;
+  constexpr float RollingDistanceDecayFactor = 0.35;
+
+
+  for (int i = 0; i < MaxPointCount; ++i) {
+    float rayEnv = SampleBuffer(outTriggerSize, 1 + i).x;
+    rayEnv = max(0.0, rayEnv - EnvDecayFactor);
+    WriteBuffer(outTriggerSize, 1 + i, float2(rayEnv, 0));
+
+    float rayTriggerTime = SampleBuffer(outTriggerTime, 1 + i);
+    float rayLaserFlickerEnvContrib = mix(1.0, 1 - sin(saturate(rayEnv) * Pi), LaserFlickerEnv);
+    rayTriggerTime -= LaserFlickerRate * rayLaserFlickerEnvContrib;
+    if (rayTriggerTime < 0) {
+      rayTriggerTime -= floor(rayTriggerTime);
+    }
+    WriteBuffer(outTriggerTime, 1 + i, rayTriggerTime);
+  }
+  if (EnvTriggered) {
+    int triggeredRay = max(0, min(RayCount - 1, (int)(pMode2TriggerRay * RayCount)));
+    WriteBuffer(outTriggerSize, 1 + triggeredRay, float2(1, 0));
+    WriteBuffer(outTriggerTime, 1 + triggeredRay, LaserHoldTime * 2);
+  }
+
+
+
+  float2 topPoint = triggerCenter;
+  for (int j = 0; j < RayStepCount; ++j) {
+    float2 uv = triggerCenter - float2(0, -1) * RayStep * (j + 1);
+    topPoint = uv;
+    float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(fineTexture, uv);
+    float value = max(textureSample.r, max(textureSample.g, textureSample.b));
+    if (value < Threshold) {
+      break;
+    }
+  }
+
+  float rollingDistance = 1.0;
+  for (int i = 0; i < RayCount; ++i) {
+    float t = i / (float)MaxPointCount;
+    float2 searchPoint = topPoint - float2(0, 1) * 0.2 * Scale * t;
+  
+    float distance1 = 0;
+    float distance2 = 0;
+    {
+      float distance = 0;
+      float prevValue = 1;
+      for (int j = 0; j < RayStepCount / 2; ++j) {
+        float2 uv = searchPoint - float2(1, 0) * distance;
+        float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(fineTexture, uv);
+        float value = max(textureSample.r, max(textureSample.g, textureSample.b));
+        if (value < Threshold) {
+          distance += RayStep * saturate(1.0 - (Threshold - value) / (prevValue - value));
+          break;
+        }
+        distance += RayStep;
+        prevValue = value;
+      }
+      distance1 = distance;
+    }
+    {
+      float distance = 0;
+      float prevValue = 1;
+      for (int j = 0; j < RayStepCount / 2; ++j) {
+        float2 uv = searchPoint + float2(1, 0) * distance;
+        float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(fineTexture, uv);
+        float value = max(textureSample.r, max(textureSample.g, textureSample.b));
+        if (value < Threshold) {
+          distance += RayStep * saturate(1.0 - (Threshold - value) / (prevValue - value));
+          break;
+        }
+        distance += RayStep;
+        prevValue = value;
+      }
+      distance2 = distance;
+    }
+
+    float totalDistance = distance1 + distance2;
+    float chokeT = i / (float)(RayCount);
+    float chokeAmount = sin(pow(chokeT, 1 + sin(rayCountT * Pi * 0.5) * 2 + pow(rayCountT, 16) * 80) * Pi * 0.5);
+    float distanceAdjust = totalDistance * chokeAmount * 0.5;
+    rollingDistance = mix(rollingDistance, totalDistance, RollingDistanceDecayFactor);
+    if (rollingDistance < RollingDistanceStopThreshold) {
+      break;
+    }
+
+    float2 point1 = searchPoint - float2(1, 0) * (distance1 - distanceAdjust);
+    float2 point2 = searchPoint + float2(1, 0) * (distance2 - distanceAdjust);
+
+    float rayEnv = pow(SampleBuffer(outTriggerSize, 1 + i).x, 16);
+    float rayTriggerTime = SampleBuffer(outTriggerTime, 1 + i);
+    float rayLaserFlickerEnvContrib = mix(1.0, 1 - sin(saturate(rayEnv) * Pi), LaserFlickerEnv);
+    float rayFlickerDutyFraction = 1.0 - rayLaserFlickerEnvContrib * 0.5;
+    bool rayIsLaser = rayEnv > 0 && rayTriggerTime > rayFlickerDutyFraction && (rayLaserFlickerEnvContrib > LaserFlickerThreshold || rayTriggerTime > 1.0);
+    float rayLineAlpha = mix(RayMinAlpha, 1.0, rayEnv);
+    {
+      int writeIndex = atomic_fetch_add_explicit(&(outCounter[0]), 1, memory_order_relaxed);
+      WriteBuffer(outPosition, writeIndex, float3((point1 * transformScale) + transformOrigin, rayLineAlpha));
+      WriteBuffer(outPathIndex, writeIndex, i);
+    }
+    if (rayIsLaser) {
+      int writeIndex = atomic_fetch_add_explicit(&(outPonkCounter[0]), 1, memory_order_relaxed);
+      WriteBuffer(outPonkPathPoints, writeIndex, (point1 * transformScale) + transformOrigin);
+      WriteBuffer(outPonkPathIndex, writeIndex, i);
+    }
+    {
+      int writeIndex = atomic_fetch_add_explicit(&(outCounter[0]), 1, memory_order_relaxed);
+      WriteBuffer(outPosition, writeIndex, float3((point2 * transformScale) + transformOrigin, rayLineAlpha));
+      WriteBuffer(outPathIndex, writeIndex, i);
+    }
+    if (rayIsLaser) {
+      int writeIndex = atomic_fetch_add_explicit(&(outPonkCounter[0]), 1, memory_order_relaxed);
+      WriteBuffer(outPonkPathPoints, writeIndex, (point2 * transformScale) + transformOrigin);
+      WriteBuffer(outPonkPathIndex, writeIndex, i);
+    }
+  }
+}
+
+
+placeholder = float3(triggerDirection, laserFlickerEnvContrib);
+
+
+
+
+
+

@@ -1,0 +1,55 @@
+
+constexpr float Pi = 3.1415926535897932384626433832795;
+
+
+// constexpr float SamplingStretch = 0.1;
+// constexpr float ScatterStrength = 1.5;
+// constexpr float ScatterSpray = 0.2;
+// constexpr float ScatterSpraySquash = 0.8;
+// constexpr float DistanceSquash = 2.0;
+
+
+float pGeneratorSeed = fract(sin(dot(gid_xy_norm, float2(12.9898, 78.233 + poffset))) * 43758.5453);
+uint pGenerator = ((uint)(pGeneratorSeed * 0xFFFFFFFF)) * 22695477 + 1;
+pGenerator = pGenerator * 22695477 + 1;
+
+
+
+float2 normalizedPos = (gid_xy_norm - 0.5) * 4.0 * float2(1, -1) / AspectRatio;
+float2 distortionNormal = float2(DistortionDirection.y, -DistortionDirection.x);
+
+
+float offset = dot(normalizedPos - DistortionCenter, DistortionDirection);
+float normalOffset = dot(normalizedPos - DistortionCenter, distortionNormal);
+
+
+
+float2 strengthUvOffset = DistortionDirection * -offset * SamplingStretch + distortionNormal * -normalOffset * SamplingStretch;
+float2 strengthUv = gid_xy_norm + strengthUvOffset * float2(1, -1) * AspectRatio;
+
+
+float4 strengthSample = SampleTexture<filter::linear, address::clamp_to_zero>(StrengthTexture, strengthUv);
+float strengthValue = max(strengthSample.r, max(strengthSample.g, strengthSample.b));
+strengthValue = saturate(strengthValue * 4) * saturate((1 - max(0.0, -offset * 80))) * DistortionStrength;
+
+
+float pRandomStrength = ((float)(pGenerator & 0x7FFFFFFF)) / ((float)0x7FFFFFFF);
+pGenerator = pGenerator * 22695477 + 1;
+float pRandomX = ((float)(pGenerator & 0x7FFFFFFF)) / ((float)0x7FFFFFFF);
+pGenerator = pGenerator * 22695477 + 1;
+float pRandomY = ((float)(pGenerator & 0x7FFFFFFF)) / ((float)0x7FFFFFFF);
+pGenerator = pGenerator * 22695477 + 1;
+
+pRandomStrength = mix(0.2, 1.0, pRandomStrength);
+pRandomX = pRandomX * 2.0 - 1.0;
+pRandomY = pow(pRandomY, DistanceSquash);
+
+float scatterStrength = ScatterStrength * pRandomStrength;
+float sprayStrength = ScatterSpray * pow(saturate(offset / 2.0), ScatterSpraySquash) * normalOffset;
+float2 uvOffset = DistortionDirection * -strengthValue * pRandomY * scatterStrength + distortionNormal * -strengthValue * pRandomX * scatterStrength * sprayStrength;
+
+float2 uv = gid_xy_norm + uvOffset * float2(1, -1) * AspectRatio;
+
+OutputColor = SampleTexture<filter::linear, address::clamp_to_zero>(textureInput, uv);
+
+

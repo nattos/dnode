@@ -1,0 +1,348 @@
+
+constexpr float Pi = 3.1415926535897932384626433832795;
+// constexpr int StarPointCount = 6;
+// constexpr int StarDecimate = 1;
+// constexpr float StarSqueeze = 0.2;
+// constexpr float StarSquash = 5.0f;
+// constexpr float StarCenterSize = 0.2f;
+
+
+// constexpr float SwitchStateRate = 0.2;
+// constexpr float SwitchStateBackRateBoost = 2.0;
+// constexpr float StarOnStopRate = 0.5;
+
+
+
+auto outPosition = output0;
+auto outCounter = output1;
+auto outState = output2;
+auto outInitPos = output3;
+auto outInitVelocity = output4;
+auto outTime = output5;
+
+float4 prandom = random[gid];
+float pGeneratorSeed = prandom.x;
+float pNextStepDistance = prandom.y;
+float pSwitchState = prandom.z;
+float pSwitchStateOnStop = prandom.w;
+
+uint pGenerator = ((uint)(pGeneratorSeed * 0xFFFFFFFF)) * 22695477 + 1;
+pGenerator = pGenerator * 22695477 + 1;
+
+
+
+int state = SampleBuffer(outState, gid);
+float switchStateRate = state == 0 ? SwitchStateRate : (SwitchStateRate * SwitchStateBackRateBoost);
+if (pSwitchState < switchStateRate) {
+  state = state == 0 ? 1 : 0;
+}
+
+
+
+
+int accWriteIndex = 0;
+bool doLine = state != 0;
+
+{
+  // constexpr float SamplingDistance = 0.005;
+  // constexpr float ValueStopThreshold = 0.001;
+  // constexpr float GradStopThreshold = -10.0;
+  // constexpr float MomentumFactor = 0.0005;
+  // constexpr float GradientDescentFactor = 0.0;
+  // constexpr float StepSpeed = 0.03;
+  // constexpr int RejectionSampleTries = 10;
+  // constexpr float TimeDecay = 0.1;
+  // constexpr float TimeStopDecay = 0.0;
+  // constexpr int StepCount = 64;
+  // constexpr float AdvStepSpeed = 0.3;
+  // constexpr float AdvMomentum = 0.3;
+
+
+
+  float2 initPos = SampleBuffer(outInitPos, gid);
+  float2 initDir = SampleBuffer(outInitVelocity, gid);
+  float time = SampleBuffer(outTime, gid);
+
+
+
+
+
+
+  float2 pos = initPos;
+  float2 dir = initDir;
+  float2 nextNextDir;
+
+  int stopStepCount = StepCount / 2;
+  bool didStop = false;
+  {
+    float2 normal = float2(dir.y, -dir.x);
+    float value01;
+    float value21;
+    float value10;
+    float value12;
+    {
+      float2 uv = (pos + dir * -SamplingDistance) * float2(AspectRatio, -1) * 0.5 + 0.5;
+      float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(textureInput, uv);
+      value10 = max(textureSample.r, max(textureSample.g, textureSample.b));
+    }
+    {
+      float2 uv = (pos + dir * SamplingDistance) * float2(AspectRatio, -1) * 0.5 + 0.5;
+      float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(textureInput, uv);
+      value12 = max(textureSample.r, max(textureSample.g, textureSample.b));
+    }
+    {
+      float2 uv = (pos + normal * -SamplingDistance) * float2(AspectRatio, -1) * 0.5 + 0.5;
+      float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(textureInput, uv);
+      value01 = max(textureSample.r, max(textureSample.g, textureSample.b));
+    }
+    {
+      float2 uv = (pos + normal * SamplingDistance) * float2(AspectRatio, -1) * 0.5 + 0.5;
+      float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(textureInput, uv);
+      value21 = max(textureSample.r, max(textureSample.g, textureSample.b));
+    }
+    float2 grad = float2(value12 - value10, value21 - value01);
+
+    float2 gradDir = dir * grad.x + normal * grad.y;
+    float2 tangentDir = float2(gradDir.y, -gradDir.x);
+    float dotValue = dot(tangentDir, dir);
+    if (dotValue < 0.00001) {
+      tangentDir = -tangentDir;
+    }
+    nextNextDir = normalize(mix(tangentDir, initDir, AdvMomentum));
+    initDir = nextNextDir;
+  }
+
+
+  if (doLine) {
+    int firstPhaseWriteLength = StepCount;
+    for (int i = 0; i < StepCount; ++i) {
+      float2 normal = float2(dir.y, -dir.x);
+
+      float value01;
+      float value21;
+      float value10;
+      float value12;
+      {
+        float2 uv = (pos + dir * -SamplingDistance) * float2(AspectRatio, -1) * 0.5 + 0.5;
+        float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(textureInput, uv);
+        value10 = max(textureSample.r, max(textureSample.g, textureSample.b));
+      }
+      {
+        float2 uv = (pos + dir * SamplingDistance) * float2(AspectRatio, -1) * 0.5 + 0.5;
+        float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(textureInput, uv);
+        value12 = max(textureSample.r, max(textureSample.g, textureSample.b));
+      }
+      {
+        float2 uv = (pos + normal * -SamplingDistance) * float2(AspectRatio, -1) * 0.5 + 0.5;
+        float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(textureInput, uv);
+        value01 = max(textureSample.r, max(textureSample.g, textureSample.b));
+      }
+      {
+        float2 uv = (pos + normal * SamplingDistance) * float2(AspectRatio, -1) * 0.5 + 0.5;
+        float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(textureInput, uv);
+        value21 = max(textureSample.r, max(textureSample.g, textureSample.b));
+      }
+      float2 grad = float2(value12 - value10, value21 - value01);
+
+      float2 gradDir = dir * grad.x + normal * grad.y;
+      float2 tangentDir = float2(gradDir.y, -gradDir.x);
+      float dotValue = dot(tangentDir, dir);
+      if (dotValue < 0.00001) {
+        tangentDir = -tangentDir;
+      }
+      if (value12 < ValueStopThreshold || grad.x < GradStopThreshold) {
+        firstPhaseWriteLength = i;
+        didStop = i < stopStepCount;
+        break;
+      }
+
+      float2 nextDir = normalize(mix(mix(tangentDir, gradDir, GradientDescentFactor), dir, MomentumFactor));
+      float2 nextPos = pos + nextDir * StepSpeed;
+
+      int writeIndex = accWriteIndex++;
+      float2 writePoint = nextPos;
+      writePoint.x *= AspectRatio;
+      WriteBuffer(outPosition, writeIndex, writePoint);
+      // WriteBuffer(outVertex, (writeIndex * 2 + 0), pos);
+      // WriteBuffer(outVertex, (writeIndex * 2 + 1), nextPos);
+
+      pos = nextPos;
+      dir = nextDir;
+    }
+
+    for (int i = 0; i < firstPhaseWriteLength / 2; ++i) {
+      int indexA = i;
+      int indexB = firstPhaseWriteLength - i - 1;
+      auto tmp = outPosition[indexA];
+      outPosition[indexA] = outPosition[indexB];
+      outPosition[indexB] = tmp;
+    }
+
+    pos = initPos;
+    dir = -initDir;
+    for (int i = 0; i < StepCount; ++i) {
+      float2 normal = float2(dir.y, -dir.x);
+
+      float value01;
+      float value21;
+      float value10;
+      float value12;
+      {
+        float2 uv = (pos + dir * -SamplingDistance) * float2(AspectRatio, -1) * 0.5 + 0.5;
+        float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(textureInput, uv);
+        value10 = max(textureSample.r, max(textureSample.g, textureSample.b));
+      }
+      {
+        float2 uv = (pos + dir * SamplingDistance) * float2(AspectRatio, -1) * 0.5 + 0.5;
+        float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(textureInput, uv);
+        value12 = max(textureSample.r, max(textureSample.g, textureSample.b));
+      }
+      {
+        float2 uv = (pos + normal * -SamplingDistance) * float2(AspectRatio, -1) * 0.5 + 0.5;
+        float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(textureInput, uv);
+        value01 = max(textureSample.r, max(textureSample.g, textureSample.b));
+      }
+      {
+        float2 uv = (pos + normal * SamplingDistance) * float2(AspectRatio, -1) * 0.5 + 0.5;
+        float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(textureInput, uv);
+        value21 = max(textureSample.r, max(textureSample.g, textureSample.b));
+      }
+      float2 grad = float2(value12 - value10, value21 - value01);
+
+      float2 gradDir = dir * grad.x + normal * grad.y;
+      float2 tangentDir = float2(gradDir.y, -gradDir.x);
+      float dotValue = dot(tangentDir, dir);
+      if (dotValue < 0.00001) {
+        tangentDir = -tangentDir;
+      }
+      if (value12 < ValueStopThreshold || grad.x < GradStopThreshold) {
+        didStop = i < stopStepCount;
+        break;
+      }
+
+      float2 nextDir = normalize(mix(mix(tangentDir, gradDir, GradientDescentFactor), dir, MomentumFactor));
+      float2 nextPos = pos + nextDir * StepSpeed;
+
+      int writeIndex = accWriteIndex++;
+      float2 writePoint = nextPos;
+      writePoint.x *= AspectRatio;
+      WriteBuffer(outPosition, writeIndex, writePoint);
+      // WriteBuffer(outVertex, (writeIndex * 2 + 0), pos);
+      // WriteBuffer(outVertex, (writeIndex * 2 + 1), nextPos);
+
+      pos = nextPos;
+      dir = nextDir;
+    }
+  }
+
+
+  // Check if thread has decayed.
+  time -= TimeDecay;
+  if (didStop) {
+    // Determine if we should bounce back.
+    time -= TimeStopDecay;
+    nextNextDir = -nextNextDir;
+  }
+  float2 nextNextPos = initPos + nextNextDir * AdvStepSpeed * pNextStepDistance;
+
+
+
+  if (time <= 0) {
+    uint pGenerator = ((uint)(pGeneratorSeed * 0xFFFFFFFF)) * 22695477 + 1;
+    pGenerator = pGenerator * 22695477 + 1;
+
+    float bestValue = -10000.0f;
+    float2 bestPos = 0.0f;
+    for (int i = 0; i < RejectionSampleTries; ++i) {
+      float pNext0 = ((float)(pGenerator & 0x7FFFFFFF)) / ((float)0x7FFFFFFF);
+      pGenerator = pGenerator * 22695477 + 1;
+      float pNext1 = ((float)(pGenerator & 0x7FFFFFFF)) / ((float)0x7FFFFFFF);
+      pGenerator = pGenerator * 22695477 + 1;
+
+      float2 samplePos = float2(pNext0, pNext1) * 2.0 - 1.0;
+      float2 uv = samplePos * float2(AspectRatio, -1) * 0.5 + 0.5;
+      float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(textureInput, uv);
+      float value = max(textureSample.r, max(textureSample.g, textureSample.b));
+
+      if (value > bestValue) {
+        bestValue = value;
+        bestPos = samplePos;
+      }
+    }
+
+    float pNextDirX = ((float)(pGenerator & 0x7FFFFFFF)) / ((float)0x7FFFFFFF);
+    pGenerator = pGenerator * 22695477 + 1;
+    float pNextDirY = ((float)(pGenerator & 0x7FFFFFFF)) / ((float)0x7FFFFFFF);
+    pGenerator = pGenerator * 22695477 + 1;
+    nextNextPos = bestPos;
+    nextNextDir = normalize(float2(pNextDirX - 0.5, pNextDirY - 0.5));
+    time = 1.0;
+
+    if (pSwitchStateOnStop < StarOnStopRate) {
+      state = 0;
+      accWriteIndex = 0;
+    }
+  }
+
+
+
+  WriteBuffer(outInitPos, gid, nextNextPos);
+  WriteBuffer(outInitVelocity, gid, nextNextDir);
+  WriteBuffer(outTime, gid, time);
+
+
+  placeholder = float2(time);
+}
+
+
+
+
+
+bool doStar = state == 0;
+if (doStar) {
+  int pointDecimate = max(1, StarDecimate + 1);
+  int pointCount = StarPointCount * pointDecimate;
+  float2 startPoint;
+  for (int i = 0; i < pointCount; ++i) {
+    float pAngle = ((float)(pGenerator & 0x7FFFFFFF)) / ((float)0x7FFFFFFF);
+    pGenerator = pGenerator * 22695477 + 1;
+    float pMagnitude = ((float)(pGenerator & 0x7FFFFFFF)) / ((float)0x7FFFFFFF);
+    pGenerator = pGenerator * 22695477 + 1;
+    pMagnitude *= Chaos;
+
+    int decimateIndex = i % pointDecimate;
+    float squeeze = 1.0;
+    if (decimateIndex != 0) {
+      float decimatePos = decimateIndex / (float)pointDecimate;
+      float decimatePower = (decimatePos - 0.5) * 2.0;
+      decimatePower = pow(abs(decimatePower), StarSquash);
+      squeeze = mix(StarSqueeze, 1.0, decimatePower);
+    }
+    pMagnitude *= squeeze;
+    pMagnitude = mix(pMagnitude, 1.0, StarCenterSize);
+
+    float2 pPoint = float2(cos(pAngle * Pi * 2), sin(pAngle * Pi * 2)) * pMagnitude;
+    float2 writePoint = pPoint * Scale;
+
+    writePoint.x *= AspectRatio;
+
+    int writeIndex = accWriteIndex++;
+    WriteBuffer(outPosition, writeIndex, writePoint);
+    if (i == 0) {
+      startPoint = writePoint;
+    }
+  }
+  {
+    int writeIndex = accWriteIndex++;
+    WriteBuffer(outPosition, writeIndex, startPoint);
+  }
+}
+
+
+
+WriteBuffer(outState, gid, state);
+atomic_fetch_add_explicit(&(outCounter[0]), accWriteIndex, memory_order_relaxed);
+
+
+
+

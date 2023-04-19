@@ -127,6 +127,7 @@ namespace NanoGraph {
       // float aspectRatio = monitorTexture.height / (float) monitorTexture.width;
       // float aspectRatio = 9.0f / 16.0f;
       Vector2Int targetOutputSize = NanoGraph.DebugInstance.TargetOutputSize;
+      SerializedTargetOutputSize = targetOutputSize;
       PluginService.Instance.RenderSize = targetOutputSize;
       float aspectRatio = targetOutputSize.y / (float)targetOutputSize.x;
       float desiredHeight = this.position.width * aspectRatio;

@@ -1,0 +1,374 @@
+
+constexpr float Pi = 3.1415926535897932384626433832795;
+constexpr int MaxPointCount = 8;
+
+
+auto outPosition = output0;
+auto outPathIndex = output1;
+auto outCounter = output2;
+auto outTriggerPoint = output3;
+auto outTriggerDirection = output4;
+auto outTriggerNormal = output5;
+auto outTriggerSize = output6;
+auto outPonkCounter = output7;
+auto outPonkPathPoints = output8;
+auto outPonkPathIndex = output9;
+auto outTriggerTime = output10;
+auto outTriPoints = output11;
+auto outTriPointUVs = output12;
+auto outTriPointsCount = output13;
+auto outTriPointsTintColor = output14;
+
+
+
+
+
+float2 transformScale = float2(0.5, 0.5);
+float2 transformOrigin = float2(0.0, 0.0);
+
+
+
+float pGeneratorSeed = prandom.x;
+uint pGenerator = ((uint)(pGeneratorSeed * 0xFFFFFFFF)) * 22695477 + 1;
+pGenerator = pGenerator * 22695477 + 1;
+
+
+
+int nextTriIndex = 0;
+float pretriggerTime = SampleBuffer(outTriggerTime, 0);
+float phaseTime = SampleBuffer(outTriggerTime, 1);
+float triggeredTime = SampleBuffer(outTriggerTime, 2);
+float flickerTime = SampleBuffer(outTriggerTime, 3);
+int phase = SampleBuffer(outTriggerTime, 4);
+
+
+
+
+constexpr int TracePhase = 0;
+constexpr int FlashPhase = 1;
+constexpr int FlashPausePhase = 2;
+constexpr int ZoomPhase = 3;
+constexpr int HoldPhase = 4;
+constexpr int ReleasePhase = 5;
+
+
+
+// constexpr float TracePhaseTimeScale = 1.0;
+// constexpr float TracePhaseCurve = 2.0;
+
+// constexpr float FlashPhaseTimeScale = 1.0;
+// constexpr float FlashPhaseCurve = 2.0;
+
+// constexpr float FlashPausePhaseTimeScale = 1.0;
+
+// constexpr float ZoomPhaseTimeScale = 0.7;
+// constexpr int ZoomPhaseSteps = 5;
+// constexpr int ZoomPhaseMaxZoom = 2;
+// constexpr float ZoomPhaseDutyCycle = 0.9;
+// constexpr float ZoomPhaseEasing = 2.0;
+// constexpr float ZoomPhaseBlackAlpha = 0.7;
+
+// constexpr float HoldPhaseTimeScale = 0.3;
+
+// constexpr float ReleasePhaseTimeScale = 0.8;
+// constexpr float ReleasePhaseLaserCycle = 0.0;
+// constexpr float ReleasePhaseContentsCycle = 0.3;
+
+
+Rate *= DeltaTime;
+
+float oldPhaseTime = phaseTime;
+int oldPhase = phase;
+switch (phase) {
+  case TracePhase: {
+    phaseTime += Rate * DeltaTime * TracePhaseTimeScale;
+    if (phaseTime > 1.0) {
+      phase++;
+    }
+    break;
+  }
+  case FlashPausePhase: {
+    phaseTime += Rate * DeltaTime * FlashPausePhaseTimeScale;
+    if (phaseTime > 1.0) {
+      phase++;
+    }
+    break;
+  }
+  case FlashPhase: {
+    phaseTime += Rate * DeltaTime * FlashPhaseTimeScale;
+    if (phaseTime > 1.0) {
+      phase++;
+    }
+    break;
+  }
+  case ZoomPhase: {
+    phaseTime += Rate * DeltaTime * ZoomPhaseTimeScale;
+    if (phaseTime > 1.0) {
+      phase++;
+    }
+    break;
+  }
+  case HoldPhase: {
+    phaseTime += Rate * DeltaTime * HoldPhaseTimeScale;
+    if (phaseTime > 1.0) {
+      phase++;
+    }
+    break;
+  }
+  case ReleasePhase: {
+    phaseTime += Rate * DeltaTime * ReleasePhaseTimeScale;
+    if (phaseTime > 1.0) {
+      phase++;
+    }
+    break;
+  }
+  default:
+    phase = 0;
+    // phase = ZoomPhase;
+    break;
+}
+
+
+if (oldPhase != phase) {
+  switch (phase) {
+    case TracePhase: {
+      phaseTime = 0;
+      float pArcStart = ((float)(pGenerator & 0x7FFFFFFF)) / ((float)0x7FFFFFFF);
+      pGenerator = pGenerator * 22695477 + 1;
+      WriteBuffer(outTriggerTime, 5, pArcStart); // TraceStart
+      break;
+    }
+    case FlashPausePhase:
+      phaseTime = 0;
+      break;
+    case FlashPhase:
+      phaseTime = 0;
+      break;
+    case ZoomPhase:
+      phaseTime = 0;
+      break;
+    case HoldPhase:
+      phaseTime = 0;
+      break;
+    case ReleasePhase:
+      phaseTime = 0;
+      break;
+  }
+}
+
+
+
+
+
+
+
+
+
+
+bool triggered = false;
+
+pretriggerTime = saturate(pretriggerTime * PretriggerDecay + PretriggerAmount * DeltaTime);
+triggeredTime = max(0.0, triggeredTime - EnvDecay * DeltaTime);
+
+
+
+
+float laserFlickerEnvContrib = mix(1.0, 1 - sin(saturate(triggeredTime) * Pi), LaserFlickerEnv);
+float flickerDutyFraction = 1.0 - laserFlickerEnvContrib * 0.5;
+flickerTime -= LaserFlickerRate * laserFlickerEnvContrib;
+if (flickerTime < 0) {
+  flickerTime -= floor(flickerTime);
+}
+bool envFlickerOn = flickerTime > flickerDutyFraction && (laserFlickerEnvContrib > LaserFlickerThreshold || flickerTime > 1.0);
+bool isLaser = triggered || envFlickerOn;
+
+
+
+
+
+
+WriteBuffer(outTriggerTime, 0, pretriggerTime);
+WriteBuffer(outTriggerTime, 1, phaseTime);
+WriteBuffer(outTriggerTime, 2, triggeredTime);
+WriteBuffer(outTriggerTime, 3, flickerTime);
+WriteBuffer(outTriggerTime, 4, (float)phase);
+
+
+
+float2 shapeCenter = float2(X, Y);
+
+int pointCount = 3;
+float2 points[MaxPointCount];
+points[0] = float2(cos(0.0 / 3 * Pi * 2), sin(0.0 / 3 * Pi * 2)) + shapeCenter;
+points[1] = float2(cos(1.0 / 3 * Pi * 2), sin(1.0 / 3 * Pi * 2)) + shapeCenter;
+points[2] = float2(cos(2.0 / 3 * Pi * 2), sin(2.0 / 3 * Pi * 2)) + shapeCenter;
+
+bool doDrawFrame = false;
+bool doDrawContents = false;
+float contentsZoom = 1.0;
+float4 contentsTintColor = 0.0;
+if (phase == TracePhase) {
+  float totalLength = 0;
+  {
+    float2 prevPoint = points[pointCount - 1];
+    for (int i = 0; i < pointCount; ++i) {
+      float2 point = points[i];
+      float length = magnitude_op(point - prevPoint);
+      totalLength += length;
+      prevPoint = point;
+    }
+  }
+
+  float traceLengthPos = 0;
+  int traceIndex = 0;
+
+  float TraceStart = SampleBuffer(outTriggerTime, 5);
+  float TraceLength = pow(phaseTime, TracePhaseCurve);
+  if (TraceLength < 0.999) {
+
+    float lengthAcc = 0;
+    float2 prevPoint = points[pointCount - 1];
+    bool traceDone = false;
+    for (int i = 0; i < pointCount; ++i) {
+      float2 point = points[i];
+      float length = magnitude_op(point - prevPoint);
+      float nextLength = lengthAcc + length;
+
+      if (nextLength > TraceStart * totalLength) {
+        float withinFraction = 1 - saturate((TraceStart * totalLength - lengthAcc) / length);
+
+        float2 traceStartPoint = mix(point, prevPoint, withinFraction);
+        traceLengthPos = length * withinFraction;
+        prevPoint = point;
+        traceIndex = i + 1;
+
+        if (isLaser) {
+          int writeIndex = atomic_fetch_add_explicit(&(outPonkCounter[0]), 1, memory_order_relaxed);
+          WriteBuffer(outPonkPathPoints, writeIndex, float2(traceStartPoint * transformScale + transformOrigin));
+          WriteBuffer(outPonkPathIndex, writeIndex, 0);
+        }
+
+        if (traceLengthPos > TraceLength * totalLength) {
+          float endWithinFraction = saturate(TraceLength * totalLength / (length * withinFraction));
+          prevPoint = mix(traceStartPoint, point, endWithinFraction);
+          traceDone = true;
+        }
+        if (isLaser) {
+          int writeIndex = atomic_fetch_add_explicit(&(outPonkCounter[0]), 1, memory_order_relaxed);
+          WriteBuffer(outPonkPathPoints, writeIndex, float2(prevPoint * transformScale + transformOrigin));
+          WriteBuffer(outPonkPathIndex, writeIndex, 0);
+        }
+
+        break;
+      }
+
+      prevPoint = point;
+      lengthAcc = nextLength;
+    }
+
+    if (!traceDone) {
+      for (int i = 0; i < pointCount; ++i) {
+        float2 point = points[(traceIndex + i) % pointCount];
+        float length = magnitude_op(point - prevPoint);
+        float nextLength = traceLengthPos + length;
+
+        if (nextLength > TraceLength * totalLength) {
+          float withinFraction = saturate((TraceLength * totalLength - traceLengthPos) / length);
+          float2 traceEndPoint = mix(prevPoint, point, withinFraction);
+          if (isLaser) {
+            int writeIndex = atomic_fetch_add_explicit(&(outPonkCounter[0]), 1, memory_order_relaxed);
+            WriteBuffer(outPonkPathPoints, writeIndex, float2(traceEndPoint * transformScale + transformOrigin));
+            WriteBuffer(outPonkPathIndex, writeIndex, 0);
+          }
+          break;
+        }
+
+        if (isLaser) {
+          int writeIndex = atomic_fetch_add_explicit(&(outPonkCounter[0]), 1, memory_order_relaxed);
+          WriteBuffer(outPonkPathPoints, writeIndex, float2(point * transformScale + transformOrigin));
+          WriteBuffer(outPonkPathIndex, writeIndex, 0);
+        }
+
+        traceLengthPos = nextLength;
+        prevPoint = point;
+      }
+    }
+
+  } else {
+    doDrawFrame = true;
+  }
+} else if (phase == FlashPhase) {
+  doDrawFrame = true;
+  doDrawContents = true;
+  contentsTintColor = float4(float3(1), saturate(1 - pow(phaseTime, FlashPhaseCurve)));
+  isLaser = true;
+} else if (phase == FlashPausePhase) {
+  doDrawFrame = true;
+  doDrawContents = true;
+} else if (phase == ZoomPhase) {
+  float rawCycles = phaseTime * ZoomPhaseSteps;
+  int cycles = (int)floor(rawCycles);
+  float cyclePos = rawCycles - cycles;
+  int oldCycles = (int)floor(oldPhaseTime * ZoomPhaseSteps);
+  bool isDuty = cycles == oldCycles && cyclePos < ZoomPhaseDutyCycle;
+
+  doDrawFrame = true;
+  doDrawContents = true;
+  contentsTintColor = isDuty ? float4(0) : float4(float3(0), ZoomPhaseBlackAlpha);
+  contentsZoom = 1 + pow(saturate(((float)cycles) / ZoomPhaseSteps), ZoomPhaseEasing) * ZoomPhaseMaxZoom;
+  isLaser &= isDuty;
+} else if (phase == HoldPhase) {
+  doDrawFrame = true;
+  doDrawContents = true;
+  contentsZoom = 1 + ZoomPhaseMaxZoom;
+} else if (phase == ReleasePhase) {
+  isLaser = true;
+  doDrawFrame = phaseTime < ReleasePhaseLaserCycle;
+  doDrawContents = phaseTime < ReleasePhaseContentsCycle;
+  contentsZoom = 1 + ZoomPhaseMaxZoom;
+}
+
+if (doDrawFrame) {
+  for (int i = 0; i < pointCount; ++i) {
+    float2 point = points[i];
+    if (isLaser) {
+      int writeIndex = atomic_fetch_add_explicit(&(outPonkCounter[0]), 1, memory_order_relaxed);
+      WriteBuffer(outPonkPathPoints, writeIndex, float2(point * transformScale + transformOrigin));
+      WriteBuffer(outPonkPathIndex, writeIndex, 0);
+    }
+  }
+  if (isLaser) {
+    int writeIndex = atomic_fetch_add_explicit(&(outPonkCounter[0]), 1, memory_order_relaxed);
+    WriteBuffer(outPonkPathPoints, writeIndex, float2(points[0] * transformScale + transformOrigin));
+    WriteBuffer(outPonkPathIndex, writeIndex, 0);
+  }
+}
+
+
+
+if (doDrawContents) {
+  float2 point1 = points[0];
+  float2 point2 = points[1];
+  float2 point3 = points[2];
+  float2 pivot = (point1 + point2 + point3) / 3.0;
+  float2 uvTransformScale = float2(0.5 / AspectRatio, -0.5) / contentsZoom;
+  float2 uvTransformOrigin = float2(0.5, 0.5) + pivot * float2(0.5 / AspectRatio, -0.5);
+
+  int writeIndex = nextTriIndex++;
+  WriteBuffer(outTriPoints, writeIndex * 3 + 0, float3(point1 * transformScale + transformOrigin, 1));
+  WriteBuffer(outTriPoints, writeIndex * 3 + 1, float3(point2 * transformScale + transformOrigin, 1));
+  WriteBuffer(outTriPoints, writeIndex * 3 + 2, float3(point3 * transformScale + transformOrigin, 1));
+  WriteBuffer(outTriPointUVs, writeIndex * 3 + 0, (point1 - pivot) * uvTransformScale + uvTransformOrigin);
+  WriteBuffer(outTriPointUVs, writeIndex * 3 + 1, (point2 - pivot) * uvTransformScale + uvTransformOrigin);
+  WriteBuffer(outTriPointUVs, writeIndex * 3 + 2, (point3 - pivot) * uvTransformScale + uvTransformOrigin);
+  WriteBuffer(outTriPointsTintColor, writeIndex * 3 + 0, contentsTintColor);
+  WriteBuffer(outTriPointsTintColor, writeIndex * 3 + 1, contentsTintColor);
+  WriteBuffer(outTriPointsTintColor, writeIndex * 3 + 2, contentsTintColor);
+}
+
+
+WriteBuffer(outTriPointsCount, 0, nextTriIndex);
+
+
+placeholder = float3(phase, phaseTime, triggeredTime);
+

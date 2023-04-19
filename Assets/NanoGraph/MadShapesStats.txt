@@ -1,0 +1,134 @@
+
+constexpr float Pi = 3.1415926535897932384626433832795;
+constexpr int GridWidth = 8;
+
+
+float values[GridWidth * GridWidth];
+float totalValue = 0;
+{
+  int index = 0;
+  float2 uv;
+  for (int y = 0; y < GridWidth; ++y) {
+    uv.y = (((float)y) + 0.5) / GridWidth;
+    for (int x = 0; x < GridWidth; ++x) {
+      uv.x = (((float)x) + 0.5) / GridWidth;
+      float4 textureSample = SampleTexture<filter::nearest, address::clamp_to_zero>(textureInput, uv);
+      float value = max(textureSample.r, max(textureSample.g, textureSample.b));
+      values[index++] = value;
+      totalValue += value;
+    }
+  }
+}
+
+float2 accCenter = 0;
+{
+  int index = 0;
+  float2 uv;
+  for (int y = 0; y < GridWidth; ++y) {
+    uv.y = (((float)y) + 0.5) / GridWidth;
+    for (int x = 0; x < GridWidth; ++x) {
+      uv.x = (((float)x) + 0.5) / GridWidth;
+      float value = values[index++];
+      accCenter += uv * value;
+    }
+  }
+}
+float2 center = accCenter / totalValue;
+
+
+
+float2 direction;
+float2 normal;
+float2 size;
+{
+  float xx = 0;
+  float xy = 0;
+  float yy = 0;
+  int index = 0;
+  float2 uv;
+  for (int y = 0; y < GridWidth; ++y) {
+    uv.y = (((float)y) + 0.5) / GridWidth;
+    for (int x = 0; x < GridWidth; ++x) {
+      uv.x = (((float)x) + 0.5) / GridWidth;
+      float value = values[index];
+      float2 point = uv - center;
+      float2 weightedPoint = point * value;
+      xx += weightedPoint.x * weightedPoint.x;
+      xy += weightedPoint.x * weightedPoint.y;
+      yy += weightedPoint.y * weightedPoint.y;
+      index++;
+    }
+  }
+
+  float lambda1;
+  float lambda2;
+  float2 eigenvec1;
+  float2 eigenvec2;
+  {
+    float b = -xx - yy;
+    float c = xx * yy - xy * xy;
+    float ac4 = 4 * c;
+    float sqrtBac = sqrt(b * b - ac4);
+    lambda1 = (-b + sqrtBac) / 2;
+    lambda2 = (-b - sqrtBac) / 2;
+  }
+  {
+    float lambda = lambda1;
+    float a = xx / lambda;
+    float b = xy / lambda;
+    float c = xy / lambda;
+    float d = yy / lambda;
+    float vy = c * b / ((1 - a) * (1 - d));
+    float vx = vy * b / (1 - a);
+    eigenvec1 = float2(vx, vy);
+  }
+  {
+    float lambda = lambda2;
+    float a = xx / lambda;
+    float b = xy / lambda;
+    float c = xy / lambda;
+    float d = yy / lambda;
+    float vy = c * b / ((1 - a) * (1 - d));
+    float vx = vy * b / (1 - a);
+    eigenvec2 = float2(vx, vy);
+  }
+
+  if (lambda2 > lambda1) {
+    auto tmpLambda = lambda1;
+    lambda1 = lambda2;
+    lambda2 = tmpLambda;
+    auto tmpEigenvec = eigenvec1;
+    eigenvec1 = eigenvec2;
+    eigenvec2 = tmpEigenvec;
+  }
+  // float normalizedLambda1 = 1.0;
+  // float normalizedLambda2 = lambda2 / max(0.000001, lambda1);
+  float2 pca = sqrt(float2(lambda1, lambda2));
+  if (dot(float2(1, 1), eigenvec1) < 0 || dot(float2(1, -1), eigenvec1) < 0) {
+    eigenvec1 = -eigenvec1;
+  }
+  if (dot(float2(1, 1), eigenvec2) < 0 || dot(float2(1, -1), eigenvec2) < 0) {
+    eigenvec2 = -eigenvec2;
+  }
+
+  direction = normalize(eigenvec1);
+  normal = normalize(eigenvec2);
+  size = pca * GridWidth;
+}
+
+
+
+
+
+
+
+
+Center = center;
+Direction = direction;
+Normal = normal;
+Size = size;
+
+
+
+
+

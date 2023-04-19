@@ -460,12 +460,19 @@ namespace NanoGraph {
     }
   }
 
+  public enum NanoValueInputType {
+    Float,
+    String,
+  }
+
   public struct NanoValueInputDecl {
     public string Name;
     public double DefaultValue;
+    public string DefaultStringValue;
     public double MinValue;
     public double MaxValue;
     public int Key;
+    public NanoValueInputType Type;
   }
 
   public class NanoProgram {
@@ -549,9 +556,25 @@ namespace NanoGraph {
       _valueInputs.Add(new NanoValueInputDecl {
         Name = name,
         DefaultValue = defaultValue,
+        DefaultStringValue = "",
         MinValue = minValue,
         MaxValue = maxValue,
         Key = index,
+        Type = NanoValueInputType.Float,
+      });
+      return index;
+    }
+
+    public int AllocateStringValueInput(string name, string defaultValue) {
+      int index = _valueInputs.Count();
+      _valueInputs.Add(new NanoValueInputDecl {
+        Name = name,
+        DefaultValue = 0,
+        DefaultStringValue = defaultValue,
+        MinValue = 0,
+        MaxValue = 1,
+        Key = index,
+        Type = NanoValueInputType.String,
       });
       return index;
     }

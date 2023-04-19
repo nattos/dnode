@@ -29,7 +29,7 @@ namespace NanoGraph.VisualScripting {
     }
 
     private static readonly HashSet<Type> _allowedUnitTypes = new HashSet<Type> {
-      typeof (SubgraphUnit),
+      // typeof (SubgraphUnit),
       typeof (GraphOutput),
       typeof (GraphInput),
     };

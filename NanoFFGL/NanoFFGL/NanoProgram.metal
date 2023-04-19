@@ -95,8 +95,8 @@ template<> vector_float3 inline Convert<vector_float4, vector_float3>(vector_flo
 
 
 
-template<typename T> static inline float min_op(T a, T b) { return min(a, b); }
-template<typename T> static inline float max_op(T a, T b) { return max(a, b); }
+template<typename T> static inline T min_op(T a, T b) { return min(a, b); }
+template<typename T> static inline T max_op(T a, T b) { return max(a, b); }
 
 
 static inline float atan_op(float a) { return atan(a); }
@@ -181,6 +181,7 @@ template<typename T> static inline T fraction_op(const T value) { return fract(v
 template<typename T> static inline T pow_op(const T a, const T b) { return pow(a, b); }
 template<typename T> static inline T cos_op(const T value) { return cos(value); }
 template<typename T> static inline T sin_op(const T value) { return sin(value); }
+template<typename T> static inline T exp_op(const T value) { return exp(value); }
 
 template<typename T>
 struct ValueAndBool {
@@ -195,6 +196,7 @@ template<typename T> static inline bool not_op(const T value) { return !to_bool(
 template<typename T> static inline bool and_op(const T lhs, const T rhs) { return to_bool(lhs) && to_bool(rhs); }
 template<typename T> static inline bool or_op(const T lhs, const T rhs) { return to_bool(lhs) || to_bool(rhs); }
 template<typename T> static inline bool xor_op(const T lhs, const T rhs) { return to_bool(lhs) ^ to_bool(rhs); }
+template<typename T> static inline ValueAndBool<T> equal_op(const T lhs, const T rhs) { return ValueAndBool<T> { rhs, (lhs == rhs) }; }
 template<typename T> static inline ValueAndBool<T> greater_than_op(const T lhs, const T rhs) { return ValueAndBool<T> { rhs, (lhs > rhs) }; }
 template<typename T> static inline ValueAndBool<T> less_than_op(const T lhs, const T rhs) { return ValueAndBool<T> { rhs, (lhs < rhs) }; }
 template<typename T> static inline ValueAndBool<T> greater_or_equal_op(const T lhs, const T rhs) { return ValueAndBool<T> { rhs, (lhs >= rhs) }; }
@@ -222,6 +224,8 @@ template<> inline vector_float4 blend_mix<true, vector_float4>(vector_float4 rhs
 
 template<bool useAlpha, typename T> static inline T add_mix(T rhs, float t) { return rhs * t; }
 template<bool useAlpha, typename T> static inline T add_mix(T rhs, T lhs, float t) { return rhs + lhs * t; }
+template<bool useAlpha, typename T> static inline T subtract_mix(T rhs, float t) { return rhs * t; }
+template<bool useAlpha, typename T> static inline T subtract_mix(T rhs, T lhs, float t) { return rhs - lhs * t; }
 
 
 kernel void CopyTextureSampleNearest(

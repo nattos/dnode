@@ -103,18 +103,17 @@ int PONKSender::draw(const std::vector<std::vector<PonkSenderPoint>>& lines, int
     std::vector<unsigned char> fullData;
     fullData.reserve(65536);
 
-    int points=0;
-
-    float j=0.0f;
-    for (const auto& line:lines){
-        j+=1.0f;
+    int points = 0;
+    float j = 0.0f;
+    for (const auto& line : lines) {
+        j += 1.0f;
 
         fullData.push_back(PONK_DATA_FORMAT_XY_F32_RGB_U8);
         fullData.push_back(2); //at any time?
-        pushMetaData(fullData,"PATHNUMB",j);
-        pushMetaData(fullData,"MAXSPEED",1.0f); //can this go BEFORE pathnumb?
-        push16bits(fullData,line.size());
-        
+        pushMetaData(fullData, "PATHNUMB", j);
+        pushMetaData(fullData, "MAXSPEED", 1.0f); //can this go BEFORE pathnumb?
+        push16bits(fullData, line.size());
+
         for (const PonkSenderPoint& point : line) {
             vector_float2 networkPoint = (point.Point + origin) * normalised_scale;
             vector_float4 color = point.Color;
@@ -130,7 +129,6 @@ int PONKSender::draw(const std::vector<std::vector<PonkSenderPoint>>& lines, int
             push8bits(fullData, networkColor.b);
             points++;
         }
-        
     }
 
     // Compute necessary chunk count
@@ -148,10 +146,12 @@ int PONKSender::draw(const std::vector<std::vector<PonkSenderPoint>>& lines, int
     }
 
     // Send all chunks to the desired IP address
+    bool isFirst = true;
     size_t written = 0;
     unsigned char chunkNumber = 0;
     unsigned char chunksCount = static_cast<unsigned char>(chunksCount64);
-    while (written < fullData.size()) {
+    while (written < fullData.size() || isFirst) {
+        isFirst = false;
         // Write packet header - 8 bytes
         GeomUdpHeader header;
         strncpy(header.headerString,PONK_HEADER_STRING,sizeof(header.headerString));

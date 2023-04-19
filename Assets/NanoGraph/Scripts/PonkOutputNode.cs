@@ -7,6 +7,8 @@ using UnityEngine;
 
 namespace NanoGraph {
   public class PonkOutputNode : ScalarComputeNode {
+    protected override string ShortNamePart => "PonkOutput";
+
     public override DataSpec InputSpec => DataSpec.FromFields(
         DataField.MakeType("Counter", TypeSpec.MakeArray(TypeSpec.MakePrimitive(PrimitiveType.Int))),
         DataField.MakeType("PathPoints", TypeSpec.MakeArray(TypeSpec.MakePrimitive(PrimitiveType.Float2))),
@@ -21,6 +23,9 @@ namespace NanoGraph {
       public string pathPointsInstanceFieldIdentifier;
       public string pathIndexesInstanceFieldIdentifier;
 
+      public int ponkEnabledValueInputKey;
+      public int ponkDestValueInputKey;
+
       public EmitterInput(PonkOutputNode node, ComputeNodeEmitCodeOperationContext context) : base(node, context) {
         Node = node;
       }
@@ -31,6 +36,9 @@ namespace NanoGraph {
         this.counterInstanceFieldIdentifier = program.AllocateBufferOutput($"{Node.ShortName}_Counter");
         this.pathPointsInstanceFieldIdentifier = program.AllocateBufferOutput($"{Node.ShortName}_PathPoints");
         this.pathIndexesInstanceFieldIdentifier = program.AllocateBufferOutput($"{Node.ShortName}_PathIndexes");
+
+        this.ponkEnabledValueInputKey = program.AllocateValueInput("Ponk Enabled", 0, 0, 1);
+        this.ponkDestValueInputKey = program.AllocateStringValueInput("Ponk Dest", "127.0.0.1:5583");
       }
 
       public override void EmitValidateCacheFunctionInner() {
@@ -39,6 +47,7 @@ namespace NanoGraph {
         validateCacheFunction.AddStatement($"{this.counterInstanceFieldIdentifier} = {GetInputExpr("Counter")}->GetGpuBuffer();");
         validateCacheFunction.AddStatement($"{this.pathPointsInstanceFieldIdentifier} = {GetInputExpr("PathPoints")}->GetGpuBuffer();");
         validateCacheFunction.AddStatement($"{this.pathIndexesInstanceFieldIdentifier} = {GetInputExpr("PathIndexes")}->GetGpuBuffer();");
+        validateCacheFunction.AddStatement($"SetPonkOutput(GetValueInput({this.ponkEnabledValueInputKey}) > 0.5, GetStringValueInput({this.ponkDestValueInputKey}));");
 
         var fieldName = resultType.GetField("Placeholder");
         validateCacheFunction.AddStatement($"{cachedResult.Identifier}.{fieldName} = 0;");

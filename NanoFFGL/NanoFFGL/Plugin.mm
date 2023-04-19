@@ -142,7 +142,8 @@ public:
       const auto& valueInput = valueInputs[i];
       _parameterIndexMap[i] = valueInput.Key;
       float defaultValue = (float)valueInput.DefaultValue;
-      SetParamInfo(index, valueInput.Name.c_str(), FF_TYPE_STANDARD, defaultValue);
+      int paramType = valueInput.Type == NanoProgram::ParameterType::String ? FF_TYPE_TEXT : FF_TYPE_STANDARD;
+      SetParamInfo(index, valueInput.Name.c_str(), paramType, defaultValue);
       //In FFGLPluginManager.cpp, line 274, SetParamInfo clamps the default value to 0...1 in case of FF_TYPE_STANDARD
       if(defaultValue < 0.0f || defaultValue > 1.0f) {
         ParamInfo* paramInfo = FindParamInfo(index);
@@ -243,6 +244,24 @@ public:
     }
     return (float)_program->GetValueInput(_parameterIndexMap[valueInputIndex]);
   }
+
+	virtual FFResult SetTextParameter(unsigned int index, const char* value) override {
+    int valueInputIndex = index;
+    if (valueInputIndex < 0 || valueInputIndex >= _program->GetValueInputCount()) {
+      return FF_FAIL;
+    }
+    _program->SetStringValueInput(_parameterIndexMap[valueInputIndex], value);
+    return FF_SUCCESS;
+  }
+
+	virtual char* GetTextParameter(unsigned int index) override {
+    int valueInputIndex = index;
+    if (valueInputIndex < 0 || valueInputIndex >= _program->GetValueInputCount()) {
+      return "";
+    }
+    return (char*)_program->GetStringValueInput(_parameterIndexMap[valueInputIndex]).c_str();
+  }
+
 
 private:
   static AAPLOpenGLMetalInteropTexture* ResizeTexture(AAPLOpenGLMetalInteropTexture* texture, int width, int height, bool createGLFBO = false) {

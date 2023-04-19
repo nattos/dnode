@@ -10,9 +10,12 @@ namespace NanoGraph.Plugin {
   public struct Parameter {
     public string Name;
     public double Value;
+    public string StringValue;
     public double DefaultValue;
+    public string DefaultStringValue;
     public double MinValue;
     public double MaxValue;
+    public NanoValueInputType Type;
   }
 
   public class PluginService : ScriptableObject {
@@ -38,7 +41,9 @@ namespace NanoGraph.Plugin {
     private readonly List<SharedTexture> _textureInputs = new List<SharedTexture>();
     private readonly List<SharedTexture> _textureOutputs = new List<SharedTexture>();
     private Dictionary<string, double> _parameterValues = new Dictionary<string, double>();
+    private Dictionary<string, string> _parameterStringValues = new Dictionary<string, string>();
     private readonly Dictionary<string, double> _queuedParameterValues = new Dictionary<string, double>();
+    private readonly Dictionary<string, string> _queuedParameterStringValues = new Dictionary<string, string>();
     private readonly Dictionary<string, double[]> _queuedDebugSetValues = new Dictionary<string, double[]>();
 
     private readonly Dictionary<string, double[]> _debugValues = new Dictionary<string, double[]>();
@@ -143,9 +148,14 @@ namespace NanoGraph.Plugin {
       }
 
       Dictionary<string, double> queuedParameterValues = null;
+      Dictionary<string, string> queuedParameterStringValues = null;
       if (_queuedParameterValues.Count > 0) {
         queuedParameterValues = _queuedParameterValues.ToDictionary();
         _queuedParameterValues.Clear();
+      }
+      if (_queuedParameterStringValues.Count > 0) {
+        queuedParameterStringValues = _queuedParameterStringValues.ToDictionary();
+        _queuedParameterStringValues.Clear();
       }
       Dictionary<string, double[]> queuedDebugSetValues = null;
       if (_queuedDebugSetValues.Count > 0) {
@@ -160,8 +170,8 @@ namespace NanoGraph.Plugin {
       RequestStepOnce = false;
 
       _inFlightRenderRequest = Task.Run(async () => {
-        if (queuedParameterValues != null) {
-          await _server.SetParametersRequest(queuedParameterValues);
+        if (queuedParameterValues != null || queuedParameterStringValues != null) {
+          await _server.SetParametersRequest(queuedParameterValues, queuedParameterStringValues);
         }
         if (queuedDebugSetValues != null) {
           await _server.DebugSetValues(queuedDebugSetValues.Select(entry => new DebugSetValuesRequest.Value { Key = entry.Key, Values = entry.Value }).ToArray());
@@ -217,27 +227,36 @@ namespace NanoGraph.Plugin {
       var thisCancelationFlag = new CancelationFlag();
       _renderLoopCancelationFlag = thisCancelationFlag;
       EditorUtils.DelayCall += async () => {
-        double frameStartTime = Time.realtimeSinceStartupAsDouble;
-        while (true) {
-          if (thisCancelationFlag.Canceled) {
-            _isServerStarting = false;
-            return;
+        bool didStart = false;
+        try {
+          double frameStartTime = Time.realtimeSinceStartupAsDouble;
+          while (true) {
+            if (thisCancelationFlag.Canceled) {
+              _isServerStarting = false;
+              return;
+            }
+
+            try {
+              await StartServer();
+              _isServerStarting = false;
+              didStart = true;
+            } catch (Exception e) {
+              Debug.Log(e);
+            }
+
+            PushRenderRequest();
+
+            double frameEndTime = Time.realtimeSinceStartupAsDouble;
+            double waitSeconds = TargetFrameDelay - (frameEndTime - frameStartTime);
+            int waitMillis = (int)Math.Round(1000 * waitSeconds);
+            await Task.Delay(Mathf.Max(0, waitMillis));
+            frameStartTime = frameEndTime;
           }
-
-          try {
-            await StartServer();
+        } catch (Exception e) {
+          if (!didStart) {
             _isServerStarting = false;
-          } catch (Exception e) {
-            Debug.Log(e);
           }
-
-          PushRenderRequest();
-
-          double frameEndTime = Time.realtimeSinceStartupAsDouble;
-          double waitSeconds = TargetFrameDelay - (frameEndTime - frameStartTime);
-          int waitMillis = (int)Math.Round(1000 * waitSeconds);
-          await Task.Delay(Mathf.Max(0, waitMillis));
-          frameStartTime = frameEndTime;
+          Debug.Log(e);
         }
       };
     }
@@ -258,6 +277,7 @@ namespace NanoGraph.Plugin {
       Parameter[] parameters = _parameters.ToArray();
       for (int i = 0; i < parameters.Length; ++i) {
         parameters[i].Value = _parameterValues.GetOrDefault(parameters[i].Name);
+        parameters[i].StringValue = _parameterStringValues.GetOrDefault(parameters[i].Name);
       }
       return parameters;
     }
@@ -265,6 +285,11 @@ namespace NanoGraph.Plugin {
     public void SetParameter(string name, double value) {
       _parameterValues[name] = value;
       _queuedParameterValues[name] = value;
+    }
+
+    public void SetParameterString(string name, string value) {
+      _parameterStringValues[name] = value;
+      _queuedParameterStringValues[name] = value;
     }
 
     public double[] GetDebugValues(string key) {
@@ -306,8 +331,10 @@ namespace NanoGraph.Plugin {
         _parameters.Add(new Parameter {
           Name = parameter.Name,
           DefaultValue = parameter.DefaultValue,
+          DefaultStringValue = parameter.DefaultStringValue,
           MinValue = parameter.MinValue,
           MaxValue = parameter.MaxValue,
+          Type = Enum.TryParse<NanoValueInputType>(parameter.Type, out NanoValueInputType type) ? type : NanoValueInputType.Float,
         });
       }
       if (parameterValuesToSet.Count > 0) {

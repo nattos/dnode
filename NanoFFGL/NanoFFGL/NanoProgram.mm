@@ -211,8 +211,10 @@ void NanoProgram::Run() {
 void NanoProgram::SetupParameters() {
   std::vector<ParameterDecl> parameters = GetParameterDecls();
   _valueInputs.resize(parameters.size());
+  _stringValueInputs.resize(parameters.size());
   for (int i = 0; i < parameters.size(); ++i) {
-    _valueInputs[i] = parameters[i].DefaultValue;
+    _valueInputs[parameters[i].Key] = parameters[i].DefaultValue;
+    _stringValueInputs[parameters[i].Key] = parameters[i].DefaultStringValue;
   }
 }
 
@@ -232,12 +234,27 @@ void NanoProgram::SetValueInput(int index, double value) {
   _valueInputs[index] = value;
 }
 
+std::string NanoProgram::GetStringValueInput(int index) const {
+  if (index < 0 || index >= _stringValueInputs.size()) {
+    return "";
+  }
+  return _stringValueInputs[index];
+}
+
+void NanoProgram::SetStringValueInput(int index, const std::string& value) {
+  if (index < 0 || index >= _stringValueInputs.size()) {
+    return;
+  }
+  _stringValueInputs[index] = value;
+}
+
 id<MTLTexture> NanoProgram::GetTextureInput(int index) const {
   if (index < 0 || index >= _inputTextures.size()) {
     return nullptr;
   }
   return _inputTextures[index];
 }
+
 void NanoProgram::SetTextureInput(int index, id<MTLTexture> value) {
   if (index < 0 || index >= _inputTextures.size()) {
     return;
@@ -271,9 +288,60 @@ NanoProgram* NanoProgram::GetCurrentInstance() {
   return result;
 }
 
+void NanoProgram::SetPonkOutput(bool ponkEnabled, const std::string& ponkDestination) {
+  _ponkEnabled = ponkEnabled;
+  _ponkDestination = ponkDestination;
+}
+
+namespace {
+  std::vector<std::string> StringSplit(const std::string& value, const std::string& separator, int limit = -1) {
+    std::string tail = value;
+    std::vector<std::string> result;
+    while (limit < 0 || result.size() < (limit - 1)) {
+      int findPos = tail.find(separator);
+      if (findPos == std::string::npos) {
+        break;
+      }
+      result.push_back(tail.substr(0, findPos));
+      tail = tail.erase(0, findPos + separator.length());
+    }
+    result.push_back(tail);
+    return result;
+  }
+}
+
 void NanoProgram::DoPonkOutput(id<MTLBuffer> counterBuffer, id<MTLBuffer> pathPointsBuffer, id<MTLBuffer> pathIndexBuffer) {
+  if (!_ponkEnabled) {
+    _ponkSender.reset();
+    return;
+  }
+  if (_ponkSenderDestination != _ponkDestination) {
+    _ponkSenderDestination = _ponkDestination;
+    _ponkSender.reset();
+  }
+    auto portParts = StringSplit(_ponkSenderDestination, ":", 2);
+    int port = PONK_PORT;
+    if (portParts.size() >= 2) {
+      port = std::atoi(portParts[1].c_str());
+      if (port == 0) {
+        port = PONK_PORT;
+      }
+    }
+    std::string hostPart = portParts[0];
+    auto hostParts = StringSplit(hostPart, ".");
+    int hostPart1 = 127;
+    int hostPart2 = 0;
+    int hostPart3 = 0;
+    int hostPart4 = 1;
+    if (hostParts.size() == 4) {
+      hostPart1 = std::atoi(hostParts[0].c_str());
+      hostPart2 = std::atoi(hostParts[1].c_str());
+      hostPart3 = std::atoi(hostParts[2].c_str());
+      hostPart4 = std::atoi(hostParts[3].c_str());
+    }
   if (!_ponkSender) {
-    _ponkSender.reset(new PONKSender());
+    uint32_t hostIp = ((hostPart1 << 24) | (hostPart2 << 16) | (hostPart3 << 8) | hostPart4);
+    _ponkSender.reset(new PONKSender(hostIp, port));
   }
 
   std::vector<std::vector<PonkSenderPoint>> lines;
@@ -611,6 +679,7 @@ void NanoProgram::DoPonkOutput(id<MTLBuffer> counterBuffer, id<MTLBuffer> pathPo
   template<typename T> static inline bool and_op(const T& lhs, const T& rhs) { return to_bool(lhs) && to_bool(rhs); }
   template<typename T> static inline bool or_op(const T& lhs, const T& rhs) { return to_bool(lhs) || to_bool(rhs); }
   template<typename T> static inline bool xor_op(const T& lhs, const T& rhs) { return to_bool(lhs) ^ to_bool(rhs); }
+  template<typename T> static inline ValueAndBool<T> equal_op(const T lhs, const T rhs) { return ValueAndBool<T> { rhs, (lhs == rhs) }; }
   template<typename T> static inline ValueAndBool<T> greater_than_op(const T& lhs, const T& rhs) { return ValueAndBool<T> { rhs, (lhs > rhs) }; }
   template<typename T> static inline ValueAndBool<T> less_than_op(const T& lhs, const T& rhs) { return ValueAndBool<T> { rhs, (lhs < rhs) }; }
   template<typename T> static inline ValueAndBool<T> greater_or_equal_op(const T& lhs, const T& rhs) { return ValueAndBool<T> { rhs, (lhs >= rhs) }; }

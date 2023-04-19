@@ -169,12 +169,16 @@ int main(int argc, const char* argv[]) {
           int parameterIndex = 0;
           for (const auto& parameterDecl : g_program->GetParameterDecls()) {
             double currentValue = g_program->GetValueInput(parameterIndex);
+            std::string currentStringValue = g_program->GetStringValueInput(parameterIndex);
             nlohmann::json parameter = {
               { "Name", parameterDecl.Name },
               { "Value", currentValue },
+              { "StringValue", currentStringValue },
               { "DefaultValue", parameterDecl.DefaultValue },
+              { "DefaultStringValue", parameterDecl.DefaultStringValue },
               { "MinValue", parameterDecl.MinValue },
               { "MaxValue", parameterDecl.MaxValue },
+              { "Type", parameterDecl.Type == NanoProgram::ParameterType::String ? "String" : "Float" },
             };
             parameters.push_back(parameter);
             ++parameterIndex;
@@ -193,6 +197,15 @@ int main(int argc, const char* argv[]) {
               continue;
             }
             g_program->SetValueInput(findIt->second, value.get<double>());
+          }
+
+          const nlohmann::json& stringParameters = request["StringValues"].get<nlohmann::json>();
+          for (const auto& [key, value] : stringParameters.items()) {
+            auto findIt = parameterMap.find(key);
+            if (findIt == parameterMap.end()) {
+              continue;
+            }
+            g_program->SetStringValueInput(findIt->second, value.get<std::string>());
           }
 
           nlohmann::json response;

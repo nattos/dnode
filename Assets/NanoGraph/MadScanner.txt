@@ -1,0 +1,240 @@
+
+constexpr float Pi = 3.1415926535897932384626433832795;
+
+auto outPosition = output0;
+auto outPathIndex = output1;
+auto outCounter = output2;
+auto outTriggerPoint = output3;
+auto outTriggerDirection = output4;
+auto outTriggerNormal = output5;
+auto outTriggerSize = output6;
+auto outPonkCounter = output7;
+auto outPonkPathPoints = output8;
+auto outPonkPathIndex = output9;
+auto outTriggerTime = output10;
+auto outTriPoints = output11;
+auto outTriPointUVs = output12;
+auto outTriPointsCount = output13;
+auto outDistortionCenter = output14;
+auto outDistortionDirection = output15;
+auto outDistortionStrength = output16;
+
+
+
+
+float2 transformScale = float2(0.5, 0.5);
+float2 transformOrigin = float2(0.0, 0.0);
+
+
+
+float pGeneratorSeed = prandom.x;
+uint pGenerator = ((uint)(pGeneratorSeed * 0xFFFFFFFF)) * 22695477 + 1;
+pGenerator = pGenerator * 22695477 + 1;
+
+
+
+// constexpr float AspectRatio = 9.0 / 16.0;
+// constexpr float SpawnSize = 1.2;
+// constexpr float PretriggerAmount = 0.1;
+// constexpr float PretriggerDecay = 0.98;
+// constexpr float Rate = 0.2;
+// constexpr float EnvDecay = 0.3;
+// constexpr float DeltaTime = 0.1;
+// constexpr float FlashQuadLength = 2.75;
+// constexpr float FlashQuadFlare = 0.5;
+// constexpr float ShapeSquash = 3.0;
+// constexpr float TimeSquash = 0.2;
+// constexpr float DistortionMin = 0.8;
+// constexpr float DistortionMax = 1.0;
+
+
+
+
+int nextTriIndex = 0;
+float pretriggerTime = SampleBuffer(outTriggerTime, 0);
+float rateTime = SampleBuffer(outTriggerTime, 1);
+float triggeredTime = SampleBuffer(outTriggerTime, 2);
+float flickerTime = SampleBuffer(outTriggerTime, 3);
+
+if (Trigger > 0.5) {
+  rateTime += Rate * DeltaTime;
+} else {
+  rateTime = 0;
+}
+
+float laserFlickerEnvContrib = mix(1.0, 1 - sin(saturate(triggeredTime) * Pi), LaserFlickerEnv);
+float flickerDutyFraction = 1.0 - laserFlickerEnvContrib * 0.5;
+flickerTime -= LaserFlickerRate * laserFlickerEnvContrib;
+if (flickerTime < 0) {
+  flickerTime -= floor(flickerTime);
+}
+bool envFlickerOn = flickerTime > flickerDutyFraction && (laserFlickerEnvContrib > LaserFlickerThreshold || flickerTime > 1.0);
+bool isLaser = envFlickerOn;
+
+
+
+
+
+
+WriteBuffer(outTriggerTime, 0, pretriggerTime);
+WriteBuffer(outTriggerTime, 1, rateTime);
+WriteBuffer(outTriggerTime, 2, triggeredTime);
+WriteBuffer(outTriggerTime, 3, flickerTime);
+
+
+
+
+if (rateTime > 0) {
+  float triggerAlpha = 1;
+  float phaseTime = max(0.00001, atan(rateTime * TimeSquash) / Pi * 2);
+  float minY = -SpawnSize;
+  float maxY = SpawnSize;
+  float lineY = mix(minY, maxY, phaseTime);
+  float height = lineY - minY + FlashQuadLength;
+  float lineWidth = sin(acos(1 - atan(phaseTime * ShapeSquash) / Pi * 2)) * SpawnSize;
+  float2 arcPointStart = float2(lineWidth, lineY);
+  float2 arcPointEnd = float2(-lineWidth, lineY);
+
+  if (isLaser) {
+    {
+      int writeIndex = atomic_fetch_add_explicit(&(outPonkCounter[0]), 1, memory_order_relaxed);
+      WriteBuffer(outPonkPathPoints, writeIndex, float2(arcPointStart * transformScale + transformOrigin));
+      WriteBuffer(outPonkPathIndex, writeIndex, 0);
+    }
+    {
+      int writeIndex = atomic_fetch_add_explicit(&(outPonkCounter[0]), 1, memory_order_relaxed);
+      WriteBuffer(outPonkPathPoints, writeIndex, float2(arcPointEnd * transformScale + transformOrigin));
+      WriteBuffer(outPonkPathIndex, writeIndex, 0);
+    }
+  }
+
+  float2 lineDelta = arcPointEnd - arcPointStart;
+  float lineLength = magnitude_op(lineDelta);
+  float2 lineDir = lineDelta / lineLength;
+  float2 lineNormal = -float2(lineDir.y, -lineDir.x);
+
+  float flashQuadLength = height;
+  float flareLength = FlashQuadFlare * flashQuadLength;
+  float2 flashQuad00 = arcPointStart;
+  float2 flashQuad10 = arcPointEnd;
+  float2 flashQuad01 = flashQuad00 + lineNormal * flashQuadLength - lineDir * flareLength;
+  float2 flashQuad11 = flashQuad10 + lineNormal * flashQuadLength + lineDir * flareLength;
+  float flareInset = flareLength / (1 + flareLength * 2);
+  float2 flashQuadA1 = flashQuad00 + lineNormal * flashQuadLength;
+  float2 flashQuadA1Uv = float2(flareInset, 1);
+  float2 flashQuadB1 = flashQuad10 + lineNormal * flashQuadLength;
+  float2 flashQuadB1Uv = float2(1 - flareInset, 1);
+  float2 flashQuad50 = (flashQuad00 + flashQuad10) * 0.5;
+  float2 flashQuad51 = (flashQuad01 + flashQuad11) * 0.5;
+
+  float pDistortionAlpha = ((float)(pGenerator & 0x7FFFFFFF)) / ((float)0x7FFFFFFF);
+  pGenerator = pGenerator * 22695477 + 1;
+  float distortionAlpha = mix(DistortionMin, DistortionMax, saturate(atan(pDistortionAlpha * 5) / Pi * 2));
+
+  constexpr int QuadHalfCount = 5;
+
+  for (int i = 0; i < QuadHalfCount; ++i) {
+    float t0 = i / ((float)QuadHalfCount);
+    float t1 = (i + 1) / ((float)QuadHalfCount);
+    float2 quad00 = mix(flashQuad50, flashQuad10, t0);
+    float2 quad10 = mix(flashQuad50, flashQuad10, t1);
+    float2 quad01 = mix(flashQuad51, flashQuad11, t0);
+    float2 quad11 = mix(flashQuad51, flashQuad11, t1);
+    float2 quad00Uv = mix(float2(0.5, 0.0), float2(1.0, 0.0), t0);
+    float2 quad10Uv = mix(float2(0.5, 0.0), float2(1.0, 0.0), t1);
+    float2 quad01Uv = mix(float2(0.5, 1.0), float2(1.0, 1.0), t0);
+    float2 quad11Uv = mix(float2(0.5, 1.0), float2(1.0, 1.0), t1);
+    {
+      int writeIndex = nextTriIndex++;
+      WriteBuffer(outTriPoints, writeIndex * 3 + 0, float3(quad00 * transformScale + transformOrigin, triggerAlpha));
+      WriteBuffer(outTriPoints, writeIndex * 3 + 1, float3(quad01 * transformScale + transformOrigin, 0));
+      WriteBuffer(outTriPoints, writeIndex * 3 + 2, float3(quad10 * transformScale + transformOrigin, triggerAlpha));
+      WriteBuffer(outTriPointUVs, writeIndex * 3 + 0, quad00Uv);
+      WriteBuffer(outTriPointUVs, writeIndex * 3 + 1, quad01Uv);
+      WriteBuffer(outTriPointUVs, writeIndex * 3 + 2, quad10Uv);
+    }
+    {
+      int writeIndex = nextTriIndex++;
+      WriteBuffer(outTriPoints, writeIndex * 3 + 0, float3(quad11 * transformScale + transformOrigin, 0));
+      WriteBuffer(outTriPoints, writeIndex * 3 + 1, float3(quad01 * transformScale + transformOrigin, 0));
+      WriteBuffer(outTriPoints, writeIndex * 3 + 2, float3(quad10 * transformScale + transformOrigin, triggerAlpha));
+      WriteBuffer(outTriPointUVs, writeIndex * 3 + 0, quad11Uv);
+      WriteBuffer(outTriPointUVs, writeIndex * 3 + 1, quad01Uv);
+      WriteBuffer(outTriPointUVs, writeIndex * 3 + 2, quad10Uv);
+    }
+  }
+  for (int i = 0; i < QuadHalfCount; ++i) {
+    float t0 = i / ((float)QuadHalfCount);
+    float t1 = (i + 1) / ((float)QuadHalfCount);
+    float2 quad00 = mix(flashQuad50, flashQuad00, t0);
+    float2 quad10 = mix(flashQuad50, flashQuad00, t1);
+    float2 quad01 = mix(flashQuad51, flashQuad01, t0);
+    float2 quad11 = mix(flashQuad51, flashQuad01, t1);
+    float2 quad00Uv = mix(float2(0.5, 0.0), float2(0.0, 0.0), t0);
+    float2 quad10Uv = mix(float2(0.5, 0.0), float2(0.0, 0.0), t1);
+    float2 quad01Uv = mix(float2(0.5, 1.0), float2(0.0, 1.0), t0);
+    float2 quad11Uv = mix(float2(0.5, 1.0), float2(0.0, 1.0), t1);
+    {
+      int writeIndex = nextTriIndex++;
+      WriteBuffer(outTriPoints, writeIndex * 3 + 0, float3(quad00 * transformScale + transformOrigin, triggerAlpha));
+      WriteBuffer(outTriPoints, writeIndex * 3 + 1, float3(quad01 * transformScale + transformOrigin, 0));
+      WriteBuffer(outTriPoints, writeIndex * 3 + 2, float3(quad10 * transformScale + transformOrigin, triggerAlpha));
+      WriteBuffer(outTriPointUVs, writeIndex * 3 + 0, quad00Uv);
+      WriteBuffer(outTriPointUVs, writeIndex * 3 + 1, quad01Uv);
+      WriteBuffer(outTriPointUVs, writeIndex * 3 + 2, quad10Uv);
+    }
+    {
+      int writeIndex = nextTriIndex++;
+      WriteBuffer(outTriPoints, writeIndex * 3 + 0, float3(quad11 * transformScale + transformOrigin, 0));
+      WriteBuffer(outTriPoints, writeIndex * 3 + 1, float3(quad01 * transformScale + transformOrigin, 0));
+      WriteBuffer(outTriPoints, writeIndex * 3 + 2, float3(quad10 * transformScale + transformOrigin, triggerAlpha));
+      WriteBuffer(outTriPointUVs, writeIndex * 3 + 0, quad11Uv);
+      WriteBuffer(outTriPointUVs, writeIndex * 3 + 1, quad01Uv);
+      WriteBuffer(outTriPointUVs, writeIndex * 3 + 2, quad10Uv);
+    }
+  }
+  WriteBuffer(outDistortionCenter, 0, (flashQuad00 + flashQuad10) * 0.5);
+  WriteBuffer(outDistortionDirection, 0, lineNormal);
+  WriteBuffer(outDistortionStrength, 0, distortionAlpha);
+} else {
+  WriteBuffer(outDistortionCenter, 0, float2(0, 0));
+  WriteBuffer(outDistortionDirection, 0, float2(0, 1));
+  WriteBuffer(outDistortionStrength, 0, 0.0);
+}
+
+WriteBuffer(outTriPointsCount, 0, nextTriIndex);
+
+
+placeholder = float3(pretriggerTime, rateTime, Trigger);
+
+
+
+
+// {
+//   int writeIndex = atomic_fetch_add_explicit(&(outCounter[0]), 1, memory_order_relaxed);
+//   WriteBuffer(outPosition, writeIndex, float3(0, 0, 1));
+//   WriteBuffer(outPathIndex, writeIndex, 0);
+// }
+// {
+//   int writeIndex = atomic_fetch_add_explicit(&(outCounter[0]), 1, memory_order_relaxed);
+//   WriteBuffer(outPosition, writeIndex, float3(0, 1, 1));
+//   WriteBuffer(outPathIndex, writeIndex, 0);
+// }
+// {
+//   int writeIndex = atomic_fetch_add_explicit(&(outCounter[0]), 1, memory_order_relaxed);
+//   WriteBuffer(outPosition, writeIndex, float3(1, 0, 1));
+//   WriteBuffer(outPathIndex, writeIndex, 0);
+// }
+// {
+//   int writeIndex = atomic_fetch_add_explicit(&(outCounter[0]), 1, memory_order_relaxed);
+//   WriteBuffer(outPosition, writeIndex, float3(1, 1, 1));
+//   WriteBuffer(outPathIndex, writeIndex, 0);
+// }
+
+
+
+
+
+
+
+
