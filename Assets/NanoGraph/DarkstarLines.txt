@@ -19,6 +19,8 @@ auto outState = output2;
 auto outInitPos = output3;
 auto outInitVelocity = output4;
 auto outTime = output5;
+auto outPonkPathIndex = output6;
+auto outPonkPathColors = output7;
 
 float4 prandom = random[gid];
 float pGeneratorSeed = prandom.x;
@@ -163,6 +165,7 @@ bool doLine = state != 0;
       float2 writePoint = nextPos;
       writePoint.x *= AspectRatio;
       WriteBuffer(outPosition, writeIndex, writePoint);
+      WriteBuffer(outPonkPathColors, writeIndex, mix(float4(1, 1, 1, 1), SampleTexture<filter::linear, address::clamp_to_edge>(ColorTexture, nextPos * 0.5 + 0.5), ColorContrib));
       // WriteBuffer(outVertex, (writeIndex * 2 + 0), pos);
       // WriteBuffer(outVertex, (writeIndex * 2 + 1), nextPos);
 
@@ -174,8 +177,11 @@ bool doLine = state != 0;
       int indexA = i;
       int indexB = firstPhaseWriteLength - i - 1;
       auto tmp = outPosition[indexA];
+      auto tmpColor = outPonkPathColors[indexA];
       outPosition[indexA] = outPosition[indexB];
+      outPonkPathColors[indexA] = outPonkPathColors[indexB];
       outPosition[indexB] = tmp;
+      outPonkPathColors[indexB] = tmpColor;
     }
 
     pos = initPos;
@@ -227,6 +233,7 @@ bool doLine = state != 0;
       float2 writePoint = nextPos;
       writePoint.x *= AspectRatio;
       WriteBuffer(outPosition, writeIndex, writePoint);
+      WriteBuffer(outPonkPathColors, writeIndex, mix(float4(1, 1, 1, 1), SampleTexture<filter::linear, address::clamp_to_edge>(ColorTexture, nextPos * 0.5 + 0.5), ColorContrib));
       // WriteBuffer(outVertex, (writeIndex * 2 + 0), pos);
       // WriteBuffer(outVertex, (writeIndex * 2 + 1), nextPos);
 
@@ -298,11 +305,12 @@ bool doLine = state != 0;
 
 
 
-bool doStar = state == 0;
+bool doStar = state == 0 && StarCenterSize > 0.0001;
 if (doStar) {
   int pointDecimate = max(1, StarDecimate + 1);
   int pointCount = StarPointCount * pointDecimate;
   float2 startPoint;
+  float2 startPos;
   for (int i = 0; i < pointCount; ++i) {
     float pAngle = ((float)(pGenerator & 0x7FFFFFFF)) / ((float)0x7FFFFFFF);
     pGenerator = pGenerator * 22695477 + 1;
@@ -322,19 +330,24 @@ if (doStar) {
     pMagnitude = mix(pMagnitude, 1.0, StarCenterSize);
 
     float2 pPoint = float2(cos(pAngle * Pi * 2), sin(pAngle * Pi * 2)) * pMagnitude;
-    float2 writePoint = pPoint * Scale;
+    float2 writePos = pPoint * Scale;
+    writePos -= (Anchor - 0.5) * float2(-1, 1) * 2.0;
+    float2 writePoint = writePos;
 
     writePoint.x *= AspectRatio;
 
     int writeIndex = accWriteIndex++;
     WriteBuffer(outPosition, writeIndex, writePoint);
+    WriteBuffer(outPonkPathColors, writeIndex, mix(float4(1, 1, 1, 1), SampleTexture<filter::linear, address::clamp_to_edge>(ColorTexture, writePos * 0.5 + 0.5), ColorContrib));
     if (i == 0) {
       startPoint = writePoint;
+      startPos = writePos;
     }
   }
   {
     int writeIndex = accWriteIndex++;
     WriteBuffer(outPosition, writeIndex, startPoint);
+    WriteBuffer(outPonkPathColors, writeIndex, mix(float4(1, 1, 1, 1), SampleTexture<filter::linear, address::clamp_to_edge>(ColorTexture, startPos * 0.5 + 0.5), ColorContrib));
   }
 }
 

@@ -1,12 +1,18 @@
 
 
 
+constexpr int MaxStepCount = 256;
+
 
 auto outCounter = output0;
 auto outVertex = output1;
 auto outInitPos = output2;
 auto outInitDir = output3;
 auto outTime = output4;
+auto outPonkPathPoints = output5;
+auto outPonkPathColors = output6;
+auto outPonkPathIndex = output7;
+auto outPonkCounter = output8;
 
 float4 prandom = random[abs(gid * 163495671 + poffset) % 1048576];
 float pGeneratorSeed = prandom.x;
@@ -30,6 +36,7 @@ int RejectionSampleTries = Params._RejectionSampleTries_006;
 float TimeDecay = Params._TimeDecay_007;
 float TimeStopDecay = Params._TimeStopDecay_008;
 int StepCount = Params._StepCount_009;
+StepCount = min(StepCount, MaxStepCount);
 float AdvStepSpeed = Params._AdvStepSpeed_010;
 float AdvMomentum = Params._AdvMomentum_011;
 float GlitchFactor = Params._GlitchFactor_012;
@@ -43,6 +50,7 @@ float2 dir = initDir;
 float2 nextNextDir;
 float2 nextNextPos;
 
+bool writePonk = gid < PonkPathLimit;
 bool didStop = false;
 {
   float2 normal = float2(dir.y, -dir.x);
@@ -51,22 +59,22 @@ bool didStop = false;
   float value10;
   float value12;
   {
-    float2 uv = (pos + dir * -SamplingDistance) * float2(9.0 / 16.0, -1) * 0.5 + 0.5;
+    float2 uv = (pos + dir * -SamplingDistance) * float2(AspectRatio, -1) * 0.5 + 0.5;
     float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(textureInput, uv);
     value10 = max(textureSample.r, max(textureSample.g, textureSample.b));
   }
   {
-    float2 uv = (pos + dir * SamplingDistance) * float2(9.0 / 16.0, -1) * 0.5 + 0.5;
+    float2 uv = (pos + dir * SamplingDistance) * float2(AspectRatio, -1) * 0.5 + 0.5;
     float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(textureInput, uv);
     value12 = max(textureSample.r, max(textureSample.g, textureSample.b));
   }
   {
-    float2 uv = (pos + normal * -SamplingDistance) * float2(9.0 / 16.0, -1) * 0.5 + 0.5;
+    float2 uv = (pos + normal * -SamplingDistance) * float2(AspectRatio, -1) * 0.5 + 0.5;
     float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(textureInput, uv);
     value01 = max(textureSample.r, max(textureSample.g, textureSample.b));
   }
   {
-    float2 uv = (pos + normal * SamplingDistance) * float2(9.0 / 16.0, -1) * 0.5 + 0.5;
+    float2 uv = (pos + normal * SamplingDistance) * float2(AspectRatio, -1) * 0.5 + 0.5;
     float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(textureInput, uv);
     value21 = max(textureSample.r, max(textureSample.g, textureSample.b));
   }
@@ -85,6 +93,9 @@ bool didStop = false;
 
 int glitchVertexOffset = (int)round(GlitchFactor * vertexOffset);
 
+{
+int ponkWriteLength = 0;
+int ponkWriteIndexes[MaxStepCount];
 for (int i = 0; i < StepCount; ++i) {
   float2 normal = float2(dir.y, -dir.x);
 
@@ -93,22 +104,22 @@ for (int i = 0; i < StepCount; ++i) {
   float value10;
   float value12;
   {
-    float2 uv = (pos + dir * -SamplingDistance) * float2(9.0 / 16.0, -1) * 0.5 + 0.5;
+    float2 uv = (pos + dir * -SamplingDistance) * float2(AspectRatio, -1) * 0.5 + 0.5;
     float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(textureInput, uv);
     value10 = max(textureSample.r, max(textureSample.g, textureSample.b));
   }
   {
-    float2 uv = (pos + dir * SamplingDistance) * float2(9.0 / 16.0, -1) * 0.5 + 0.5;
+    float2 uv = (pos + dir * SamplingDistance) * float2(AspectRatio, -1) * 0.5 + 0.5;
     float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(textureInput, uv);
     value12 = max(textureSample.r, max(textureSample.g, textureSample.b));
   }
   {
-    float2 uv = (pos + normal * -SamplingDistance) * float2(9.0 / 16.0, -1) * 0.5 + 0.5;
+    float2 uv = (pos + normal * -SamplingDistance) * float2(AspectRatio, -1) * 0.5 + 0.5;
     float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(textureInput, uv);
     value01 = max(textureSample.r, max(textureSample.g, textureSample.b));
   }
   {
-    float2 uv = (pos + normal * SamplingDistance) * float2(9.0 / 16.0, -1) * 0.5 + 0.5;
+    float2 uv = (pos + normal * SamplingDistance) * float2(AspectRatio, -1) * 0.5 + 0.5;
     float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(textureInput, uv);
     value21 = max(textureSample.r, max(textureSample.g, textureSample.b));
   }
@@ -131,9 +142,40 @@ for (int i = 0; i < StepCount; ++i) {
   int writeIndex = max(0, atomic_fetch_add_explicit(&(outCounter[0]), 1, memory_order_relaxed) + glitchVertexOffset);
   WriteBuffer(outVertex, (writeIndex * 2 + 0), pos);
   WriteBuffer(outVertex, (writeIndex * 2 + 1), nextPos);
+  if (writePonk) {
+    int ponkWriteIndex = max(0, atomic_fetch_add_explicit(&(outPonkCounter[0]), 1, memory_order_relaxed));
+    outPonkPathPoints[ponkWriteIndex] = nextPos;
+    WriteBuffer(outPonkPathColors, ponkWriteIndex, mix(float4(1, 1, 1, 1), SampleTexture<filter::linear, address::clamp_to_edge>(ColorTexture, nextPos * 0.5 + 0.5), ColorContrib));
+    outPonkPathIndex[ponkWriteIndex] = gid;
+    ponkWriteIndexes[i] = ponkWriteIndex;
+    ++ponkWriteLength;
+  }
 
   pos = nextPos;
   dir = nextDir;
+}
+
+if (writePonk) {
+  for (int i = 0; i < ponkWriteLength / 2; ++i) {
+    int indexA = ponkWriteIndexes[i];
+    int indexB = ponkWriteIndexes[ponkWriteLength - 1 - i];
+    {
+      auto tmp = outPonkPathPoints[indexA];
+      outPonkPathPoints[indexA] = outPonkPathPoints[indexB];
+      outPonkPathPoints[indexB] = tmp;
+    }
+    {
+      auto tmp = outPonkPathColors[indexA];
+      outPonkPathColors[indexA] = outPonkPathColors[indexB];
+      outPonkPathColors[indexB] = tmp;
+    }
+    {
+      auto tmp = outPonkPathIndex[indexA];
+      outPonkPathIndex[indexA] = outPonkPathIndex[indexB];
+      outPonkPathIndex[indexB] = tmp;
+    }
+  }
+}
 }
 
 pos = initPos;
@@ -146,22 +188,22 @@ for (int i = 0; i < StepCount; ++i) {
   float value10;
   float value12;
   {
-    float2 uv = (pos + dir * -SamplingDistance) * float2(9.0 / 16.0, -1) * 0.5 + 0.5;
+    float2 uv = (pos + dir * -SamplingDistance) * float2(AspectRatio, -1) * 0.5 + 0.5;
     float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(textureInput, uv);
     value10 = max(textureSample.r, max(textureSample.g, textureSample.b));
   }
   {
-    float2 uv = (pos + dir * SamplingDistance) * float2(9.0 / 16.0, -1) * 0.5 + 0.5;
+    float2 uv = (pos + dir * SamplingDistance) * float2(AspectRatio, -1) * 0.5 + 0.5;
     float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(textureInput, uv);
     value12 = max(textureSample.r, max(textureSample.g, textureSample.b));
   }
   {
-    float2 uv = (pos + normal * -SamplingDistance) * float2(9.0 / 16.0, -1) * 0.5 + 0.5;
+    float2 uv = (pos + normal * -SamplingDistance) * float2(AspectRatio, -1) * 0.5 + 0.5;
     float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(textureInput, uv);
     value01 = max(textureSample.r, max(textureSample.g, textureSample.b));
   }
   {
-    float2 uv = (pos + normal * SamplingDistance) * float2(9.0 / 16.0, -1) * 0.5 + 0.5;
+    float2 uv = (pos + normal * SamplingDistance) * float2(AspectRatio, -1) * 0.5 + 0.5;
     float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(textureInput, uv);
     value21 = max(textureSample.r, max(textureSample.g, textureSample.b));
   }
@@ -184,6 +226,12 @@ for (int i = 0; i < StepCount; ++i) {
   int writeIndex = max(0, atomic_fetch_add_explicit(&(outCounter[0]), 1, memory_order_relaxed) + glitchVertexOffset);
   WriteBuffer(outVertex, (writeIndex * 2 + 0), pos);
   WriteBuffer(outVertex, (writeIndex * 2 + 1), nextPos);
+  if (writePonk) {
+    int ponkWriteIndex = max(0, atomic_fetch_add_explicit(&(outPonkCounter[0]), 1, memory_order_relaxed));
+    outPonkPathPoints[ponkWriteIndex] = nextPos;
+    WriteBuffer(outPonkPathColors, ponkWriteIndex, mix(float4(1, 1, 1, 1), SampleTexture<filter::linear, address::clamp_to_edge>(ColorTexture, nextPos * 0.5 + 0.5), ColorContrib));
+    outPonkPathIndex[ponkWriteIndex] = gid;
+  }
 
   pos = nextPos;
   dir = nextDir;
@@ -214,7 +262,7 @@ if (time <= 0) {
     pGenerator = pGenerator * 22695477 + 1;
 
     float2 samplePos = float2(pNext0, pNext1) * 2.0 - 1.0;
-    float2 uv = samplePos * float2(9.0 / 16.0, -1) * 0.5 + 0.5;
+    float2 uv = samplePos * float2(AspectRatio, -1) * 0.5 + 0.5;
     float4 textureSample = SampleTexture<filter::linear, address::clamp_to_zero>(textureInput, uv);
     float value = max(textureSample.r, max(textureSample.g, textureSample.b));
 

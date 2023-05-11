@@ -1,0 +1,40 @@
+
+
+
+constexpr int MaxStepCount = 256;
+constexpr float pointSize = 4.0 / 1024.0;
+
+
+auto outPonkCounter = output0;
+auto outPonkPathPoints = output1;
+auto outPonkPathColors = output2;
+auto outPonkPathIndex = output3;
+
+
+bool writePonk = gid < Limit && gid < Count;
+
+
+if (writePonk) {
+  float2 nextPos = SampleBuffer(Points, gid).xy;
+  float4 color = mix(float4(1, 1, 1, 1), SampleTexture<filter::linear, address::clamp_to_edge>(ColorTexture, nextPos * 0.5 + 0.5), ColorContrib);
+  {
+    int ponkWriteIndex = max(0, atomic_fetch_add_explicit(&(outPonkCounter[0]), 1, memory_order_relaxed));
+    outPonkPathPoints[ponkWriteIndex] = nextPos;
+    WriteBuffer(outPonkPathColors, ponkWriteIndex, color);
+    outPonkPathIndex[ponkWriteIndex] = gid;
+  }
+  {
+    int ponkWriteIndex = max(0, atomic_fetch_add_explicit(&(outPonkCounter[0]), 1, memory_order_relaxed));
+    outPonkPathPoints[ponkWriteIndex] = nextPos + float2(pointSize, pointSize);
+    WriteBuffer(outPonkPathColors, ponkWriteIndex, color);
+    outPonkPathIndex[ponkWriteIndex] = gid;
+  }
+}
+
+placeholder = 0;
+
+
+
+
+
+

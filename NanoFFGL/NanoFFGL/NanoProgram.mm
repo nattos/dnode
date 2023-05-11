@@ -1,6 +1,8 @@
 #include "Prefix.pch"
 
+#include <dlfcn.h>
 #include "PonkSender.h"
+#include "NioStackData.h"
 
 namespace {
   id<MTLDevice> NanoProgramGetCurrentMTLDevice();
@@ -15,14 +17,22 @@ public:
   NanoBuffer(int elementSize)
       : ElementSize(elementSize) {
   }
+  NanoBuffer(void* buffer, int byteCount)
+      : ElementSize(byteCount)
+      , _noCopyCpuBuffer(buffer)
+      , _hasCpuBuffer(true) {
+  }
 
   int GetByteLength() const { return ElementSize; }
   int GetTotalByteLength() const { return ElementSize * _elementCount; }
   int GetElementCount() const { return _elementCount; }
-  void* GetCpuBuffer() { return _cpuBuffer.data(); }
+  void* GetCpuBuffer() { return _noCopyCpuBuffer ?: _cpuBuffer.data(); }
   id<MTLBuffer> GetGpuBuffer() const { return _gpuBuffer; }
 
   void Resize(int elementCount) {
+    if (_noCopyCpuBuffer) {
+      return;
+    }
     if (elementCount == _elementCount) {
       if (_elementCount == 0) {
         _hasCpuBuffer = true;
@@ -47,6 +57,9 @@ public:
     }
   }
   void EnsureCapacity(int elementCount) {
+    if (_noCopyCpuBuffer) {
+      return;
+    }
     if (elementCount <= _elementCount) {
       if (_elementCount == 0) {
         _cpuBuffer.reserve(ElementSize);
@@ -59,7 +72,7 @@ public:
 
   void EnsureCpuBuffer() {
     // TODO: Implement.
-    if (_hasCpuBuffer) {
+    if (_noCopyCpuBuffer || _hasCpuBuffer) {
       return;
     }
     _hasCpuBuffer = true;
@@ -108,6 +121,8 @@ public:
   void CopyCpuFrom(NanoBuffer* other) {
     assert(this);
     assert(other);
+    assert(!this->_noCopyCpuBuffer);
+    assert(!other->_noCopyCpuBuffer);
     swap(this->_cpuBuffer, other->_cpuBuffer);
     this->_hasCpuBuffer = true;
     this->_elementCount = other->_elementCount;
@@ -130,6 +145,7 @@ private:
 
   int _elementCount;
   bool _hasCpuBuffer = false;
+  void* _noCopyCpuBuffer = nullptr;
   std::vector<uint8> _cpuBuffer;
   int _gpuBufferCapacityCount = 0;
   id<MTLBuffer> _gpuBuffer;
@@ -310,7 +326,7 @@ namespace {
   }
 }
 
-void NanoProgram::DoPonkOutput(id<MTLBuffer> counterBuffer, id<MTLBuffer> pathPointsBuffer, id<MTLBuffer> pathIndexBuffer) {
+void NanoProgram::DoPonkOutput(id<MTLBuffer> counterBuffer, id<MTLBuffer> pathPointsBuffer, id<MTLBuffer> pathColorsBuffer, id<MTLBuffer> pathIndexBuffer) {
   if (!_ponkEnabled) {
     _ponkSender.reset();
     return;
@@ -349,11 +365,19 @@ void NanoProgram::DoPonkOutput(id<MTLBuffer> counterBuffer, id<MTLBuffer> pathPo
     [_ponkSyncToCpuCommandBuffer waitUntilCompleted];
     _ponkSyncToCpuCommandBuffer = nullptr;
     int count = ((const int *)_ponkCounterBuffer.contents)[0];
+    count = std::min(count, (int)(_ponkPathPointBuffer.length / sizeof(vector_float2)));
+    count = std::min(count, (int)(_ponkPathIndexBuffer.length / sizeof(int)));
+    count = std::min(count, (int)(_ponkPathColorsBuffer.length / sizeof(vector_float4)));
     const vector_float2* points = (const vector_float2*)_ponkPathPointBuffer.contents;
     const int* indices = (const int*)_ponkPathIndexBuffer.contents;
+    const vector_float4* colors = (const vector_float4*)_ponkPathColorsBuffer.contents;
     for (int i = 0; i < count; ++i) {
       const vector_float2 point = points[i];
       const int index = indices[i];
+      vector_float4 color = vector_float4(1.0f);
+      if (colors) {
+        color = colors[i];
+      }
       if (index < 0 || index >= PonkMaxPaths) {
         continue;
       }
@@ -364,7 +388,7 @@ void NanoProgram::DoPonkOutput(id<MTLBuffer> counterBuffer, id<MTLBuffer> pathPo
       std::vector<PonkSenderPoint>& polyline = lines[index];
       PonkSenderPoint ponkSenderPoint = {
         .Point = vector_float2 { clientPoint.x, clientPoint.y },
-        .Color = vector_float4(1.0f),
+        .Color = color,
       };
       polyline.push_back(ponkSenderPoint);
     }
@@ -381,6 +405,7 @@ void NanoProgram::DoPonkOutput(id<MTLBuffer> counterBuffer, id<MTLBuffer> pathPo
   }
   _ponkCounterBuffer = [_device newBufferWithLength:counterBuffer.length options:MTLResourceStorageModeManaged];
   _ponkPathPointBuffer = [_device newBufferWithLength:pathPointsBuffer.length options:MTLResourceStorageModeManaged];
+  _ponkPathColorsBuffer = pathColorsBuffer ? [_device newBufferWithLength:pathColorsBuffer.length options:MTLResourceStorageModeManaged] : nullptr;
   _ponkPathIndexBuffer = [_device newBufferWithLength:pathIndexBuffer.length options:MTLResourceStorageModeManaged];
   {
     id<MTLCommandQueue> commandQueue = GetCommandQueue();
@@ -388,9 +413,15 @@ void NanoProgram::DoPonkOutput(id<MTLBuffer> counterBuffer, id<MTLBuffer> pathPo
     id<MTLBlitCommandEncoder> encoder = [buffer blitCommandEncoder];
     [encoder copyFromBuffer:counterBuffer sourceOffset:0 toBuffer:_ponkCounterBuffer destinationOffset:0 size:counterBuffer.length];
     [encoder copyFromBuffer:pathPointsBuffer sourceOffset:0 toBuffer:_ponkPathPointBuffer destinationOffset:0 size:pathPointsBuffer.length];
+    if (pathColorsBuffer) {
+      [encoder copyFromBuffer:pathColorsBuffer sourceOffset:0 toBuffer:_ponkPathColorsBuffer destinationOffset:0 size:pathColorsBuffer.length];
+    }
     [encoder copyFromBuffer:pathIndexBuffer sourceOffset:0 toBuffer:_ponkPathIndexBuffer destinationOffset:0 size:pathIndexBuffer.length];
     [encoder synchronizeResource:_ponkCounterBuffer];
     [encoder synchronizeResource:_ponkPathPointBuffer];
+    if (_ponkPathColorsBuffer) {
+      [encoder synchronizeResource:_ponkPathColorsBuffer];
+    }
     [encoder synchronizeResource:_ponkPathIndexBuffer];
     [encoder endEncoding];
     // TODO: Use [buffer addCompletedHandler:] to reduce latency.
@@ -434,6 +465,57 @@ void NanoProgram::DoPonkOutput(id<MTLBuffer> counterBuffer, id<MTLBuffer> pathPo
     ptr.reset(NanoSharedTexture::Create(device, width, height));
   }
 
+
+namespace {
+
+static NioGetStackDataPtr g_NioGetStackDataPtr = nullptr;
+static NioGetStackDataEntryCountPtr g_NioGetStackDataEntryCountPtr = nullptr;
+static NioGetStackDataEntryPtr g_NioGetStackDataEntryPtr = nullptr;
+static NioAddStackDataEntryPtr g_NioAddStackDataEntryPtr = nullptr;
+static NioRemoveStackDataEntryPtr g_NioRemoveStackDataEntryPtr = nullptr;
+
+static NioStackDataHandle NioGetStackDataDynamic(NSBundle* bundle) {
+  if (!g_NioGetStackDataPtr) {
+    NSString* bundlePath = [bundle bundlePath];
+    NSString* bundleDir = [bundlePath stringByDeletingLastPathComponent];
+    NSString* libraryPath = [bundleDir stringByAppendingPathComponent:@"libNioStack.dylib"];
+
+    void* libraryHandle = dlopen([libraryPath cStringUsingEncoding:NSUTF8StringEncoding], 0);
+    if (!libraryHandle) {
+      return nullptr;
+    }
+    g_NioGetStackDataPtr = (NioGetStackDataPtr)dlsym(libraryHandle, "NioGetStackData");
+    g_NioGetStackDataEntryCountPtr = (NioGetStackDataEntryCountPtr)dlsym(libraryHandle, "NioGetStackDataEntryCount");
+    g_NioGetStackDataEntryPtr = (NioGetStackDataEntryPtr)dlsym(libraryHandle, "NioGetStackDataEntry");
+    g_NioAddStackDataEntryPtr = (NioAddStackDataEntryPtr)dlsym(libraryHandle, "NioAddStackDataEntry");
+    g_NioRemoveStackDataEntryPtr = (NioRemoveStackDataEntryPtr)dlsym(libraryHandle, "NioRemoveStackDataEntry");
+
+    if (!g_NioGetStackDataPtr) {
+      return nullptr;
+    }
+  }
+  return g_NioGetStackDataPtr();
+}
+
+}
+
+
+  id<MTLTexture> NanoProgram::GetTextureFromStack(int offset) {
+    NioStackDataHandle handle = NioGetStackDataDynamic(GetThisBundle());
+    if (!handle) {
+      return nullptr;
+    }
+    int stackSize = g_NioGetStackDataEntryCountPtr(handle);
+    int readIndex = stackSize - 1 - offset;
+    if (readIndex < 0 || readIndex >= stackSize) {
+      return nullptr;
+    }
+    NioStackEntry* entry = g_NioGetStackDataEntryPtr(handle, readIndex);
+    if (!entry) {
+      return nullptr;
+    }
+    return entry->MetalTexture;
+  }
 
   template<typename TFrom, typename TTo> static inline TTo Convert(TFrom value) {
     return value;

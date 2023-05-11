@@ -1,8 +1,9 @@
 #pragma once
 
-#import "Foundation/Foundation.h"
+#import <Foundation/Foundation.h>
+#import <AVFoundation/AVFoundation.h>
+#import <MetalKit/MetalKit.h>
 #import "simd/simd.h"
-#import "MetalKit/MetalKit.h"
 
 #include <map>
 #include <memory>

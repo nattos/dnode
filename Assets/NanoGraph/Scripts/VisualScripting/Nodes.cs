@@ -737,6 +737,7 @@ namespace NanoGraph.VisualScripting {
   [Alias(typeof(ValueInAliasProvider))]
   public class ValueIn : NodeOfType<ValueInputNode>{}
   public class TextureIn : NodeOfType<TextureInputNode>{}
+  public class NioTextureIn : NodeOfType<NioTextureInputNode>{}
   public class PonkOutput : NodeOfType<PonkOutputNode>{}
 
   public class TypeDecl : NodeOfType<TypeDeclNode>{}

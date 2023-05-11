@@ -1399,7 +1399,7 @@ namespace NanoGraph {
 
       // Much hack.
       if (hasPonkOutput) {
-        executeFunction.AddStatement($"DoPonkOutput(GetOutputBuffer(0), GetOutputBuffer(1), GetOutputBuffer(2));");
+        executeFunction.AddStatement($"DoPonkOutput(GetOutputBuffer(0), GetOutputBuffer(1), GetOutputBuffer(2), GetOutputBuffer(3));");
       }
 
       // Store final outputs.
@@ -1457,6 +1457,9 @@ namespace NanoGraph {
       }
       getOutputBufferFunction.AddStatement($"}}");
       getOutputBufferFunction.AddStatement($"return nullptr;");
+
+      var getThisBundleFunction = program.AddOverrideFunction("GetThisBundle", NanoProgram.CpuContext, NanoProgramType.MakeBuiltIn(program, "NSBundle*"));
+      getThisBundleFunction.AddStatement($"return [NSBundle bundleForClass:[{objCPlaceholderClassIdentifier} class]];");
 
       string outerCpuCode = program.OuterCpuCode;
       if (DebugVerbose) {

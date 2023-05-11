@@ -18,6 +18,8 @@ auto outTriPointsCount = output13;
 auto outDistortionCenter = output14;
 auto outDistortionDirection = output15;
 auto outDistortionStrength = output16;
+auto outPonkPathColors = output17;
+
 
 
 
@@ -99,11 +101,13 @@ if (rateTime > 0) {
     {
       int writeIndex = atomic_fetch_add_explicit(&(outPonkCounter[0]), 1, memory_order_relaxed);
       WriteBuffer(outPonkPathPoints, writeIndex, float2(arcPointStart * transformScale + transformOrigin));
+      WriteBuffer(outPonkPathColors, writeIndex, mix(float4(1, 1, 1, 1), SampleTexture<filter::linear, address::clamp_to_edge>(ColorTexture, arcPointStart), ColorContrib));
       WriteBuffer(outPonkPathIndex, writeIndex, 0);
     }
     {
       int writeIndex = atomic_fetch_add_explicit(&(outPonkCounter[0]), 1, memory_order_relaxed);
       WriteBuffer(outPonkPathPoints, writeIndex, float2(arcPointEnd * transformScale + transformOrigin));
+      WriteBuffer(outPonkPathColors, writeIndex, mix(float4(1, 1, 1, 1), SampleTexture<filter::linear, address::clamp_to_edge>(ColorTexture, arcPointEnd), ColorContrib));
       WriteBuffer(outPonkPathIndex, writeIndex, 0);
     }
   }

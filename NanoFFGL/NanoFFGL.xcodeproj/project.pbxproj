@@ -27,6 +27,8 @@
 		0C4E42AE29C75D1F00834EE4 /* SyphonCFMessageSender.m in Sources */ = {isa = PBXBuildFile; fileRef = 0C4E428C29C75CCD00834EE4 /* SyphonCFMessageSender.m */; };
 		0C4E42AF29C75D1F00834EE4 /* SyphonServerConnectionManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 0C4E427829C75CCD00834EE4 /* SyphonServerConnectionManager.m */; };
 		0C4E42B029C75D2E00834EE4 /* libSyphon.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 0C4E429C29C75CFE00834EE4 /* libSyphon.a */; };
+		0C5175222A0C21B700AEA612 /* NanoAudioInputStream.h in Headers */ = {isa = PBXBuildFile; fileRef = 0C5175202A0C21B700AEA612 /* NanoAudioInputStream.h */; };
+		0C5175232A0C21B700AEA612 /* NanoAudioInputStream.mm in Sources */ = {isa = PBXBuildFile; fileRef = 0C5175212A0C21B700AEA612 /* NanoAudioInputStream.mm */; };
 		0C518A2A294BCB0D00E31962 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0C518A29294BCB0D00E31962 /* Assets.xcassets */; };
 		0C5E92842972D78700DD1FEC /* libNanoFFGLLib.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 0C34D386296F78CF00D3C19F /* libNanoFFGLLib.a */; };
 		0C5E92852972D79400DD1FEC /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0CF2DE73296F9B3100E7E950 /* MetalKit.framework */; };
@@ -49,6 +51,8 @@
 		0CBB556529C75C0C002C42DC /* CoreVideo.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0C5E928F2972D88E00DD1FEC /* CoreVideo.framework */; };
 		0CBB556629C75C0C002C42DC /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0C34D37E296F783100D3C19F /* Metal.framework */; };
 		0CBB556729C75C0C002C42DC /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0CF2DE73296F9B3100E7E950 /* MetalKit.framework */; };
+		0CC897E72A03DC5200847077 /* CoreAudio.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0CC897E62A03DC5200847077 /* CoreAudio.framework */; };
+		0CC897E92A03E3DA00847077 /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0CC897E82A03E3DA00847077 /* AVFoundation.framework */; };
 		0CEE60CE29C725A900FB4D22 /* AAPLOpenGLMetalInteropTexture.m in Sources */ = {isa = PBXBuildFile; fileRef = 0C5E928D2972D86B00DD1FEC /* AAPLOpenGLMetalInteropTexture.m */; };
 		0CEE60CF29C725A900FB4D22 /* FFGLSDK.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 0C5E92912972DBE000DD1FEC /* FFGLSDK.cpp */; };
 		0CEE60D329C725A900FB4D22 /* CoreVideo.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0C5E928F2972D88E00DD1FEC /* CoreVideo.framework */; };
@@ -58,6 +62,12 @@
 		0CF2DE74296F9B3100E7E950 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0CF2DE73296F9B3100E7E950 /* MetalKit.framework */; };
 		0CF2DE75296F9B4E00E7E950 /* libNanoFFGLLib.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 0C34D386296F78CF00D3C19F /* libNanoFFGLLib.a */; };
 		0CF2DE7C296F9C6800E7E950 /* NanoProgram.metal in Sources */ = {isa = PBXBuildFile; fileRef = 0C518A37294BCB7B00E31962 /* NanoProgram.metal */; };
+		0CFBB23929F1D48E00FAF45D /* AAPLOpenGLMetalInteropTexture.m in Sources */ = {isa = PBXBuildFile; fileRef = 0C5E928D2972D86B00DD1FEC /* AAPLOpenGLMetalInteropTexture.m */; };
+		0CFBB23A29F1D48E00FAF45D /* FFGLSDK.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 0C5E92912972DBE000DD1FEC /* FFGLSDK.cpp */; };
+		0CFBB23B29F1D48E00FAF45D /* IOPushPlugin.mm in Sources */ = {isa = PBXBuildFile; fileRef = 0CEE60DC29C725EB00FB4D22 /* IOPushPlugin.mm */; };
+		0CFBB23D29F1D48E00FAF45D /* CoreVideo.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0C5E928F2972D88E00DD1FEC /* CoreVideo.framework */; };
+		0CFBB23E29F1D48E00FAF45D /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0C34D37E296F783100D3C19F /* Metal.framework */; };
+		0CFBB23F29F1D48E00FAF45D /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0CF2DE73296F9B3100E7E950 /* MetalKit.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -120,6 +130,8 @@
 		0C4E428B29C75CCD00834EE4 /* SyphonPrivate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SyphonPrivate.h; sourceTree = "<group>"; };
 		0C4E428C29C75CCD00834EE4 /* SyphonCFMessageSender.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SyphonCFMessageSender.m; sourceTree = "<group>"; };
 		0C4E429C29C75CFE00834EE4 /* libSyphon.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libSyphon.a; sourceTree = BUILT_PRODUCTS_DIR; };
+		0C5175202A0C21B700AEA612 /* NanoAudioInputStream.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NanoAudioInputStream.h; sourceTree = "<group>"; };
+		0C5175212A0C21B700AEA612 /* NanoAudioInputStream.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = NanoAudioInputStream.mm; sourceTree = "<group>"; };
 		0C518A20294BCB0C00E31962 /* NanoFFGL.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = NanoFFGL.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		0C518A29294BCB0D00E31962 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		0C518A2E294BCB0D00E31962 /* main.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
@@ -142,9 +154,12 @@
 		0CBB555029C73E7B002C42DC /* NioStackData.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = NioStackData.mm; sourceTree = "<group>"; };
 		0CBB555529C73F17002C42DC /* libNioStack.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = libNioStack.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 		0CBB556C29C75C0C002C42DC /* IO Export.bundle */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "IO Export.bundle"; sourceTree = BUILT_PRODUCTS_DIR; };
+		0CC897E62A03DC5200847077 /* CoreAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreAudio.framework; path = System/Library/Frameworks/CoreAudio.framework; sourceTree = SDKROOT; };
+		0CC897E82A03E3DA00847077 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
 		0CEE60DB29C725A900FB4D22 /* IO Push.bundle */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "IO Push.bundle"; sourceTree = BUILT_PRODUCTS_DIR; };
 		0CEE60DC29C725EB00FB4D22 /* IOPushPlugin.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = IOPushPlugin.mm; sourceTree = "<group>"; };
 		0CF2DE73296F9B3100E7E950 /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
+		0CFBB24429F1D48E00FAF45D /* IO Peek.bundle */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "IO Peek.bundle"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -168,7 +183,9 @@
 			files = (
 				0CF2DE75296F9B4E00E7E950 /* libNanoFFGLLib.a in Frameworks */,
 				0CF2DE74296F9B3100E7E950 /* MetalKit.framework in Frameworks */,
+				0CC897E92A03E3DA00847077 /* AVFoundation.framework in Frameworks */,
 				0C34D381296F783E00D3C19F /* IOSurface.framework in Frameworks */,
+				0CC897E72A03DC5200847077 /* CoreAudio.framework in Frameworks */,
 				0C34D37F296F783100D3C19F /* Metal.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -222,12 +239,24 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		0CFBB23C29F1D48E00FAF45D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0CFBB23D29F1D48E00FAF45D /* CoreVideo.framework in Frameworks */,
+				0CFBB23E29F1D48E00FAF45D /* Metal.framework in Frameworks */,
+				0CFBB23F29F1D48E00FAF45D /* MetalKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		0C34D37B296F782100D3C19F /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				0CC897E82A03E3DA00847077 /* AVFoundation.framework */,
+				0CC897E62A03DC5200847077 /* CoreAudio.framework */,
 				0C5E928F2972D88E00DD1FEC /* CoreVideo.framework */,
 				0CF2DE73296F9B3100E7E950 /* MetalKit.framework */,
 				0C34D380296F783E00D3C19F /* IOSurface.framework */,
@@ -289,6 +318,7 @@
 				0CBB555529C73F17002C42DC /* libNioStack.dylib */,
 				0CBB556C29C75C0C002C42DC /* IO Export.bundle */,
 				0C4E429C29C75CFE00834EE4 /* libSyphon.a */,
+				0CFBB24429F1D48E00FAF45D /* IO Peek.bundle */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -301,6 +331,8 @@
 				0C5E928C2972D86B00DD1FEC /* AAPLGLHeaders.h */,
 				0C5E928B2972D86B00DD1FEC /* AAPLOpenGLMetalInteropTexture.h */,
 				0C5E928D2972D86B00DD1FEC /* AAPLOpenGLMetalInteropTexture.m */,
+				0C5175202A0C21B700AEA612 /* NanoAudioInputStream.h */,
+				0C5175212A0C21B700AEA612 /* NanoAudioInputStream.mm */,
 				0C518A37294BCB7B00E31962 /* NanoProgram.metal */,
 				0C34D392296F798D00D3C19F /* NanoProgram.h */,
 				0C518A36294BCB7B00E31962 /* NanoProgram.mm */,
@@ -333,6 +365,7 @@
 			files = (
 				0C47B30229E7080C00E48917 /* DatagramSocket.h in Headers */,
 				0C47B2FE29E705B500E48917 /* PonkSender.h in Headers */,
+				0C5175222A0C21B700AEA612 /* NanoAudioInputStream.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -492,6 +525,23 @@
 			productReference = 0CEE60DB29C725A900FB4D22 /* IO Push.bundle */;
 			productType = "com.apple.product-type.bundle";
 		};
+		0CFBB23729F1D48E00FAF45D /* IO Peek */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0CFBB24129F1D48E00FAF45D /* Build configuration list for PBXNativeTarget "IO Peek" */;
+			buildPhases = (
+				0CFBB23829F1D48E00FAF45D /* Sources */,
+				0CFBB23C29F1D48E00FAF45D /* Frameworks */,
+				0CFBB24029F1D48E00FAF45D /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "IO Peek";
+			productName = Test;
+			productReference = 0CFBB24429F1D48E00FAF45D /* IO Peek.bundle */;
+			productType = "com.apple.product-type.bundle";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -536,6 +586,7 @@
 				0C5E927D2972D74900DD1FEC /* Plugin */,
 				0CEE60CA29C725A900FB4D22 /* IO Push */,
 				0C6096DF29C72A2B00EFF780 /* IO Pop */,
+				0CFBB23729F1D48E00FAF45D /* IO Peek */,
 				0CBB555F29C75C0C002C42DC /* IO Export */,
 				0CBB555429C73F16002C42DC /* NioStack */,
 				0C4E429B29C75CFE00834EE4 /* Syphon */,
@@ -580,6 +631,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		0CFBB24029F1D48E00FAF45D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -588,6 +646,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				0C47B2FD29E705B500E48917 /* PonkSender.mm in Sources */,
+				0C5175232A0C21B700AEA612 /* NanoAudioInputStream.mm in Sources */,
 				0C34D38F296F78E100D3C19F /* NanoProgram.mm in Sources */,
 				0C47B30329E7080C00E48917 /* DatagramSocket.mm in Sources */,
 			);
@@ -666,6 +725,16 @@
 				0CEE60CE29C725A900FB4D22 /* AAPLOpenGLMetalInteropTexture.m in Sources */,
 				0CEE60CF29C725A900FB4D22 /* FFGLSDK.cpp in Sources */,
 				0CEE60DD29C725EB00FB4D22 /* IOPushPlugin.mm in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0CFBB23829F1D48E00FAF45D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0CFBB23929F1D48E00FAF45D /* AAPLOpenGLMetalInteropTexture.m in Sources */,
+				0CFBB23A29F1D48E00FAF45D /* FFGLSDK.cpp in Sources */,
+				0CFBB23B29F1D48E00FAF45D /* IOPushPlugin.mm in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -861,12 +930,15 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = NanoFFGL/NanoFFGL.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Z3KKQNQ6B6;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSMainStoryboardFile = Main;
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "This app requires microphone access to perform audio reactive effects.";
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -886,12 +958,15 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = NanoFFGL/NanoFFGL.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Z3KKQNQ6B6;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSMainStoryboardFile = Main;
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "This app requires microphone access to perform audio reactive effects.";
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1152,6 +1227,62 @@
 			};
 			name = Release;
 		};
+		0CFBB24229F1D48E00FAF45D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+					"$(PREPROCESSOR_BASE)",
+					"NIO_PEEK=1",
+				);
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = "\"NanoFFGL/lib/\"";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSPrincipalClass = "";
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Bundles";
+				MACOSX_DEPLOYMENT_TARGET = 13.1;
+				MARKETING_VERSION = 1.0;
+				PREPROCESSOR_BASE = "TARGET_OS_MAC=1 TARGET_MACOS=1";
+				PRODUCT_BUNDLE_IDENTIFIER = "";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				WRAPPER_EXTENSION = bundle;
+			};
+			name = Debug;
+		};
+		0CFBB24329F1D48E00FAF45D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(PREPROCESSOR_BASE)",
+					"NIO_PEEK=1",
+				);
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = "\"NanoFFGL/lib/\"";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSPrincipalClass = "";
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Bundles";
+				MACOSX_DEPLOYMENT_TARGET = 13.1;
+				MARKETING_VERSION = 1.0;
+				PREPROCESSOR_BASE = "TARGET_OS_MAC=1 TARGET_MACOS=1";
+				PRODUCT_BUNDLE_IDENTIFIER = "";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				WRAPPER_EXTENSION = bundle;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -1232,6 +1363,15 @@
 			buildConfigurations = (
 				0CEE60D929C725A900FB4D22 /* Debug */,
 				0CEE60DA29C725A900FB4D22 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		0CFBB24129F1D48E00FAF45D /* Build configuration list for PBXNativeTarget "IO Peek" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0CFBB24229F1D48E00FAF45D /* Debug */,
+				0CFBB24329F1D48E00FAF45D /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

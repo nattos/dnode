@@ -116,7 +116,6 @@ namespace {
   constexpr const char* kDebugSetValuesRequestKey = "DebugSetValues";
 }
 
-
 int main(int argc, const char* argv[]) {
   @autoreleasepool {
     g_program = CreateProgram();

@@ -1,0 +1,117 @@
+
+constexpr float Pi = 3.1415926535897932384626433832795;
+constexpr float3  kRGBToYPrime = float3(0.299, 0.587, 0.114);
+constexpr float3  kRGBToI      = float3(0.596, -0.275, -0.321);
+constexpr float3  kRGBToQ      = float3(0.212, -0.523, 0.311);
+
+constexpr float3  kYIQToR     = float3(1.0, 0.956, 0.621);
+constexpr float3  kYIQToG     = float3(1.0, -0.272, -0.647);
+constexpr float3  kYIQToB     = float3(1.0, -1.107, 1.704);
+
+
+constexpr int BucketCount = 64;
+
+constexpr float IsolationWidth = 0.3;
+
+
+float majorBucket;
+float majorBucketWeight;
+{
+  int bestBucket = 0;
+  float bestBucketWeight = 0;
+  for (int i = 0; i < BucketCount; ++i) {
+    float bucketWeight = SampleBuffer(BucketCounts, i);
+    if (bucketWeight > bestBucketWeight) {
+      bestBucketWeight = bucketWeight;
+      bestBucket = i;
+    }
+  }
+  float bucketWeight0 = SampleBuffer(BucketCounts, (bestBucket - 1) & (BucketCount - 1));
+  float bucketWeight1 = bestBucketWeight;
+  float bucketWeight2 = SampleBuffer(BucketCounts, (bestBucket + 1) & (BucketCount - 1));
+  majorBucket = max(-1.0, min(1.0, (bucketWeight2 - bucketWeight0) / bucketWeight1)) * 0.5 + bestBucket;
+  majorBucketWeight = bestBucketWeight;
+}
+
+float minorBucket;
+float minorBucketWeight;
+{
+  int bestBucket = 0;
+  float bestBucketWeight = 0;
+  for (int i = 0; i < BucketCount; ++i) {
+    float isolationAmount = saturate(abs(i - majorBucket) / BucketCount / max(0.0001, IsolationWidth));
+    isolationAmount *= isolationAmount;
+    float bucketWeight = SampleBuffer(BucketCounts, i) * isolationAmount;
+    if (bucketWeight > bestBucketWeight) {
+      bestBucketWeight = bucketWeight;
+      bestBucket = i;
+    }
+  }
+  float bucketWeight0 = SampleBuffer(BucketCounts, (bestBucket - 1) & (BucketCount - 1));
+  float bucketWeight1 = bestBucketWeight;
+  float bucketWeight2 = SampleBuffer(BucketCounts, (bestBucket + 1) & (BucketCount - 1));
+  minorBucket = max(-1.0, min(1.0, (bucketWeight2 - bucketWeight0) / bucketWeight1)) * 0.5 + bestBucket;
+  minorBucketWeight = bestBucketWeight;
+}
+
+float majorMinorDiff = (majorBucket - minorBucket) / BucketCount;
+float rawMajorMinorDiff = majorMinorDiff;
+majorMinorDiff = fmod(majorMinorDiff, 0.5);
+// majorMinorDiff *= 2.0;
+// majorMinorDiff = fract(majorMinorDiff) * sign(majorMinorDiff);
+// majorMinorDiff *= 0.5;
+float offBucket = majorBucket + majorMinorDiff * 0.5;
+offBucket = offBucket + 0.5;
+offBucket -= floor(offBucket);
+offBucket *= BucketCount;
+
+
+
+constexpr float ColorSaturate = 0.05;
+{
+  float3 hsl = float3(majorBucket / BucketCount, 1, 1);
+  float totalWeight = saturate(atan(majorBucketWeight * ColorSaturate) / Pi * 2);
+  float hue = hsl.x * Pi * 2;
+  float chroma = hsl.y;
+  float lightness = hsl.z;
+  float Q = chroma * sin(hue);
+  float I = chroma * cos(hue);
+  float3 yIQ = float3(lightness, I, Q);
+  float3 color = saturate(float3(dot(yIQ, kYIQToR), dot(yIQ, kYIQToG), dot(yIQ, kYIQToB)) * 0.5);
+  MajorColor = mix(NeutralColor, color, totalWeight);
+}
+{
+  float3 hsl = float3(minorBucket / BucketCount, 1, 1);
+  float totalWeight = saturate(atan(minorBucketWeight * ColorSaturate) / Pi * 2);
+  float hue = hsl.x * Pi * 2;
+  float chroma = hsl.y;
+  float lightness = hsl.z;
+  float Q = chroma * sin(hue);
+  float I = chroma * cos(hue);
+  float3 yIQ = float3(lightness, I, Q);
+  float3 color = saturate(float3(dot(yIQ, kYIQToR), dot(yIQ, kYIQToG), dot(yIQ, kYIQToB)) * 0.5);
+  MinorColor = mix(NeutralColor, color, totalWeight);
+}
+{
+  float3 hsl = float3(offBucket / BucketCount, 1, 1);
+  float hue = hsl.x * Pi * 2;
+  float chroma = hsl.y;
+  float lightness = hsl.z;
+  float Q = chroma * sin(hue);
+  float I = chroma * cos(hue);
+  float3 yIQ = float3(lightness, I, Q);
+  OffColor = saturate(float3(dot(yIQ, kYIQToR), dot(yIQ, kYIQToG), dot(yIQ, kYIQToB)) * 0.5);
+}
+
+MajorHue = majorBucket / BucketCount;
+MinorHue = minorBucket / BucketCount;
+OffHue = offBucket / BucketCount;
+
+
+
+// MajorColor = float3(majorBucket / BucketCount, 0, 0);
+// MinorColor = float3(minorBucket / BucketCount, 0, 0);
+// OffColor = float3(offBucket / BucketCount, 0, 0);
+
+
+

@@ -22,6 +22,7 @@ auto outPonkCounter = output7;
 auto outPonkPathPoints = output8;
 auto outPonkPathIndex = output9;
 auto outTriggerTime = output10;
+auto outPonkPathColors = output11;
 
 
 float pMode2TriggerRay = prandom.x;
@@ -108,6 +109,7 @@ if (Mode == 0) {
     float2 arcDir = float2(cos(angle), sin(angle));
 
     float2 nextPoint = triggerCenter + (triggerDirection * triggerSize.x * arcDir.x + triggerNormal * triggerSize.y * arcDir.y) * radiusScale;
+    nextPoint = (atan(nextPoint * 2.0 - 1.0) / Pi * 2) * 0.5 + 0.5;
     {
       int writeIndex = atomic_fetch_add_explicit(&(outCounter[0]), 1, memory_order_relaxed);
       WriteBuffer(outPosition, writeIndex, float3((nextPoint * transformScale) + transformOrigin, lineAlpha));
@@ -116,6 +118,7 @@ if (Mode == 0) {
     if (isLaser) {
       int writeIndex = atomic_fetch_add_explicit(&(outPonkCounter[0]), 1, memory_order_relaxed);
       WriteBuffer(outPonkPathPoints, writeIndex, (nextPoint * transformScale) + transformOrigin);
+      WriteBuffer(outPonkPathColors, writeIndex, mix(float4(1, 1, 1, 1), SampleTexture<filter::linear, address::clamp_to_edge>(ColorTexture, nextPoint), ColorContrib));
       WriteBuffer(outPonkPathIndex, writeIndex, 0);
     }
 
@@ -131,6 +134,7 @@ if (Mode == 0) {
   if (isLaser) {
     int writeIndex = atomic_fetch_add_explicit(&(outPonkCounter[0]), 1, memory_order_relaxed);
     WriteBuffer(outPonkPathPoints, writeIndex, (startPoint * transformScale) + transformOrigin);
+    WriteBuffer(outPonkPathColors, writeIndex, mix(float4(1, 1, 1, 1), SampleTexture<filter::linear, address::clamp_to_edge>(ColorTexture, startPoint), ColorContrib));
     WriteBuffer(outPonkPathIndex, writeIndex, 0);
   }
 } else if (Mode == 1) {
@@ -147,7 +151,7 @@ if (Mode == 0) {
     float angle = (t + phaseOffset) * Pi * 2;
     float2 arcDir = float2(cos(angle), sin(angle));
 
-    float rayDistance = RayStep;
+    float rayDistance = 0;
     float2 rayDir = triggerDirection * triggerSizeNorm.x * arcDir.x + triggerNormal * triggerSizeNorm.y * arcDir.y;
     for (int j = 0; j < RayStepCount; ++j) {
       float2 uv = triggerCenter + rayDir * rayDistance;
@@ -160,6 +164,7 @@ if (Mode == 0) {
     }
 
     float2 nextPoint = triggerCenter + rayDir * rayDistance * Scale;
+    nextPoint = (atan(nextPoint * 2.0 - 1.0) / Pi * 2) * 0.5 + 0.5;
     {
       int writeIndex = atomic_fetch_add_explicit(&(outCounter[0]), 1, memory_order_relaxed);
       WriteBuffer(outPosition, writeIndex, float3((nextPoint * transformScale) + transformOrigin, lineAlpha));
@@ -168,6 +173,7 @@ if (Mode == 0) {
     if (isLaser) {
       int writeIndex = atomic_fetch_add_explicit(&(outPonkCounter[0]), 1, memory_order_relaxed);
       WriteBuffer(outPonkPathPoints, writeIndex, (nextPoint * transformScale) + transformOrigin);
+      WriteBuffer(outPonkPathColors, writeIndex, mix(float4(1, 1, 1, 1), SampleTexture<filter::linear, address::clamp_to_edge>(ColorTexture, nextPoint), ColorContrib));
       WriteBuffer(outPonkPathIndex, writeIndex, 0);
     }
 
@@ -183,6 +189,7 @@ if (Mode == 0) {
   if (isLaser) {
     int writeIndex = atomic_fetch_add_explicit(&(outPonkCounter[0]), 1, memory_order_relaxed);
     WriteBuffer(outPonkPathPoints, writeIndex, (startPoint * transformScale) + transformOrigin);
+    WriteBuffer(outPonkPathColors, writeIndex, mix(float4(1, 1, 1, 1), SampleTexture<filter::linear, address::clamp_to_edge>(ColorTexture, startPoint), ColorContrib));
     WriteBuffer(outPonkPathIndex, writeIndex, 0);
   }
 } else if (Mode == 2) {
@@ -297,6 +304,7 @@ if (Mode == 0) {
     if (rayIsLaser) {
       int writeIndex = atomic_fetch_add_explicit(&(outPonkCounter[0]), 1, memory_order_relaxed);
       WriteBuffer(outPonkPathPoints, writeIndex, (point1 * transformScale) + transformOrigin);
+      WriteBuffer(outPonkPathColors, writeIndex, mix(float4(1, 1, 1, 1), SampleTexture<filter::linear, address::clamp_to_edge>(ColorTexture, point1), ColorContrib));
       WriteBuffer(outPonkPathIndex, writeIndex, i);
     }
     {
@@ -307,6 +315,7 @@ if (Mode == 0) {
     if (rayIsLaser) {
       int writeIndex = atomic_fetch_add_explicit(&(outPonkCounter[0]), 1, memory_order_relaxed);
       WriteBuffer(outPonkPathPoints, writeIndex, (point2 * transformScale) + transformOrigin);
+      WriteBuffer(outPonkPathColors, writeIndex, mix(float4(1, 1, 1, 1), SampleTexture<filter::linear, address::clamp_to_edge>(ColorTexture, point2), ColorContrib));
       WriteBuffer(outPonkPathIndex, writeIndex, i);
     }
   }

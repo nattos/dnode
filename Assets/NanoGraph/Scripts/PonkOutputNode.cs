@@ -12,6 +12,7 @@ namespace NanoGraph {
     public override DataSpec InputSpec => DataSpec.FromFields(
         DataField.MakeType("Counter", TypeSpec.MakeArray(TypeSpec.MakePrimitive(PrimitiveType.Int))),
         DataField.MakeType("PathPoints", TypeSpec.MakeArray(TypeSpec.MakePrimitive(PrimitiveType.Float2))),
+        DataField.MakeType("PathColors", TypeSpec.MakeArray(TypeSpec.MakePrimitive(PrimitiveType.Float4))),
         DataField.MakeType("PathIndexes", TypeSpec.MakeArray(TypeSpec.MakePrimitive(PrimitiveType.Int))));
     public override DataSpec OutputSpec => DataSpec.FromFields(DataField.MakePrimitive("Placeholder", PrimitiveType.Int));
 
@@ -21,6 +22,7 @@ namespace NanoGraph {
       public new PonkOutputNode Node;
       public string counterInstanceFieldIdentifier;
       public string pathPointsInstanceFieldIdentifier;
+      public string pathColorsInstanceFieldIdentifier;
       public string pathIndexesInstanceFieldIdentifier;
 
       public int ponkEnabledValueInputKey;
@@ -35,6 +37,7 @@ namespace NanoGraph {
         NanoProgramType ponkDataType = NanoProgramType.MakeBuiltIn(program, "std::vector<std::vector<vector_float2>>");
         this.counterInstanceFieldIdentifier = program.AllocateBufferOutput($"{Node.ShortName}_Counter");
         this.pathPointsInstanceFieldIdentifier = program.AllocateBufferOutput($"{Node.ShortName}_PathPoints");
+        this.pathColorsInstanceFieldIdentifier = program.AllocateBufferOutput($"{Node.ShortName}_PathColors");
         this.pathIndexesInstanceFieldIdentifier = program.AllocateBufferOutput($"{Node.ShortName}_PathIndexes");
 
         this.ponkEnabledValueInputKey = program.AllocateValueInput("Ponk Enabled", 0, 0, 1);
@@ -46,6 +49,9 @@ namespace NanoGraph {
 
         validateCacheFunction.AddStatement($"{this.counterInstanceFieldIdentifier} = {GetInputExpr("Counter")}->GetGpuBuffer();");
         validateCacheFunction.AddStatement($"{this.pathPointsInstanceFieldIdentifier} = {GetInputExpr("PathPoints")}->GetGpuBuffer();");
+        string pathColorsExpr = GetInputExpr("PathColors");
+        string pathColorsBufferExpr = pathColorsExpr == null ? "nullptr" : $"{pathColorsExpr}->GetGpuBuffer()";
+        validateCacheFunction.AddStatement($"{this.pathColorsInstanceFieldIdentifier} = {pathColorsBufferExpr};");
         validateCacheFunction.AddStatement($"{this.pathIndexesInstanceFieldIdentifier} = {GetInputExpr("PathIndexes")}->GetGpuBuffer();");
         validateCacheFunction.AddStatement($"SetPonkOutput(GetValueInput({this.ponkEnabledValueInputKey}) > 0.5, GetStringValueInput({this.ponkDestValueInputKey}));");
 

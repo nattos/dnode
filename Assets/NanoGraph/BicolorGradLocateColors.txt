@@ -1,0 +1,39 @@
+
+constexpr float Pi = 3.1415926535897932384626433832795;
+constexpr int GridSize = 16;
+
+float2 majorAcc = 0;
+float2 minorAcc = 0;
+float majorWeightAcc = 0;
+float minorWeightAcc = 0;
+for (int y = 0; y < GridSize; ++y) {
+  for (int x = 0; x < GridSize; ++x) {
+    float2 uv = float2((x + 0.5) / (float)GridSize, (y + 0.5) / (float)GridSize);
+    float4 textureSample = SampleTexture<filter::nearest, address::clamp_to_zero>(textureInput, uv);
+    float majorWeight = textureSample.x * textureSample.z;
+    float minorWeight = textureSample.y * textureSample.z;
+    majorAcc += uv * majorWeight;
+    minorAcc += uv * minorWeight;
+    majorWeightAcc += majorWeight;
+    minorWeightAcc += minorWeight;
+  }
+}
+majorAcc = majorWeightAcc > 0.0001 ? (majorAcc / majorWeightAcc) : float2(0.5, 0.5);
+minorAcc = minorWeightAcc > 0.0001 ? (minorAcc / minorWeightAcc) : float2(0.5, 0.5);
+
+float2 diff = majorAcc - minorAcc;
+float length = magnitude_op(diff);
+float2 dir = float2(1, 0);
+if (length > 0.001) {
+  dir = diff / length;
+}
+
+
+Center = (majorAcc + minorAcc) * 0.5 * 2 - 1;
+Direction = dir * DirectionSign;
+Distance = 1.0;
+
+
+
+
+

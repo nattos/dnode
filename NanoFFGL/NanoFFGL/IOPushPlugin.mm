@@ -33,6 +33,11 @@
   #define PLUGIN_NAME "nIO Pop"
 #endif // NIO_POP
 
+#if NIO_PEEK
+  #define PLUGIN_CODE "nIOS"
+  #define PLUGIN_NAME "nIO Peek"
+#endif // NIO_PEEK
+
 #if NIO_EXPORT
   #define PLUGIN_CODE "nIOE"
   #define PLUGIN_NAME "nIO Export"
@@ -224,6 +229,13 @@ public:
   PluginImpl() {
     SetMinInputs(1);
     SetMaxInputs(1);
+#if NIO_POP
+    SetParamInfo(0, "Discard", FF_TYPE_BOOLEAN, false);
+#endif // NIO_POP
+#if NIO_PEEK
+    SetParamInfo(0, "Offset", FF_TYPE_INTEGER, 0.0f);
+    SetParamRange(0, 0, 16);
+#endif // NIO_PEEK
   }
   virtual ~PluginImpl() {}
 
@@ -350,6 +362,7 @@ public:
       thisEntry->LastFrameNumber = _frameNumber;
       thisEntry->TextureRef = _storedTexture;
       thisEntry->OpenGLTexture = _storedTexture.openGLTexture;
+      thisEntry->MetalTexture = _storedTexture.metalTexture;
     }
     // Return fail so that we can avoid a texture copy. The host _should_ just ignore our output.
     return FF_FAIL;
@@ -363,6 +376,37 @@ public:
       }
       NioStackEntry* entry = g_NioGetStackDataEntryPtr(data, dataEntryCount - 1);
 
+      if (!_popDiscard) {
+        auto& shader = g_pipeline->GetBlitFromRectShader();
+        ScopedShaderBinding shaderBinding(shader.GetGLID());
+        ScopedSamplerActivation activateSampler(0);
+        ScopedTextureBinding textureBinding(GL_TEXTURE_RECTANGLE, entry->OpenGLTexture);
+        glSamplerParameteri(GL_TEXTURE0, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glSamplerParameteri(GL_TEXTURE0, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+        shader.Set("InputTexture", 0);
+        FFGLTexCoords maxCoords = GetMaxGLTexCoordsRect(*pGL->inputTextures[0]);
+        shader.Set("MaxUV", maxCoords.s, maxCoords.t);
+        g_pipeline->GetFullViewportQuad().Draw();
+      }
+
+      g_NioRemoveStackDataEntryPtr(data, dataEntryCount - 1);
+    }
+    return _popDiscard ? FF_FAIL : FF_SUCCESS;
+#endif // NIO_POP
+#if NIO_PEEK
+    // Blit result back to OpenGL output texture.
+    {
+      int dataEntryCount = g_NioGetStackDataEntryCountPtr(data);
+      if (dataEntryCount <= 0) {
+        return FF_FAIL;
+      }
+      int readIndex = std::max(0, std::min(dataEntryCount - 1, dataEntryCount - 1 - _peekOffset));
+      if (readIndex < 0 || readIndex >= dataEntryCount) {
+        return FF_FAIL;
+      }
+      NioStackEntry* entry = g_NioGetStackDataEntryPtr(data, readIndex);
+
       auto& shader = g_pipeline->GetBlitFromRectShader();
       ScopedShaderBinding shaderBinding(shader.GetGLID());
       ScopedSamplerActivation activateSampler(0);
@@ -374,8 +418,6 @@ public:
       FFGLTexCoords maxCoords = GetMaxGLTexCoordsRect(*pGL->inputTextures[0]);
       shader.Set("MaxUV", maxCoords.s, maxCoords.t);
       g_pipeline->GetFullViewportQuad().Draw();
-
-      g_NioRemoveStackDataEntryPtr(data, dataEntryCount - 1);
     }
     return FF_SUCCESS;
 #endif // NIO_POP
@@ -421,10 +463,32 @@ public:
   }
 
   virtual FFResult SetFloatParameter(uint index, float value) override {
+#if NIO_POP
+    if (index == 0) {
+      _popDiscard = ((int)std::round(value)) != 0;
+      return FF_SUCCESS;
+    }
+#endif // NIO_POP
+#if NIO_PEEK
+    if (index == 0) {
+      _peekOffset = (int)std::round(value);
+      return FF_SUCCESS;
+    }
+#endif // NIO_PEEK
     return FF_FAIL;
   }
 
   virtual float GetFloatParameter(uint index) override {
+#if NIO_POP
+    if (index == 0) {
+      return _popDiscard ? 1.0f : 0.0f;
+    }
+#endif // NIO_POP
+#if NIO_PEEK
+    if (index == 0) {
+      return _peekOffset;
+    }
+#endif // NIO_PEEK
     return 0.0f;
   }
 
@@ -539,6 +603,13 @@ private:
 #if NIO_TRACKS_ZOMBIE_TEXTURES
   std::unordered_map<void*, int> _lastSeenFrameCounts;
 #endif // NIO_TRACKS_ZOMBIE_TEXTURES
+
+#if NIO_POP
+  bool _popDiscard = false;
+#endif // NIO_POP
+#if NIO_PEEK
+  int _peekOffset = 0;
+#endif // NIO_PEEK
 
 #if NIO_USES_SYPHON
   int _syphonSurfaceWidth = 0;

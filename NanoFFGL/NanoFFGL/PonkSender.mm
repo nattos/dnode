@@ -98,7 +98,7 @@ void pushMetaData(std::vector<unsigned char>& fullData, const char (&eightCC)[9]
 
 int PONKSender::draw(const std::vector<std::vector<PonkSenderPoint>>& lines, int intensity) {
     vector_float2 origin = 0;
-    float normalised_scale = 2.0f;
+    float normalised_scale = 1.0f;
 
     std::vector<unsigned char> fullData;
     fullData.reserve(65536);
@@ -120,13 +120,13 @@ int PONKSender::draw(const std::vector<std::vector<PonkSenderPoint>>& lines, int
             vector_int4 networkColor = simd_max(vector_int4(0), simd_min(vector_int4(0xFF), vector_int4(color * 0x100)));
             push32bits(fullData, networkPoint.x);
             // Push Y - LSB first
-            push32bits(fullData, networkPoint.y);
+            push32bits(fullData, -networkPoint.y);
             // Push R - LSB first
-            push8bits(fullData, networkColor.x);
+            push8bits(fullData, std::max(0, std::min(0xFF, (int)(color.x * 0x100))));//networkColor.x);
             // Push G - LSB first
-            push8bits(fullData, networkColor.y);
+            push8bits(fullData, std::max(0, std::min(0xFF, (int)(color.y * 0x100))));//networkColor.y);
             // Push B - LSB first
-            push8bits(fullData, networkColor.b);
+            push8bits(fullData, std::max(0, std::min(0xFF, (int)(color.x * 0x100))));//networkColor.z);
             points++;
         }
     }

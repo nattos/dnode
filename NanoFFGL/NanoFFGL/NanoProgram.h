@@ -13,7 +13,7 @@ struct BlitOutputTextureResources {
 
 class NanoProgram {
 private:
-  static constexpr int PonkMaxPaths = 16;
+  static constexpr int PonkMaxPaths = 128;
 public:
   enum class ParameterType {
     Float,
@@ -84,7 +84,7 @@ public:
   double GetFrameDeltaTime() const { return _frameDeltaTime; }
   
   void SetPonkOutput(bool ponkEnabled, const std::string& ponkDestination);
-  void DoPonkOutput(id<MTLBuffer> counterBuffer, id<MTLBuffer> pathPointsBuffer, id<MTLBuffer> pathIndexBuffer);
+  void DoPonkOutput(id<MTLBuffer> counterBuffer, id<MTLBuffer> pathPointsBuffer, id<MTLBuffer> pathColorsBuffer, id<MTLBuffer> pathIndexBuffer);
 
   static void SetCurrentInstance(NanoProgram* ptr);
   static NanoProgram* GetCurrentInstance();
@@ -92,9 +92,12 @@ public:
 protected:
   virtual void Execute() = 0;
   virtual void CreatePipelines() = 0;
+  virtual NSBundle* GetThisBundle() = 0;
 
   id<MTLTexture> ResizeTexture(id<MTLTexture> originalTexture, int width, int height, MTLPixelFormat format);
   static void ResizeSharedTexture(std::unique_ptr<NanoSharedTexture>& ptr, id<MTLDevice> device, int32_t width, int32_t height);
+
+  id<MTLTexture> GetTextureFromStack(int offset);
 
 private:
   id<MTLDevice> _device;
@@ -118,6 +121,7 @@ private:
   id<MTLCommandBuffer> _ponkSyncToCpuCommandBuffer = nullptr;
   id<MTLBuffer> _ponkCounterBuffer = nullptr;
   id<MTLBuffer> _ponkPathPointBuffer = nullptr;
+  id<MTLBuffer> _ponkPathColorsBuffer = nullptr;
   id<MTLBuffer> _ponkPathIndexBuffer = nullptr;
   std::string _ponkSenderDestination;
   std::unique_ptr<PONKSender> _ponkSender;

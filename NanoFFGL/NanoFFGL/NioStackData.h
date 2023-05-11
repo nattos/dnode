@@ -3,11 +3,14 @@
 
 #include <vector>
 
+@protocol MTLTexture;
+
 struct NioStackEntry {
   void* Source;
   int LastFrameNumber;
   NSObject* TextureRef;
   uint32_t OpenGLTexture;
+  id<MTLTexture> MetalTexture;
 };
 
 typedef void* NioStackDataHandle;

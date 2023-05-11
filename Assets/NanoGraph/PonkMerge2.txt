@@ -1,0 +1,62 @@
+
+
+
+
+auto outCounter = output0;
+auto outPoint = output1;
+auto outColor = output2;
+auto outIndex = output3;
+
+int nextWriteIndex = 0;
+int indexOffset = 0;
+int maxIndex = 0;
+{
+  auto counter = Counter0;
+  auto points = Points0;
+  auto colors = Colors0;
+  auto indexes = Indexes0;
+  int count = counter[0];
+
+  for (int i = 0; i < count; ++i) {
+    float2 point = points[i];
+    float4 color = colors[i];
+    int index = indexes[i];
+    int actualIndex = index + indexOffset;
+    maxIndex = max(maxIndex, actualIndex);
+    int writeIndex = nextWriteIndex++;
+    outPoint[writeIndex] = point;
+    outColor[writeIndex] = color;
+    outIndex[writeIndex] = actualIndex;
+  }
+  indexOffset = maxIndex + 1;
+}
+{
+  auto counter = Counter1;
+  auto points = Points1;
+  auto colors = Colors1;
+  auto indexes = Indexes1;
+  int count = counter[0];
+
+  for (int i = 0; i < count; ++i) {
+    float2 point = points[i];
+    float4 color = colors[i];
+    int index = indexes[i];
+    int actualIndex = index + indexOffset;
+    maxIndex = max(maxIndex, actualIndex);
+    int writeIndex = nextWriteIndex++;
+    outPoint[writeIndex] = point;
+    outColor[writeIndex] = color;
+    outIndex[writeIndex] = actualIndex;
+  }
+  indexOffset = maxIndex + 1;
+}
+
+
+outCounter[0] = nextWriteIndex;
+
+
+
+placeholder = nextWriteIndex;
+
+
+
