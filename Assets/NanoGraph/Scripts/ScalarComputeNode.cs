@@ -166,11 +166,14 @@ namespace NanoGraph {
             continue;
           }
           var fieldName = resultType.GetField(field.Name);
+          // if (field.Type.IsArray) {
+          //   validateCacheFunction.AddStatement($"CopyCpuFrom({cachedResult.Identifier}.{fieldName}, ({funcResultLocal}.{fieldName}));");
+          // } else {
+          validateCacheFunction.AddStatement($"{cachedResult.Identifier}.{fieldName} = {funcResultLocal}.{fieldName};");
           if (field.Type.IsArray) {
-            validateCacheFunction.AddStatement($"CopyCpuFrom({cachedResult.Identifier}.{fieldName}, ({funcResultLocal}.{fieldName}));");
-          } else {
-            validateCacheFunction.AddStatement($"{cachedResult.Identifier}.{fieldName} = {funcResultLocal}.{fieldName};");
+            validateCacheFunction.AddStatement($"{funcResultLocal}.{fieldName}->MarkCpuBufferChanged();");
           }
+          // }
         }
       }
     }

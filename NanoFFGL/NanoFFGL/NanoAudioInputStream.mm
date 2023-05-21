@@ -151,6 +151,15 @@ void NanoAudioInputStream::ProcessSamples(
   const auto& inputBuffer = inInputData->mBuffers[0];
   if (_formatIsFloat) {
     switch (_formatBitsPerChannel) {
+      case 32:
+        DecimateSamplesToBuffer<float>(inputBuffer);
+        break;
+      case 64:
+        DecimateSamplesToBuffer<double>(inputBuffer);
+        break;
+    }
+  } else {
+    switch (_formatBitsPerChannel) {
       case 8:
         DecimateSamplesToBuffer<int8_t>(inputBuffer);
         break;
@@ -160,15 +169,6 @@ void NanoAudioInputStream::ProcessSamples(
       // TODO: 24bits :(
       case 32:
         DecimateSamplesToBuffer<int32_t>(inputBuffer);
-        break;
-    }
-  } else {
-    switch (_formatBitsPerChannel) {
-      case 32:
-        DecimateSamplesToBuffer<float>(inputBuffer);
-        break;
-      case 64:
-        DecimateSamplesToBuffer<double>(inputBuffer);
         break;
     }
   }
@@ -198,10 +198,12 @@ template<typename T> void NanoAudioInputStream::DecimateSamplesToBuffer(const Au
   float lastSample = ConvertSample(samples[(sampleCount - 1) * channels]);
 
   int writeCount = (sampleCount - _decimateIndex) / _decimateRate;
+  int writePos = _bufferWritePos;
   for (int i = 0; i < writeCount; ++i) {
-    _buffer[(_bufferWritePos++) & (BufferLength - 1)] = ConvertSample(samples[(i * _decimateRate + _decimateIndex) * channels]);
+    _buffer[(writePos++) & (BufferLength - 1)] = ConvertSample(samples[(i * _decimateRate + _decimateIndex) * channels]);
   }
+  _bufferWritePos = writePos & (BufferLength - 1);
 
   _decimateIndex = (_decimateIndex + (sampleCount % _decimateRate)) % _decimateRate;
-  NSLog(@"Received sampleCount: %d firstSample: %f lastSample: %f _buffer[0]: %f _decimateIndex: %d writeCount: %d", sampleCount, firstSample, lastSample, _buffer[0], _decimateIndex, writeCount);
+//  NSLog(@"Received sampleCount: %d firstSample: %f lastSample: %f _buffer[0]: %f _decimateIndex: %d writeCount: %d", sampleCount, firstSample, lastSample, _buffer[0], _decimateIndex, writeCount);
 }

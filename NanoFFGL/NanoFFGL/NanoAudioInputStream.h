@@ -4,12 +4,18 @@
 
 class NanoAudioInputStream {
   static constexpr int TargetSampleRate = 44100;
-  static constexpr int BufferLength = 1024 * 16;
+  static constexpr int BufferLength = 1024 * 64;
 
 public:
   ~NanoAudioInputStream();
   void Start();
   void Stop();
+  
+  const float* GetBuffer() const { return _buffer; }
+  float* GetBuffer() { return _buffer; }
+  int GetBufferLength() const { return BufferLength; }
+  float GetSampleRate() const { return _sampleRate; }
+  int GetBufferNextWriteIndex() const { return _bufferWritePos; }
 
 private:
   void ProcessSamples(

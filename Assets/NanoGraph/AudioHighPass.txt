@@ -1,0 +1,34 @@
+
+constexpr float Pi = 3.1415926535897932384626433832795;
+const float Tau = Frequency / SampleRate * Pi * 2;
+const float Alpha = 1 / (1 + Tau);
+
+int bufferLength = GetLength(Samples);
+
+if (!InBuffer || GetLength(InBuffer) != bufferLength) {
+  InBuffer.reset(NanoTypedBuffer<float>::Allocate(bufferLength));
+  InReadPos = 0;
+  InHistory = 0;
+}
+
+int readLength = (InWritePos - InReadPos + bufferLength) % bufferLength;
+
+float x = InHistory.x;
+float acc = InHistory.y;
+for (int i = 0; i < readLength; ++i) {
+  int readPos = (InReadPos++) % bufferLength;
+  float sample = (*Samples)[readPos];
+
+  float output = Alpha * (acc + sample - x);
+  acc = output;
+  x = sample;
+
+  (*InBuffer)[readPos] = output;
+}
+x = std::max(-1.0f, std::min(1.0f, x));
+acc = std::max(-1.0f, std::min(1.0f, acc));
+InReadPos = InReadPos % bufferLength;
+
+OutBuffer = InBuffer;
+OutReadPos = InReadPos;
+OutHistory = vector_float2 { x, acc };

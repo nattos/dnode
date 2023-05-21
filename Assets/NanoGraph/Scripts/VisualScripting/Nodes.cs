@@ -739,6 +739,7 @@ namespace NanoGraph.VisualScripting {
   public class TextureIn : NodeOfType<TextureInputNode>{}
   public class NioTextureIn : NodeOfType<NioTextureInputNode>{}
   public class PonkOutput : NodeOfType<PonkOutputNode>{}
+  public class AudioInput : NodeOfType<AudioInputNode>{}
 
   public class TypeDecl : NodeOfType<TypeDeclNode>{}
 

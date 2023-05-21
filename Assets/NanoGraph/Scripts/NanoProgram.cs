@@ -489,6 +489,7 @@ namespace NanoGraph {
     private readonly Dictionary<NanoProgramType, NanoProgramType> _arrayTypesByElementType = new Dictionary<NanoProgramType, NanoProgramType>();
     private readonly List<NanoFunction> _functions = new List<NanoFunction>();
     private readonly List<string> _preambleStatements = new List<string>();
+    private readonly List<string> _customIncludes = new List<string>();
 
     private readonly List<string> _fields = new List<string>();
     private readonly List<string> _fieldsCode = new List<string>();
@@ -587,6 +588,13 @@ namespace NanoGraph {
 
     public void AddPreambleStatement(string line) {
       _preambleStatements.Add(line);
+    }
+
+    public void AddCustomInclude(string include) {
+      if (_customIncludes.Contains(include)) {
+        return;
+      }
+      _customIncludes.Add(include);
     }
 
     public NanoFunction AddOverrideFunction(string name, INanoCodeContext context, NanoProgramType returnType, string[] modifiers = null) {
@@ -734,6 +742,9 @@ namespace NanoGraph {
     public string OuterCpuCode {
       get {
         StringBuilder output = new StringBuilder();
+        foreach (string include in _customIncludes) {
+          output.AppendLine($"#include \"{include}\"");
+        }
         foreach (string line in _preambleStatements) {
           output.AppendLine(line);
         }

@@ -1,0 +1,35 @@
+
+constexpr float Pi = 3.1415926535897932384626433832795;
+constexpr float Decay = 0.999f;
+float Normalization = 1.0f / Length;
+
+int bufferLength = GetLength(Samples);
+
+if (!InBuffer || GetLength(InBuffer) != bufferLength) {
+  InBuffer.reset(NanoTypedBuffer<float>::Allocate(bufferLength));
+  InReadPos = 0;
+  InHistory = 0;
+}
+
+int readLength = (InWritePos - InReadPos + bufferLength) % bufferLength;
+
+float x = InHistory.x;
+float acc = InHistory.y;
+for (int i = 0; i < readLength; ++i) {
+  int readPos = (InReadPos++) % bufferLength;
+  int oldReadPos = (readPos - Length + bufferLength) % bufferLength;
+  float sample = (*Samples)[readPos];
+  float oldSample = (*Samples)[oldReadPos];
+
+  acc += (sample * sample - oldSample * oldSample);
+  acc = std::max(0.0f, acc * Decay);
+
+  (*InBuffer)[readPos] = std::sqrt(acc * Normalization);
+}
+x = std::max(-1.0f, std::min(1.0f, x));
+acc = std::max(-128.0f, std::min(128.0f, acc));
+InReadPos = InReadPos % bufferLength;
+
+OutBuffer = InBuffer;
+OutReadPos = InReadPos;
+OutHistory = vector_float2 { x, acc };

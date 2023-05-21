@@ -250,7 +250,9 @@ namespace NanoGraph {
             DataPlug bufferRefPlug = new DataPlug { Node = computeNode, FieldName = bufferedField.Name };
             if (bufferRefTokens.TryGetValue((bufferRefPlug, false), out CodeCachedResult bufferedResult)) {
               string referencedResultExpr = bufferedResult.Result.Identifier;
-              string fieldName = bufferedResult.ResultType.GetField(bufferedField.Name);
+              // TODO: ???
+              // string fieldName = bufferedResult.ResultType.GetField(bufferedField.Name);
+              string fieldName = bufferedResult.ResultType.GetField("Out");
               _bufferRefCopyStatements.Add($"{referencedResultExpr}.{fieldName} = {bufferedResultIdentifier}.{bufferedFieldName};");
             } else {
               if (bufferedField.Type.IsArray) {

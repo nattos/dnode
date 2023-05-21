@@ -1,0 +1,43 @@
+
+constexpr float Pi = 3.1415926535897932384626433832795;
+const float AngularFrequencyFraction = Frequency / SampleRate;
+const float AngularFrequency = AngularFrequencyFraction * Pi * 2;
+const float AngularFrequencySqrt = std::sqrt(AngularFrequency);
+const float Gain = 2.0f * std::atan(AngularFrequency) * AngularFrequencyFraction;// * AngularFrequency;
+
+
+int bufferLength = GetLength(Samples);
+
+if (!InBuffer || GetLength(InBuffer) != bufferLength) {
+  InBuffer.reset(NanoTypedBuffer<float>::Allocate(bufferLength));
+  InReadPos = 0;
+  InHistory = 0;
+}
+
+int readLength = (InWritePos - InReadPos + bufferLength) % bufferLength;
+
+float x = InHistory.x;
+float xx = InHistory.y;
+for (int i = 0; i < readLength; ++i) {
+  int readPos = (InReadPos++) % bufferLength;
+  float sample = (*Samples)[readPos];
+
+  float xxx = sample * Gain - AngularFrequency * AngularFrequency * x - 2 * Quality * AngularFrequency * xx;
+  // xx = std::max(-1.0f, std::min(1.0f, xx + xxx * DeltaTime));
+  // x = std::max(-1.0f, std::min(1.0f, x + xx * DeltaTime));
+  xx += xxx;
+  x += xx;
+
+  float xxd = xx / AngularFrequency;
+  (*InBuffer)[readPos] = std::sqrt(x * x + xxd * xxd);
+  // (*InBuffer)[readPos] = std::sqrt(x * x);
+  // (*InBuffer)[readPos] = std::sqrt(xxd * xxd);
+  // (*InBuffer)[readPos] = x;
+}
+xx = std::max(-1.0f, std::min(1.0f, xx));
+x = std::max(-1.0f, std::min(1.0f, x));
+InReadPos = InReadPos % bufferLength;
+
+OutBuffer = InBuffer;
+OutReadPos = InReadPos;
+OutHistory = vector_float2 { x, xx };

@@ -1,0 +1,25 @@
+
+constexpr float Pi = 3.1415926535897932384626433832795;
+
+int inBufferLength = GetLength(Samples);
+int bufferLength = std::max(1, (int)std::ceil(SampleRate * LengthSeconds));
+
+if (!InBuffer || GetLength(InBuffer) != bufferLength) {
+  InBuffer.reset(NanoTypedBuffer<float>::Allocate(bufferLength));
+  InReadPos = 0;
+  InBufferWritePos = 0;
+}
+
+int readLength = (InWritePos - InReadPos + inBufferLength) % inBufferLength;
+
+for (int i = 0; i < readLength; ++i) {
+  int readPos = (InReadPos++) % inBufferLength;
+  int writePos = (InBufferWritePos++) % bufferLength;
+  (*InBuffer)[writePos] = (*Samples)[readPos];
+}
+InReadPos = InReadPos % inBufferLength;
+InBufferWritePos = InBufferWritePos % bufferLength;
+
+OutBuffer = InBuffer;
+OutReadPos = InReadPos;
+OutBufferWritePos = InBufferWritePos;

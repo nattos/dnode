@@ -9,9 +9,6 @@ namespace NanoGraph {
   public class ReadBufferRefNode : ScalarComputeNode {
     protected override string ShortNamePart => $"ReadBufferRef";
 
-    [EditableAttribute]
-    public bool IsGpuContext = false;
-
     public override DataSpec InputSpec => DataSpec.FromFields(new DataField { Name = "BufferRef", IsCompileTimeOnly = true, Type = TypeSpec.MakePrimitive(PrimitiveType.BufferRef) });
 
     public override IComputeNodeEmitCodeOperation CreateEmitCodeOperation(ComputeNodeEmitCodeOperationContext context) => new EmitterInput(this, context);

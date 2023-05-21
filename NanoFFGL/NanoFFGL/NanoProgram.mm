@@ -17,10 +17,11 @@ public:
   NanoBuffer(int elementSize)
       : ElementSize(elementSize) {
   }
-  NanoBuffer(void* buffer, int byteCount)
-      : ElementSize(byteCount)
+  NanoBuffer(void* buffer, int byteCount, int elementSize)
+      : ElementSize(elementSize)
       , _noCopyCpuBuffer(buffer)
-      , _hasCpuBuffer(true) {
+      , _hasCpuBuffer(true)
+      , _elementCount(byteCount / elementSize) {
   }
 
   int GetByteLength() const { return ElementSize; }
@@ -109,7 +110,7 @@ public:
     id<MTLDevice> device = NanoProgramGetCurrentMTLDevice();
     int length = _elementCount * ElementSize;
     if (length > 0) {
-      id<MTLBuffer> tmpSharedBuffer = [device newBufferWithBytes:_cpuBuffer.data() length:length options:MTLResourceStorageModeShared];
+      id<MTLBuffer> tmpSharedBuffer = [device newBufferWithBytes:GetCpuBuffer() length:length options:MTLResourceStorageModeShared];
 
       id<MTLCommandBuffer> commandBuffer = NanoProgramGetCurrentCurrentMTLCommandBuffer();
       id<MTLBlitCommandEncoder> encoder = [commandBuffer blitCommandEncoder];
@@ -160,6 +161,7 @@ template<typename T>
 class NanoTypedBuffer : public NanoBuffer {
 public:
   NanoTypedBuffer() : NanoBuffer(sizeof(T)) {}
+  NanoTypedBuffer(T* buffer, int elementCount) : NanoBuffer(buffer, elementCount * sizeof(T), sizeof(T)) {}
 
   static NanoTypedBuffer<T>* Allocate(int length) {
     NanoTypedBuffer<T>* buffer = new NanoTypedBuffer<T>();
